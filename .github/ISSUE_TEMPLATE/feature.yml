@@ -1,0 +1,42 @@
+name: Feature request
+description: Something Editbay should be able to do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Editbay deliberately does one job: a long recording in, a short video out. A request
+        that fits that job has a much better chance than one that makes it a general purpose
+        editor.
+
+        `docs/ideas-95.md` holds about ninety ideas already gathered, with a note at the top
+        saying which are still open. Worth a look first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: |
+        Describe the editing job, not the feature. "I cut one recording into five shorts and
+        have to set the same crop five times" tells us more than "add a copy crop button",
+        and often there is already a way.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you think would fix it
+      description: If you have a shape in mind, describe it. Skip this if you do not.
+    validations:
+      required: false
+
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: Where have you seen this done well
+      description: |
+        Naming a tool that does it right, and what specifically it gets right, is the single
+        most useful thing you can add here.
+    validations:
+      required: false

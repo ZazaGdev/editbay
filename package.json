@@ -1,0 +1,58 @@
+{
+  "name": "editbay",
+  "version": "1.0.0",
+  "description": "A free, local video editor: multi-track timeline, layers, sound and captions",
+  "author": {
+    "name": "Zaza Gejadze",
+    "email": "zazagdev@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZazaGdev/editbay.git"
+  },
+  "homepage": "https://github.com/ZazaGdev/editbay",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "postinstall": "node scripts/fetch-ffmpeg.mjs",
+    "dev": "electron-vite dev",
+    "build": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run --dir test/unit",
+    "test:relevant": "node scripts/test-relevant.mjs",
+    "test:watch": "vitest --dir test/unit",
+    "test:e2e": "vitest run --dir test/e2e",
+    "test:smoke": "vitest run --dir test/smoke",
+    "test:all": "vitest run --dir test/unit && vitest run --dir test/e2e && vitest run --dir test/smoke && npm run test:ui",
+    "test:ui": "electron-vite build && vitest run --dir test/ui --no-file-parallelism",
+    "dist": "electron-vite build && electron-builder --win --publish never",
+    "dist:dir": "electron-vite build && electron-builder --win --dir --publish never",
+    "dist:test": "electron-vite build && electron-builder --win --dir --publish never --config electron-builder.test.yml",
+    "test:packaged": "vitest run test/ui/packaged.test.ts",
+    "cli:build": "node scripts/build-cli.mjs",
+    "cli": "node out/cli/editbay-cli.cjs"
+  },
+  "devDependencies": {
+    "@electron/asar": "^3.4.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "esbuild": "^0.25.12",
+    "lucide-react": "^1.47.0",
+    "onnxruntime-node": "^1.30.0",
+    "playwright-core": "^1.63.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^7.0.0",
+    "vitest": "^5.0.1"
+  }
+}

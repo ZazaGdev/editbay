@@ -1,0 +1,189 @@
+{
+  "_": "Open-source check hits a person has looked at and found fine (plan 103). By file, and by the exact text matched where there is one; a file with no match is accepted whole. Add to it only after checking the hit.",
+  "accepted": [
+    {
+      "file": "resources/licences/ONNXRuntime-ThirdPartyNotices.txt",
+      "why": "third-party licence text: its authors' names, emails and ordinary words"
+    },
+    {
+      "file": "resources/licences/FFmpeg-GPLv3.txt",
+      "why": "the GPL text"
+    },
+    {
+      "file": "resources/licences/YuNet-MIT.txt",
+      "why": "third-party licence text with its author's email"
+    },
+    {
+      "file": "package-lock.json",
+      "why": "package authors' emails"
+    },
+    {
+      "file": "scripts/public-accepted.json",
+      "why": "this list, which quotes what it accepts"
+    },
+    {
+      "file": "docs/tutorials/032-choose-inspector-sections.md",
+      "why": "named like a private doc only because 'inspector' holds 'spec'"
+    },
+    {
+      "file": "CODE_OF_CONDUCT.md",
+      "match": "personal",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "CODE_OF_CONDUCT.md",
+      "match": "zazagdev@gmail.com",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "LICENSE",
+      "match": "Zaza Gejadze",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "THIRD-PARTY-NOTICES.md",
+      "match": "zazagdev@gmail.com",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "package.json",
+      "match": "Zaza Gejadze",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "package.json",
+      "match": "zazagdev@gmail.com",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "resources/licences/Editbay-MIT.txt",
+      "match": "Zaza Gejadze",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "resources/licences/README.txt",
+      "match": "zazagdev@gmail.com",
+      "why": "the public author name and email"
+    },
+    {
+      "file": "scripts/publish-public.d.mts",
+      "match": "personal",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "scripts/publish-public.mjs",
+      "match": "personal",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "src/main/media/vfr.ts",
+      "match": "presentation",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "src/renderer/preview/pictureStart.ts",
+      "match": "presentation",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "src/shared/free-packs.ts",
+      "match": "personal",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "test/unit/clip-name.test.ts",
+      "match": "/home/x/",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/file-url.test.ts",
+      "match": "/home/x/",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/file-url.test.ts",
+      "match": "/Users/X/",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/file-url.test.ts",
+      "match": "C:/Users/X",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/file-url.test.ts",
+      "match": "C:\\\\Users\\\\X\\\\Videos\\\\Screen",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/filename.test.ts",
+      "match": "/home/x/",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/obs-folder.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\AppData\\\\Roaming",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/obs-folder.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\Videos",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/project-file.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\AppData\\\\Roaming\\\\Editbay\\\\media-cache\\\\${id}`",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/project-file.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\Videos\\\\a.mov",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/project-file.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\Videos\\\\holiday.editbay",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/publish-public.test.ts",
+      "match": "personal",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "test/unit/publish-public.test.ts",
+      "match": "someone@example.com",
+      "why": "an example address in a test"
+    },
+    {
+      "file": "test/unit/publish-public.test.ts",
+      "match": "test@example.com",
+      "why": "an example address in a test"
+    },
+    {
+      "file": "test/unit/renderer/fake-player.ts",
+      "match": "presentation",
+      "why": "an ordinary word that is also the name of another folder"
+    },
+    {
+      "file": "test/unit/source-paths.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\AppData\\\\Roaming\\\\Microsoft\\\\Windows\\\\Start",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/store.test.ts",
+      "match": "C:\\\\Users\\\\me\\\\AppData\\\\Roaming\\\\Microsoft\\\\Windows\\\\Start",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/voiceover.test.ts",
+      "match": "/home/x/",
+      "why": "a made-up path in a test"
+    },
+    {
+      "file": "test/unit/voiceover.test.ts",
+      "match": "C:\\\\Users\\\\X\\\\Documents",
+      "why": "a made-up path in a test"
+    }
+  ]
+}

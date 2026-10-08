@@ -1,0 +1,90 @@
+name: Bug report
+description: Something in Editbay does not work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most bugs in a video editor come down to the footage. The questions below about your
+        source file are not box ticking: they are usually the whole answer.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I dragged a clip's left edge to trim it and the sound stayed where it was.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Editbay version
+      description: Shown in the window title bar, or the version of the installer you ran.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: How are you running it
+      options:
+        - The installer from Releases
+        - Built from source with npm run dist
+        - npm run dev
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: "Settings, System, About. For example: Windows 11 Pro 24H2"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: "### About the footage"
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where did the recording come from
+      options:
+        - OBS
+        - Windows Game Bar
+        - A phone
+        - A camera
+        - Downloaded
+        - Something else, described below
+        - No footage involved
+    validations:
+      required: true
+
+  - type: textarea
+    id: ffprobe
+    attributes:
+      label: What the file is
+      description: |
+        The container, codec, resolution and frame rate. If you have ffprobe, the fastest way
+        is to paste the first few lines of `ffprobe yourfile.mp4`. If the frame rate is
+        variable, say so, because that is behind a large share of timing bugs.
+      render: text
+      placeholder: |
+        Input #0, matroska,webm, from 'recording.mkv':
+          Stream #0:0: Video: h264, yuv420p, 2560x1440, 60 fps, 60 tbr
+          Stream #0:1: Audio: aac, 48000 Hz, stereo
+    validations:
+      required: false
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      description: Screenshots, a screen capture, or an export that came out wrong. Drag files in.
+    validations:
+      required: false

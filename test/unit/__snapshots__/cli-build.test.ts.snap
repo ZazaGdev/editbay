@@ -1,0 +1,694 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a half of a side-by-side recording > writes the same file every time 1`] = `
+"{
+  "schemaVersion": 10,
+  "name": "obs cut",
+  "fps": 30,
+  "media": [
+    {
+      "id": "obs",
+      "originalPath": "D:\\\\OBS\\\\obs.mkv",
+      "playablePath": "",
+      "conformed": true,
+      "conformReasons": [],
+      "durationSec": 60,
+      "width": 3840,
+      "height": 1080,
+      "fps": 60,
+      "codec": "h264",
+      "hasAudio": true,
+      "peaksPath": "",
+      "filmstripPath": "",
+      "audioTracks": 6
+    },
+    {
+      "id": "cam",
+      "originalPath": "D:\\\\OBS\\\\obs.mkv",
+      "playablePath": "",
+      "conformed": true,
+      "conformReasons": [],
+      "durationSec": 60,
+      "width": 3840,
+      "height": 1080,
+      "fps": 60,
+      "codec": "h264",
+      "hasAudio": true,
+      "peaksPath": "",
+      "filmstripPath": "",
+      "audioTracks": 6
+    }
+  ],
+  "sequences": [
+    {
+      "id": "sequence-1",
+      "name": "Landscape",
+      "nameFollowsShape": true,
+      "presetId": "landscape",
+      "output": {
+        "width": 1920,
+        "height": 1080
+      },
+      "videoTracks": [
+        {
+          "id": "v1",
+          "clips": [
+            {
+              "id": "id-1",
+              "mediaId": "obs",
+              "sourceIn": 0,
+              "sourceOut": 300,
+              "timelineStart": 0,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "keys": [
+                  {
+                    "at": 599,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    },
+                    "ease": "hold"
+                  }
+                ]
+              },
+              "layers": [],
+              "layout": "single",
+              "link": "id-3"
+            },
+            {
+              "id": "id-9",
+              "mediaId": "obs",
+              "sourceIn": 360,
+              "sourceOut": 1800,
+              "timelineStart": 300,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "keys": [
+                  {
+                    "at": 599,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    },
+                    "ease": "hold"
+                  },
+                  {
+                    "at": 600,
+                    "crop": {
+                      "x": 960,
+                      "y": 0,
+                      "w": 960,
+                      "h": 540
+                    },
+                    "ease": "hold"
+                  },
+                  {
+                    "at": 750,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    }
+                  }
+                ]
+              },
+              "layers": [],
+              "layout": "single",
+              "link": "id-8"
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "clips": [
+            {
+              "id": "id-2",
+              "mediaId": "cam",
+              "sourceIn": 0,
+              "sourceOut": 300,
+              "timelineStart": 0,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 1920,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0.6666666666666666,
+                  "y": 0.6666666666666666,
+                  "w": 0.3333333333333333,
+                  "h": 0.3333333333333333
+                }
+              },
+              "layers": [],
+              "layout": "custom",
+              "link": "id-3"
+            },
+            {
+              "id": "id-10",
+              "mediaId": "cam",
+              "sourceIn": 360,
+              "sourceOut": 1800,
+              "timelineStart": 300,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 1920,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0.6666666666666666,
+                  "y": 0.6666666666666666,
+                  "w": 0.3333333333333333,
+                  "h": 0.3333333333333333
+                }
+              },
+              "layers": [],
+              "layout": "custom",
+              "link": "id-8"
+            }
+          ]
+        }
+      ],
+      "audioTracks": [
+        {
+          "id": "a1",
+          "clips": [
+            {
+              "id": "id-1.1",
+              "mediaId": "obs",
+              "track": 0,
+              "sourceIn": 0,
+              "sourceOut": 300,
+              "timelineStart": 0,
+              "gain": 1,
+              "muted": false,
+              "link": "id-3"
+            },
+            {
+              "id": "id-11",
+              "mediaId": "obs",
+              "track": 0,
+              "sourceIn": 360,
+              "sourceOut": 1800,
+              "timelineStart": 300,
+              "gain": 1,
+              "muted": false,
+              "link": "id-8"
+            }
+          ]
+        }
+      ],
+      "captions": {
+        "clips": [],
+        "style": {
+          "size": 0.07,
+          "height": 0.65,
+          "across": 0.5,
+          "wordsPerCaption": 3,
+          "capitals": true,
+          "highlight": "#FFD400",
+          "font": "montserrat",
+          "wordColour": "#FFFFFF",
+          "outline": 0.08,
+          "outlineColour": "#000000",
+          "shadow": 0,
+          "shadowColour": "#000000",
+          "spacing": 0,
+          "box": false,
+          "boxColour": "#000000",
+          "boxOpacity": 0.6,
+          "glow": 0,
+          "glowColour": "#FFD400",
+          "popGrow": false,
+          "popBox": false,
+          "popBoxColour": "#7C3AED"
+        },
+        "listenTo": [],
+        "edited": false
+      },
+      "markers": []
+    }
+  ],
+  "workspace": {
+    "activeSequenceId": "sequence-1",
+    "timelines": {},
+    "aspectLocked": true,
+    "trackSize": "small",
+    "monitorVolume": 1,
+    "export": {
+      "folder": null,
+      "mode": "join",
+      "filenamePattern": "{project}_{index}_{clip}",
+      "subtitleFile": false,
+      "transcriptFile": false,
+      "sharpen": false,
+      "fast": false,
+      "fileNames": {}
+    }
+  }
+}"
+`;
+
+exports[`a project made from an edit list > writes the same file every time 1`] = `
+"{
+  "schemaVersion": 10,
+  "name": "rough cut",
+  "fps": 30,
+  "media": [
+    {
+      "id": "screen",
+      "originalPath": "D:\\\\OBS\\\\screen.mkv",
+      "playablePath": "",
+      "conformed": true,
+      "conformReasons": [],
+      "durationSec": 60,
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "codec": "h264",
+      "hasAudio": true,
+      "peaksPath": "",
+      "filmstripPath": "",
+      "audioTracks": 2
+    },
+    {
+      "id": "camera",
+      "originalPath": "D:\\\\Phone\\\\camera.mp4",
+      "playablePath": "",
+      "conformed": true,
+      "conformReasons": [],
+      "durationSec": 70,
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "codec": "h264",
+      "hasAudio": true,
+      "peaksPath": "",
+      "filmstripPath": "",
+      "audioTracks": 1
+    }
+  ],
+  "sequences": [
+    {
+      "id": "sequence-1",
+      "name": "Landscape",
+      "nameFollowsShape": true,
+      "presetId": "landscape",
+      "output": {
+        "width": 1920,
+        "height": 1080
+      },
+      "videoTracks": [
+        {
+          "id": "v1",
+          "clips": [
+            {
+              "id": "id-1",
+              "mediaId": "screen",
+              "sourceIn": 0,
+              "sourceOut": 300,
+              "timelineStart": 0,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "keys": [
+                  {
+                    "at": 899,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    },
+                    "ease": "hold"
+                  }
+                ]
+              },
+              "layers": [],
+              "layout": "single",
+              "link": "id-3"
+            },
+            {
+              "id": "id-17",
+              "mediaId": "screen",
+              "sourceIn": 360,
+              "sourceOut": 600,
+              "timelineStart": 300,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "keys": [
+                  {
+                    "at": 899,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    },
+                    "ease": "hold"
+                  }
+                ]
+              },
+              "layers": [],
+              "layout": "single",
+              "link": "id-16"
+            },
+            {
+              "id": "id-13",
+              "mediaId": "screen",
+              "sourceIn": 750,
+              "sourceOut": 1500,
+              "timelineStart": 540,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1920,
+                  "h": 1080
+                },
+                "place": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1
+                },
+                "keys": [
+                  {
+                    "at": 899,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    },
+                    "ease": "hold"
+                  },
+                  {
+                    "at": 900,
+                    "crop": {
+                      "x": 960,
+                      "y": 0,
+                      "w": 960,
+                      "h": 540
+                    },
+                    "ease": "hold"
+                  },
+                  {
+                    "at": 1050,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    }
+                  },
+                  {
+                    "at": 1200,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    }
+                  },
+                  {
+                    "at": 1215,
+                    "crop": {
+                      "x": 480,
+                      "y": 270,
+                      "w": 960,
+                      "h": 540
+                    }
+                  },
+                  {
+                    "at": 1305,
+                    "crop": {
+                      "x": 480,
+                      "y": 270,
+                      "w": 960,
+                      "h": 540
+                    }
+                  },
+                  {
+                    "at": 1320,
+                    "crop": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 1920,
+                      "h": 1080
+                    }
+                  }
+                ]
+              },
+              "layers": [],
+              "layout": "single",
+              "link": "id-12"
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "clips": [
+            {
+              "id": "id-2",
+              "mediaId": "camera",
+              "sourceIn": 60,
+              "sourceOut": 360,
+              "timelineStart": 0,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1280,
+                  "h": 720
+                },
+                "place": {
+                  "x": 0.6666666666666666,
+                  "y": 0.6666666666666666,
+                  "w": 0.3333333333333333,
+                  "h": 0.3333333333333333
+                }
+              },
+              "layers": [],
+              "layout": "custom",
+              "link": "id-3"
+            },
+            {
+              "id": "id-18",
+              "mediaId": "camera",
+              "sourceIn": 420,
+              "sourceOut": 660,
+              "timelineStart": 300,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1280,
+                  "h": 720
+                },
+                "place": {
+                  "x": 0.6666666666666666,
+                  "y": 0.6666666666666666,
+                  "w": 0.3333333333333333,
+                  "h": 0.3333333333333333
+                }
+              },
+              "layers": [],
+              "layout": "custom",
+              "link": "id-16"
+            },
+            {
+              "id": "id-14",
+              "mediaId": "camera",
+              "sourceIn": 810,
+              "sourceOut": 1560,
+              "timelineStart": 540,
+              "transform": {
+                "mode": "crop",
+                "crop": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1280,
+                  "h": 720
+                },
+                "place": {
+                  "x": 0.6666666666666666,
+                  "y": 0.6666666666666666,
+                  "w": 0.3333333333333333,
+                  "h": 0.3333333333333333
+                }
+              },
+              "layers": [],
+              "layout": "custom",
+              "link": "id-12"
+            }
+          ]
+        }
+      ],
+      "audioTracks": [
+        {
+          "id": "a1",
+          "clips": [
+            {
+              "id": "id-1.1",
+              "mediaId": "screen",
+              "track": 0,
+              "sourceIn": 0,
+              "sourceOut": 300,
+              "timelineStart": 0,
+              "gain": 1,
+              "muted": false,
+              "link": "id-3"
+            },
+            {
+              "id": "id-19",
+              "mediaId": "screen",
+              "track": 0,
+              "sourceIn": 360,
+              "sourceOut": 600,
+              "timelineStart": 300,
+              "gain": 1,
+              "muted": false,
+              "link": "id-16"
+            },
+            {
+              "id": "id-15",
+              "mediaId": "screen",
+              "track": 0,
+              "sourceIn": 750,
+              "sourceOut": 1500,
+              "timelineStart": 540,
+              "gain": 1,
+              "muted": false,
+              "link": "id-12"
+            }
+          ]
+        }
+      ],
+      "captions": {
+        "clips": [],
+        "style": {
+          "size": 0.07,
+          "height": 0.65,
+          "across": 0.5,
+          "wordsPerCaption": 3,
+          "capitals": true,
+          "highlight": "#FFD400",
+          "font": "montserrat",
+          "wordColour": "#FFFFFF",
+          "outline": 0.08,
+          "outlineColour": "#000000",
+          "shadow": 0,
+          "shadowColour": "#000000",
+          "spacing": 0,
+          "box": false,
+          "boxColour": "#000000",
+          "boxOpacity": 0.6,
+          "glow": 0,
+          "glowColour": "#FFD400",
+          "popGrow": false,
+          "popBox": false,
+          "popBoxColour": "#7C3AED"
+        },
+        "listenTo": [],
+        "edited": false
+      },
+      "markers": [
+        {
+          "id": "id-20",
+          "frame": 540,
+          "name": "Retake: \\"so this is the, so this is\\""
+        },
+        {
+          "id": "id-21",
+          "frame": 690,
+          "name": "Zoom: the export button"
+        },
+        {
+          "id": "id-22",
+          "frame": 1140,
+          "name": "Check the ending"
+        }
+      ]
+    }
+  ],
+  "workspace": {
+    "activeSequenceId": "sequence-1",
+    "timelines": {},
+    "aspectLocked": true,
+    "trackSize": "small",
+    "monitorVolume": 1,
+    "export": {
+      "folder": null,
+      "mode": "join",
+      "filenamePattern": "{project}_{index}_{clip}",
+      "subtitleFile": false,
+      "transcriptFile": false,
+      "sharpen": false,
+      "fast": false,
+      "fileNames": {}
+    }
+  }
+}"
+`;

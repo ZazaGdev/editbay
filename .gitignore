@@ -1,0 +1,30 @@
+node_modules/
+out/
+dist/
+.vite/
+test/.fixtures/
+*.log
+*.tsbuildinfo
+test/smoke/media.local.txt
+release/
+release-test/
+.playwright-mcp/
+
+# Session reviews are working notes, not part of the project.
+.claude/reviews/
+
+# The working bug list and its screenshots. They become GitHub issues, not
+# part of the published repository.
+bugfixes.md
+bugfixes/
+bugfixes-2.md
+
+# Private drafts: the launch posts and the brainstormed ideas. Kept on disk, not published.
+docs/launch-posts.md
+docs/ideas-95.md
+
+# Local design previews from brainstorming sessions
+.superpowers/
+
+# ffmpeg and ffprobe, fetched by npm install (scripts/fetch-ffmpeg.mjs).
+vendor/

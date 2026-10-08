@@ -1,0 +1,804 @@
+/*
+ * What an inline style cannot say.
+ *
+ * Every value here comes from `theme.ts`, written onto the document by
+ * `applyTheme` before the first render, so this file holds no colour and no
+ * size of its own. It holds only what needs a selector: a hover, a press, a
+ * keyboard focus, a disabled control, and the transitions between them. Layout
+ * stays inline, where the components put it.
+ */
+
+/* ---------------------------------------------------------------- the page */
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--ink-primary);
+}
+
+/*
+ * A desktop app's panels are not a page to select. Text that was selected by
+ * a stray drag across labels, or the word a double click on a slider lands
+ * on, turned the next press on a control inside it into the browser dragging
+ * a see-through copy of the panel, and the control never moved. Only what is
+ * typed or worth copying can be selected: fields, and messages such as an
+ * error's details.
+ */
+body {
+  user-select: none;
+}
+
+input:not([type='range']):not([type='checkbox']):not([type='radio']),
+textarea,
+[contenteditable]:not([contenteditable='false']),
+pre,
+.ui-selectable {
+  user-select: text;
+}
+
+/* Dark, thin, and the same in every panel that scrolls. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-line-strong) transparent;
+}
+
+/*
+ * Windows turns animation off system-wide and Chromium passes that through, so
+ * a machine with it off gets no motion at all, which is correct.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* --------------------------------------------------------- the focus ring */
+
+/*
+ * Drawn with a shadow rather than an outline: several controls sit inside a
+ * parent with `overflow: hidden`, which clips an outline and would leave them
+ * with no ring at all. `:focus-visible` means a click never draws one.
+ *
+ * A field's ring goes on its box, not on the input inside it: the input is
+ * smaller than the box, so a ring on it reads as a second field within the
+ * first. A text input counts as keyboard focused after a click too, so a
+ * field shows its ring however it was reached.
+ */
+.ui-focusable:focus-visible,
+.ui-btn:focus-visible,
+.ui-seg__item:focus-visible,
+.ui-field__box:has(.ui-field__input:focus-visible),
+.ui-select__input:focus-visible,
+.ui-check__box:focus-visible,
+.ui-menu__item:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--surface-canvas),
+    0 0 0 4px var(--accent-bright);
+}
+
+/* ------------------------------------------------------------- the button */
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  box-sizing: border-box;
+  font: var(--type-body);
+  color: var(--ink-primary);
+  background: var(--surface-control);
+  border: 1px solid var(--surface-line-strong);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--motion-quick) var(--motion-ease-out),
+    border-color var(--motion-quick) var(--motion-ease-out),
+    color var(--motion-quick) var(--motion-ease-out),
+    transform var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-btn:hover:not(:disabled) {
+  background: var(--surface-control-hover);
+  border-color: var(--surface-edge);
+}
+
+.ui-btn:active:not(:disabled) {
+  background: var(--surface-raised);
+  transform: translateY(1px);
+}
+
+.ui-btn:disabled {
+  color: var(--ink-disabled);
+  background: var(--surface-sunken);
+  border-color: var(--surface-line);
+  cursor: not-allowed;
+}
+
+/*
+ * A toggle that is on, or the choice of a row that is chosen: one look for
+ * every control with an on state, decided once so they cannot drift apart
+ * again, which is how the track headers (entry 1) and the Layout buttons
+ * (entry 20) each came to be reported.
+ *
+ * Loud on purpose. The wash alone was too close to a control at rest, and an
+ * accent outline round it still read as an outline rather than as on. So the
+ * fill itself is the accent, bright enough to tell apart from rest at a
+ * glance and dark enough never to be taken for the primary button, with the
+ * words in white on it.
+ */
+.ui-btn[aria-pressed='true'] {
+  color: var(--ink-primary);
+  background: var(--accent-pressed);
+  border-color: var(--accent-bright);
+}
+
+/*
+ * Hover must not undo it. A variant's hover is more specific than the rule
+ * above, so ghost's hover was repainting an on toggle as an ordinary one
+ * under the pointer, at the moment you are most likely to be reading it.
+ */
+.ui-btn[aria-pressed='true']:hover:not(:disabled) {
+  color: var(--ink-primary);
+  background: var(--accent-pressed-hover);
+  border-color: var(--accent-bright);
+}
+
+.ui-btn--primary {
+  font: var(--type-body);
+  font-weight: 600;
+  color: var(--ink-on-accent);
+  background: var(--accent-base);
+  border-color: var(--accent-bright);
+}
+
+.ui-btn--primary:hover:not(:disabled) {
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
+}
+
+.ui-btn--primary:active:not(:disabled) {
+  background: var(--accent-base);
+}
+
+.ui-btn--ghost {
+  color: var(--ink-secondary);
+  background: transparent;
+}
+
+.ui-btn--ghost:hover:not(:disabled) {
+  color: var(--ink-primary);
+  background: var(--surface-control);
+}
+
+.ui-btn--danger {
+  color: var(--danger-ink);
+  background: var(--danger-fill);
+  border-color: var(--danger-line);
+}
+
+.ui-btn--danger:hover:not(:disabled) {
+  background: var(--danger-fill-hover);
+  border-color: var(--danger-line-hover);
+}
+
+/* A square button holding one icon. Its words live in aria-label and title. */
+.ui-btn--icon {
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* Two buttons that read as one, such as Save and its menu. */
+.ui-btn--joined-start {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.ui-btn--joined-end {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+}
+
+/* --------------------------------------------------- the segmented switch */
+
+.ui-seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--surface-line-strong);
+  border-radius: 7px;
+}
+
+.ui-seg__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: var(--type-meta);
+  color: var(--ink-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--motion-quick) var(--motion-ease-out),
+    color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-seg__item:hover:not(:disabled):not([aria-pressed='true']) {
+  color: var(--ink-primary);
+  background: var(--surface-control);
+}
+
+.ui-seg__item[aria-pressed='true'] {
+  font-weight: 600;
+  color: var(--ink-primary);
+  /* The same on as a button's, so a switch and a row of buttons say it alike. */
+  background: var(--accent-pressed);
+  box-shadow: inset 0 0 0 1px var(--accent-bright);
+}
+
+.ui-seg__item:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+/*
+ * There for a screen reader, drawn nowhere. It takes no space at all, so it
+ * cannot add a pixel to a panel that scrolls, which an absolutely positioned
+ * label inside an unpositioned parent can.
+ */
+.ui-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------- the field */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ui-field__label {
+  font: var(--type-meta);
+  color: var(--ink-muted);
+}
+
+.ui-field__box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  background: var(--surface-canvas);
+  border: 1px solid var(--surface-control-line);
+  border-radius: var(--radius-control);
+  transition: border-color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-field__box:hover {
+  border-color: var(--surface-control-line-hover);
+}
+
+.ui-field__box:focus-within {
+  border-color: var(--accent-base);
+}
+
+.ui-field__input {
+  flex-grow: 1;
+  min-width: 0;
+  font: var(--type-body);
+  color: var(--ink-primary);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+.ui-field__input::placeholder {
+  color: var(--ink-muted);
+}
+
+/* No browser arrows on a number field: the arrow keys step it instead. */
+.ui-field__input[type='number'] {
+  appearance: textfield;
+}
+
+.ui-field__input[type='number']::-webkit-inner-spin-button,
+.ui-field__input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.ui-field--number .ui-field__input {
+  font: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ui-field__unit {
+  flex-shrink: 0;
+  font: var(--type-mono-small);
+  color: var(--ink-muted);
+}
+
+.ui-field--invalid .ui-field__box {
+  border-color: var(--meaning-stop);
+}
+
+/* ------------------------------------------------------------- the select */
+
+/*
+ * A real select, so the list it opens is the operating system's and the
+ * keyboard works it as it always has. Only the box around it is the app's.
+ */
+.ui-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  background: var(--surface-control);
+  border: 1px solid var(--surface-control-line);
+  border-radius: var(--radius-control);
+  transition:
+    background var(--motion-quick) var(--motion-ease-out),
+    border-color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-select:hover:not(.ui-select--off) {
+  background: var(--surface-control-hover);
+  border-color: var(--surface-control-line-hover);
+}
+
+.ui-select:focus-within {
+  border-color: var(--accent-base);
+}
+
+.ui-select--off {
+  background: var(--surface-sunken);
+  border-color: var(--surface-line);
+}
+
+.ui-select__input {
+  appearance: none;
+  flex-grow: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 26px 0 8px;
+  font: var(--type-body);
+  color: var(--ink-primary);
+  background: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.ui-select__input:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+/* The options the box itself holds, as a screen reader or the arrow keys meet them. */
+.ui-select__input option {
+  color: var(--ink-primary);
+  background: var(--surface-raised);
+}
+
+/*
+ * The list a select opens: the app's own, inside the window, like a menu. The
+ * system's list is a window of its own, which a window capture leaves out.
+ */
+.ui-select-list {
+  z-index: 90;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ui-select-list__group {
+  padding: 6px 10px 3px 30px;
+  font: var(--type-meta);
+  color: var(--ink-muted);
+}
+
+.ui-select-list__option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  font: var(--type-body);
+  color: var(--ink-primary);
+  white-space: nowrap;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.ui-select-list__option[data-active='yes'] {
+  background: var(--surface-line-strong);
+}
+
+.ui-select-list__option[aria-disabled='true'] {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+.ui-select-list__tick {
+  display: flex;
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--accent-bright);
+}
+
+.ui-select__arrow {
+  position: absolute;
+  right: 7px;
+  display: flex;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.ui-select--off .ui-select__arrow {
+  color: var(--ink-disabled);
+}
+
+/* -------------------------------------------------------------- the range */
+
+/*
+ * A slider: volume, a caption's size, where it sits. The track is drawn by the
+ * app, the thumb is the app's own circle, and both answer a hover so the
+ * control says it can be dragged before it is.
+ */
+.ui-range {
+  appearance: none;
+  height: 18px;
+  background: none;
+  cursor: pointer;
+}
+
+.ui-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--surface-line-strong);
+  box-sizing: border-box;
+}
+
+.ui-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: var(--ink-secondary);
+  border: none;
+  transition:
+    background var(--motion-quick) var(--motion-ease-out),
+    transform var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-range:hover::-webkit-slider-thumb {
+  background: var(--ink-primary);
+}
+
+.ui-range:active::-webkit-slider-thumb {
+  background: var(--accent-base);
+  transform: scale(1.1);
+}
+
+.ui-range:disabled {
+  cursor: not-allowed;
+}
+
+.ui-range:disabled::-webkit-slider-thumb {
+  background: var(--ink-disabled);
+}
+
+.ui-range:focus-visible {
+  outline: none;
+}
+
+.ui-range:focus-visible::-webkit-slider-thumb {
+  background: var(--accent-bright);
+  box-shadow:
+    0 0 0 2px var(--surface-canvas),
+    0 0 0 4px var(--accent-bright);
+}
+
+/* --------------------------------------------------------- the colour box */
+
+/* The swatch that opens the operating system's colour picker. */
+.ui-colour {
+  appearance: none;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--surface-control-line);
+  border-radius: var(--radius-chip);
+  cursor: pointer;
+  transition: border-color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-colour:hover {
+  border-color: var(--surface-control-line-hover);
+}
+
+.ui-colour::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.ui-colour::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------------- the check box */
+
+.ui-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font: var(--type-meta);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-check:hover {
+  color: var(--ink-primary);
+}
+
+.ui-check__box {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent-base);
+  cursor: pointer;
+}
+
+.ui-check--off,
+.ui-check--off:hover {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+.ui-check--off .ui-check__box {
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------- the dialog */
+
+/*
+ * A dialog arrives rather than appearing: the dim behind it fades, the box
+ * itself comes up a few pixels with it. Both are short enough to read as the
+ * window answering rather than as an animation.
+ */
+@keyframes ui-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ui-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+
+.ui-scrim {
+  animation: ui-scrim-in var(--motion-dialog) var(--motion-ease-out);
+}
+
+.ui-dialog {
+  background: var(--surface-panel);
+  border: 1px solid var(--surface-line-strong);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--elevation-over);
+  color: var(--ink-primary);
+  animation: ui-dialog-in var(--motion-dialog) var(--motion-ease-out);
+}
+
+/* --------------------------------------------------------------- the menu */
+
+.ui-menu {
+  padding: 5px;
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--elevation-over);
+}
+
+.ui-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  font: var(--type-body);
+  color: var(--ink-primary);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: background var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-menu__item:hover:not(:disabled) {
+  background: var(--surface-line-strong);
+}
+
+.ui-menu__item:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+.ui-menu__item--danger {
+  color: var(--danger-ink);
+}
+
+/* --------------------------------------------------------------- the tab */
+
+/* A sequence's tab. Its colours are set where it is drawn, since which one is
+ * on screen is the window's business; only the hover belongs here. */
+.ui-tab {
+  transition:
+    background var(--motion-quick) var(--motion-ease-out),
+    border-color var(--motion-quick) var(--motion-ease-out),
+    color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-tab[data-active='no']:hover {
+  color: var(--ink-primary);
+  border-color: var(--surface-line-strong);
+}
+
+.ui-tab:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--surface-canvas),
+    0 0 0 4px var(--accent-bright);
+}
+
+/* ------------------------------------------------------ the settings tab */
+
+/* A tab down the left of the Settings window. The one open is coloured where
+ * it is drawn; the hover and the keyboard focus belong here. */
+.ui-settings-tab {
+  transition:
+    background var(--motion-quick) var(--motion-ease-out),
+    color var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-settings-tab[data-active='no']:hover {
+  background: var(--surface-control-hover);
+  color: var(--ink-primary);
+}
+
+.ui-settings-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-bright);
+}
+
+/* A setting the search just led to, lit and let fade so the eye lands on it. */
+.ui-setting--found {
+  animation: ui-setting-found 1.6s var(--motion-ease-out);
+}
+
+@keyframes ui-setting-found {
+  0%,
+  40% {
+    background: var(--accent-band);
+    box-shadow: 0 0 0 6px var(--accent-band);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* ------------------------------------------------------------ the divider */
+
+/*
+ * The strip between two columns. Its line is invisible until the pointer is
+ * on it, so the window is quiet until you go looking for the handle.
+ */
+.ui-divider__line {
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: transparent;
+  transition: background var(--motion-quick) var(--motion-ease-out);
+}
+
+.ui-divider:hover .ui-divider__line {
+  background: var(--surface-edge);
+}
+
+.ui-divider--dragging .ui-divider__line,
+.ui-divider--dragging:hover .ui-divider__line {
+  background: var(--accent-base);
+}
+
+/* -------------------------------------------------------------- the small */
+
+.ui-kbd {
+  font: var(--type-mono-small);
+  color: var(--ink-muted);
+  background: var(--surface-control);
+  border: 1px solid var(--surface-line-strong);
+  border-radius: var(--radius-chip);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.ui-label {
+  font: var(--type-label);
+  letter-spacing: var(--type-label-tracking);
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+
+.ui-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-panel);
+}
+
+.ui-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px 0 12px;
+  border-bottom: 1px solid var(--surface-line);
+}
+
+.ui-panel__body {
+  flex-grow: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/*
+ * An Inspector section beside the timeline (plan 92). The Inspector's own
+ * drawing of it fills the cell, and the stand-in shows only while that
+ * drawing has nothing in it: a section the selection has no use for.
+ */
+.section-cell > section {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.section-cell__empty {
+  display: none;
+  padding-top: 6px;
+}
+
+.section-cell:not(:has([data-inspector-group])) > .section-cell__empty {
+  display: block;
+}
+
+/* The Inspector's own empty panel, for a selection this section has nothing for, takes no room above the stand-in. */
+.section-cell:not(:has([data-inspector-group])) > section {
+  display: none;
+}

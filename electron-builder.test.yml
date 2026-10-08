@@ -1,0 +1,9 @@
+# The copy of the app the packaged test drives: the installed build in every
+# way but two switches, which the test needs and the installer must not have.
+# See electronFuses in electron-builder.yml. Built by `npm run dist:test`.
+extends: electron-builder.yml
+directories:
+  output: release-test
+electronFuses:
+  runAsNode: true
+  enableNodeCliInspectArguments: true

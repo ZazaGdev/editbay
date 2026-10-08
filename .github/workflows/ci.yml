@@ -1,0 +1,50 @@
+name: CI
+
+# Started by hand only, from the Actions tab, and always before a release.
+# Every push used to run it, and used up most of the month's Windows minutes: the tests are run
+# on the development machine for every change instead.
+on:
+  workflow_dispatch:
+
+jobs:
+  # Types, pure logic, and the real media pipeline. The e2e suite generates its
+  # own footage with the bundled ffmpeg, so nothing here needs checked-in media
+  # or anything set up on the runner.
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run test:e2e
+
+  # The built app, driven through Playwright. Kept off every push on purpose:
+  # it builds first, it starts a real Electron window, and some of its
+  # assertions are about timing, which makes it the flakiest suite on a shared
+  # runner. Run it from the Actions tab, and always before a release.
+  ui:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run test:ui

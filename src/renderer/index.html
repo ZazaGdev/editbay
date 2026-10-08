@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Editbay</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; media-src 'self' file:; object-src 'none'; base-uri 'none'"
+    />
+    <style>
+      /* Native controls, scrollbars and dropdowns in the dark, as the window is. */
+      :root {
+        color-scheme: dark;
+      }
+      /* The window is the page: no margin and no page scrollbar at any size. */
+      html,
+      body,
+      #root {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0f1115;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

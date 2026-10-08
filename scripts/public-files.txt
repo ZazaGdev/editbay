@@ -1,0 +1,32 @@
+# What goes into the public editbay repo (plan 103). Anything not listed stays private,
+# so a new folder or file is published only once someone adds it here.
+# One path per line: a folder ends with /, anything else is one file.
+
+src/
+test/
+resources/
+build/
+scripts/
+.github/
+docs/tutorials/
+docs/edit-list.md
+docs/releasing.md
+docs/smoke-checklist.md
+
+README.md
+LICENSE
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+THIRD-PARTY-NOTICES.md
+package.json
+package-lock.json
+electron-builder.yml
+electron-builder.test.yml
+electron.vite.config.ts
+tsconfig.json
+tsconfig.node.json
+tsconfig.web.json
+vitest.config.ts
+.gitignore
