@@ -27,6 +27,11 @@ export function removeClip(p: Timeline, clipId: string, alone = false): Timeline
   return without(p, new Set(alone ? [clipId] : linkedIds(p, clipId)))
 }
 
+/** The clips on V1, by which a linked group with a picture there moves as it closes up. */
+export function onV1(p: Timeline): Set<string> {
+  return new Set(p.videoTracks[0]?.clips.map((c) => c.id) ?? [])
+}
+
 /**
  * Take `length` frames from `at` out of the sequence: everything that starts
  * after them moves earlier by that much, on every track, and what starts
@@ -36,7 +41,7 @@ export function removeClip(p: Timeline, clipId: string, alone = false): Timeline
  */
 export function closeUpStretch(p: Timeline, at: number, length: number, leave: ReadonlySet<string> = new Set()): Timeline {
   if (length <= 0) return p
-  const starts = closeUpStarts(allClips(p), at, length, leave)
+  const starts = closeUpStarts(allClips(p), at, length, leave, onV1(p))
   return {
     ...p,
     videoTracks: p.videoTracks.map((r) => withStarts(r, starts)),
@@ -57,7 +62,7 @@ export function closeUpStretch(p: Timeline, at: number, length: number, leave: R
  */
 export function closeUpBlockers(p: Timeline, at: number, length: number, leave: ReadonlySet<string> = new Set()): (Clip | SoundClip)[] {
   if (length <= 0) return []
-  const meant = closeUpStarts(allClips(p), at, length, leave)
+  const meant = closeUpStarts(allClips(p), at, length, leave, onV1(p))
   const members = new Map<string, number>()
   for (const c of allClips(p)) if (c.link !== undefined) members.set(c.link, (members.get(c.link) ?? 0) + 1)
   const before = new Map(allClips(p).map((c) => [c.id, c.timelineStart]))
@@ -129,9 +134,7 @@ export function openUpStretch(
 export function closeUpClip(p: Timeline, clipId: string): Timeline {
   const ids = linkedIds(p, clipId)
   if (ids.length === 0) return p
-  const clips = allClips(p).filter((c) => ids.includes(c.id))
-  const from = Math.min(...clips.map((c) => c.timelineStart))
-  const to = Math.max(...clips.map(spanEnd))
+  const { from, to } = takenStretch(p, new Set(ids))
   const out = without(p, new Set(ids))
   // Not when it would push a clip out of step: see closeUpBlockers.
   if (closeUpBlockers(out, from, to - from).length > 0) return p
@@ -142,9 +145,23 @@ export function closeUpClip(p: Timeline, clipId: string): Timeline {
 export function closeUpClipBlockers(p: Timeline, clipId: string): (Clip | SoundClip)[] {
   const ids = linkedIds(p, clipId)
   if (ids.length === 0) return []
-  const clips = allClips(p).filter((c) => ids.includes(c.id))
-  const from = Math.min(...clips.map((c) => c.timelineStart))
-  return closeUpBlockers(without(p, new Set(ids)), from, Math.max(...clips.map(spanEnd)) - from)
+  const { from, to } = takenStretch(p, new Set(ids))
+  return closeUpBlockers(without(p, new Set(ids)), from, to - from)
+}
+
+/**
+ * The stretch of the sequence taking clips away closes up: what their
+ * pictures on V1 cover, when any are there, or else what they all cover. A
+ * J-cut's sound leading in under the shot before, or an L-cut's running on
+ * under the shot after, is not time of its own: taking it out too moved what
+ * sits over the other shot (audit 2026-10-10).
+ */
+function takenStretch(p: Timeline, going: ReadonlySet<string>): { from: number; to: number } {
+  const clips = allClips(p).filter((c) => going.has(c.id))
+  const v1 = onV1(p)
+  const pictures = clips.filter((c) => v1.has(c.id))
+  const measured = pictures.length > 0 ? pictures : clips
+  return { from: Math.min(...measured.map((c) => c.timelineStart)), to: Math.max(...measured.map(spanEnd)) }
 }
 
 /** The clips a removal takes: each named, with the clips linked to it unless they go on their own. */
@@ -164,8 +181,7 @@ function goingWith(p: Timeline, clipIds: readonly string[], alone: boolean): Set
  */
 export function closeUpStart(p: Timeline, clipIds: readonly string[], alone = false): number | null {
   const going = goingWith(p, clipIds, alone)
-  const clips = allClips(p).filter((c) => going.has(c.id))
-  return clips.length === 0 ? null : Math.min(...clips.map((c) => c.timelineStart))
+  return going.size === 0 ? null : takenStretch(p, going).from
 }
 
 /** Why several clips cannot be taken away closing up. */
@@ -188,13 +204,13 @@ export function removeClipsRefusal(p: Timeline, clipIds: readonly string[], alon
     .filter((c) => going.has(c.id))
     .map((c) => [c.timelineStart, spanEnd(c)] as [number, number])
     .sort((a, b) => a[0] - b[0])
-  const from = spans[0]![0]
   let reach = spans[0]![1]
   for (const [start, end] of spans) {
     if (start > reach) return { why: 'apart' }
     reach = Math.max(reach, end)
   }
-  const blockers = closeUpBlockers(without(p, going), from, reach - from)
+  const taken = takenStretch(p, going)
+  const blockers = closeUpBlockers(without(p, going), taken.from, taken.to - taken.from)
   return blockers.length > 0 ? { why: 'blocked', clips: blockers } : null
 }
 
@@ -211,9 +227,8 @@ export function removeClips(p: Timeline, clipIds: readonly string[], opts: { alo
   const out = without(p, going)
   if (opts.closeUp !== true) return out
   if (removeClipsRefusal(p, clipIds, opts.alone === true)) return p
-  const clips = allClips(p).filter((c) => going.has(c.id))
-  const from = Math.min(...clips.map((c) => c.timelineStart))
-  return closeUpStretch(out, from, Math.max(...clips.map(spanEnd)) - from)
+  const { from, to } = takenStretch(p, going)
+  return closeUpStretch(out, from, to - from)
 }
 
 /** A gap on a track: the empty stretch from `from` to `to`. */

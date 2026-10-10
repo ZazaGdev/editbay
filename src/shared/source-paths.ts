@@ -93,7 +93,59 @@ export function sharesToAsk(media: readonly ProjectMedia[], allowed: ReadonlySet
  * project naming one as a source could have it reach out to another computer
  * (audit 2026-10-08). No recording is one, so a source that is opens as missing.
  */
-const PLAYLIST = /\.(m3u8?|mpd)$/i
+// Windows drops dots and spaces at the end of a name when it opens a file, so
+// `clip.m3u8.` opens `clip.m3u8` (audit 2026-10-10).
+const PLAYLIST = /\.(m3u8?|mpd)[. ]*$/i
+
+/**
+ * Whether a file's first bytes are a playlist's, whatever it is called: the
+ * window's own player reads one named `.mp4` too, and follows what it names
+ * (audit 2026-10-10). An HLS playlist starts `#EXTM3U`, a DASH one is XML
+ * whose first element is `MPD`.
+ */
+export function looksLikePlaylist(head: string): boolean {
+  const text = head.replace(/^\uFEFF/, '').trimStart()
+  if (text.startsWith('#EXTM3U')) return true
+  return /^(<\?xml[^>]*\?>\s*)?(<!--[\s\S]*?-->\s*)*<([A-Za-z_][\w.-]*:)?MPD[\s>]/.test(text)
+}
+
+/**
+ * The path a `file:` URL opens on Windows, or null for one that is not a
+ * `file:` URL or cannot be read. `file://host/share/a.ts` is the share
+ * `\\host\share`, as is `file:////host/share/a.ts`.
+ */
+export function fileUrlPath(url: string): string | null {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return null
+  }
+  if (u.protocol !== 'file:') return null
+  let path: string
+  try {
+    path = decodeURIComponent(u.pathname)
+  } catch {
+    return null
+  }
+  const host = u.hostname.toLowerCase()
+  if (host !== '' && host !== 'localhost') return `\\\\${host}${path.replace(/\//g, '\\')}`
+  // `/C:/a.mp4` is the drive path; anything else keeps its leading slashes, so `//host/share` is a share.
+  return /^\/[A-Za-z]:[\\/]/.test(path) ? path.slice(1) : path
+}
+
+/**
+ * Whether the window may load `url`: anything that is not a `file:` URL,
+ * which the page's own rules govern, and a `file:` URL only on a drive or on
+ * a share in `allowed`. A playlist the window's player reads can name a file
+ * on any computer, and loading it signs in there with the user's Windows
+ * account (audit 2026-10-10).
+ */
+export function mayLoad(url: string, allowed: ReadonlySet<string>): boolean {
+  if (!/^file:/i.test(url)) return true
+  const path = fileUrlPath(url)
+  return path !== null && mayUse(path, allowed)
+}
 
 /** A file name Windows accepts, from the last part of any path or URL. */
 function fileName(path: string): string {

@@ -519,7 +519,7 @@ export { placeSource, addSource, prepareDrop, addClip } from './place-source'
 export type { SourceDrop } from './place-source'
 export {
   removeClip, closeUpStretch, closeUpBlockers, openUpStretch, closeUpClip, closeUpClipBlockers, closeUpStart,
-  removeClipsRefusal, removeClips, gapCanClose, gapPartsGroup, closeUpGap, liftRange, removeRange
+  removeClipsRefusal, removeClips, gapCanClose, gapPartsGroup, closeUpGap, liftRange, removeRange, onV1
 } from './remove-clips'
 export type { ClipsRefusal, Gap } from './remove-clips'
 export {

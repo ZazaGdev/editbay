@@ -188,6 +188,27 @@ export function rippleTrimBlockers(p: Timeline, clipId: string, edge: 'start' | 
   return ripplePlan(p, clipId, edge, frame, alone).blockers
 }
 
+/**
+ * Make room for `length` frames at `at`, where a picture on V1 now ends
+ * later: every group whose clip in `anchors`, its picture on V1, or else whose
+ * earliest clip starts at or after `at` moves later by that much, whole, and
+ * so does every clip of its own starting there. Unlike `openUpStretch`
+ * nothing is cut: the next shot's sound leading in across `at` moves on with
+ * its picture, and a title starting before `at`, over the picture's last
+ * frames, stays. The clips named in `leave` stay as they are.
+ */
+function openUpAfter(p: Timeline, at: number, length: number, leave: ReadonlySet<string>, anchors: ReadonlySet<string>): Timeline {
+  const clips = allClips(p).filter((c) => !leave.has(c.id))
+  const from = new Map<string, number>()
+  for (const c of clips) if (c.link !== undefined) from.set(c.link, Math.min(from.get(c.link) ?? Infinity, c.timelineStart))
+  for (const c of clips) if (c.link !== undefined && anchors.has(c.id)) from.set(c.link, c.timelineStart)
+  const starts = new Map<string, number>()
+  for (const c of clips) {
+    if ((c.link === undefined ? c.timelineStart : from.get(c.link)!) >= at) starts.set(c.id, c.timelineStart + length)
+  }
+  return { ...p, videoTracks: p.videoTracks.map((r) => withStarts(r, starts)), audioTracks: p.audioTracks.map((r) => withStarts(r, starts)) }
+}
+
 function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: number, alone: boolean): { result: Timeline; blockers: (Clip | SoundClip)[] } {
   const done = (result: Timeline): { result: Timeline; blockers: (Clip | SoundClip)[] } => ({ result, blockers: [] })
   const found = findClip(p, clipId)
@@ -230,11 +251,17 @@ function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: n
   }
   const point = Math.min(...members.map((m) => spanEnd(m.clip)))
   const trimmed = reshape(p, ids, (x) => ({ ...x, sourceOut: x.sourceOut + d }))
+  // From the picture's own end on V1: the next shot's sound leading in under
+  // it ends this group's sound early, and closing up or opening up from there
+  // moved what sits over its last frames (audit 2026-10-10).
+  const onV1 = new Set(p.videoTracks[0]!.clips.map((x) => x.id))
+  const picture = members.find((m) => onV1.has(m.clip.id))
   if (d < 0) {
-    const blockers = closeUpBlockers(trimmed, point + d, -d, ids)
-    return blockers.length > 0 ? { result: p, blockers } : done(closeUpStretch(trimmed, point + d, -d, ids))
+    const end = picture ? spanEnd(picture.clip) : point
+    const blockers = closeUpBlockers(trimmed, end + d, -d, ids)
+    return blockers.length > 0 ? { result: p, blockers } : done(closeUpStretch(trimmed, end + d, -d, ids))
   }
-  return done(openUpStretch(trimmed, point, d, ids))
+  return done(picture ? openUpAfter(trimmed, spanEnd(picture.clip), d, ids, onV1) : openUpStretch(trimmed, point, d, ids))
 }
 
 /**

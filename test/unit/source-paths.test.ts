@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MEDIA_FIELDS, insideDir, mayUse, pathKind, shareOf, sharesToAsk, usableProject, withUsablePaths, withWithheld, type PathRules } from '../../src/shared/source-paths'
+import { MEDIA_FIELDS, fileUrlPath, insideDir, looksLikePlaylist, mayLoad, mayUse, pathKind, shareOf, sharesToAsk, usableProject, withUsablePaths, withWithheld, type PathRules } from '../../src/shared/source-paths'
 import type { ProjectMedia } from '../../src/shared/project'
 import { defaultWorkspace, type Workspace } from '../../src/shared/workspace'
 
@@ -136,6 +136,13 @@ describe('a source with the paths it may not use taken out', () => {
     }
   })
 
+  it('opens as missing when it is a playlist with dots or spaces after its name, which Windows drops (audit 2026-10-10)', () => {
+    for (const name of ['clip.m3u8.', 'clip.m3u8..', 'clip.mpd. ', 'clip.m3u ']) {
+      const m = withUsablePaths(media(`C:\\p\\${name}`), rules)
+      expect(m.playablePath).toBe(`C:\\app\\offline\\${name.replace(/[. ]+$/, '')}`)
+    }
+  })
+
   it('opens from a share that is allowed', () => {
     const m = media('\\\\nas\\footage\\a.mp4')
     expect(withUsablePaths(m, { ...rules, allowed: new Set(['\\\\nas\\footage']) })).toBe(m)
@@ -234,5 +241,63 @@ describe('a source with the paths it may not use taken out', () => {
     const m = withUsablePaths(media('C:\\cache\\text\\k.png', { originalPath: '', peaksPath: '\\\\evil\\s\\p.bin' }), rules)
     expect(m.originalPath).toBe('')
     expect(m.playablePath).toBe('C:\\cache\\text\\k.png')
+  })
+})
+
+describe('a playlist told by its first bytes (audit 2026-10-10)', () => {
+  it('knows an HLS or a DASH playlist, with a byte order mark, white space or an XML declaration first', () => {
+    expect(looksLikePlaylist('#EXTM3U\n#EXT-X-VERSION:3\n')).toBe(true)
+    expect(looksLikePlaylist('\uFEFF  \r\n#EXTM3U\n')).toBe(true)
+    expect(looksLikePlaylist('<MPD xmlns="urn:mpeg:dash:schema:mpd:2011">')).toBe(true)
+    expect(looksLikePlaylist('<?xml version="1.0"?>\n<!-- made by x -->\n<MPD>')).toBe(true)
+    expect(looksLikePlaylist('<dash:MPD xmlns:dash="urn:mpeg:dash:schema:mpd:2011">')).toBe(true)
+  })
+
+  it('takes a recording, or other XML, for what it is', () => {
+    expect(looksLikePlaylist('\u0000\u0000\u0000 ftypisom')).toBe(false)
+    expect(looksLikePlaylist('\u001aE\u00df\u00a3 matroska')).toBe(false)
+    expect(looksLikePlaylist('<?xml version="1.0"?><svg>')).toBe(false)
+    expect(looksLikePlaylist('<MPDX>')).toBe(false)
+    expect(looksLikePlaylist('')).toBe(false)
+  })
+})
+
+describe('what the window may load (audit 2026-10-10)', () => {
+  const nas = new Set(['\\\\nas\\footage'])
+
+  it('reads a file URL as the path Windows opens', () => {
+    expect(fileUrlPath('file:///D:/Footage/a%20b.mp4')).toBe('D:/Footage/a b.mp4')
+    expect(fileUrlPath('file://localhost/C:/a.mp4')).toBe('C:/a.mp4')
+    expect(fileUrlPath('file://host/share/seg.ts')).toBe('\\\\host\\share\\seg.ts')
+    expect(fileUrlPath('file:////host/share/seg.ts')).toBe('//host/share/seg.ts')
+    expect(fileUrlPath('https://example.com/a.mp4')).toBeNull()
+    expect(fileUrlPath('file:///C:/%E0%A4%A')).toBeNull()
+  })
+
+  it('loads a file on a drive, and anything that is not a file URL, which the page rules govern', () => {
+    expect(mayLoad('file:///D:/Footage/a.mp4', new Set())).toBe(true)
+    expect(mayLoad('http://localhost:5173/src/main.tsx', new Set())).toBe(true)
+    expect(mayLoad('devtools://devtools/bundled/x.js', new Set())).toBe(true)
+  })
+
+  it('refuses a share not allowed, however it is written', () => {
+    for (const url of [
+      'file://192.0.2.71/share/seg.ts',
+      'FILE://attacker/share/seg.ts',
+      'file:////attacker/share/seg.ts',
+      'file:///%5C%5Cattacker%5Cshare%5Cseg.ts',
+      'file:///%2F%2Fattacker/share/seg.ts',
+      'file://attacker@SSL/share/seg.ts',
+      'file:///%5C%5C%3F%5CUNC%5Cattacker%5Cshare%5Cseg.ts',
+      'file:///nowhere'
+    ]) {
+      expect(mayLoad(url, nas), url).toBe(false)
+    }
+  })
+
+  it('loads from a share the user has allowed', () => {
+    expect(mayLoad('file://nas/footage/a.mp4', nas)).toBe(true)
+    expect(mayLoad('file://NAS/Footage/a.mp4', nas)).toBe(true)
+    expect(mayLoad('file://nas/other/a.mp4', nas)).toBe(false)
   })
 })

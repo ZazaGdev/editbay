@@ -45,6 +45,7 @@ export type ActionId =
   | 'deselect'
   | 'selectNextClip'
   | 'selectPreviousClip'
+  | 'selectAll'
   | 'undo'
   | 'redo'
   | 'zoomIn'
@@ -145,6 +146,7 @@ export const ACTIONS: ActionDef[] = [
   // Clips chosen from the keyboard, for anyone not using a mouse (audit 2026-10-01).
   { id: 'selectNextClip', label: 'Select the next clip on the track', group: 'Editing', defaults: ['BracketRight'] },
   { id: 'selectPreviousClip', label: 'Select the previous clip on the track', group: 'Editing', defaults: ['BracketLeft'] },
+  { id: 'selectAll', label: 'Select every clip on the timeline', group: 'Editing', defaults: ['Ctrl+KeyA'] },
   { id: 'undo', label: 'Undo', group: 'Editing', defaults: ['Ctrl+KeyZ'] },
   { id: 'redo', label: 'Redo', group: 'Editing', defaults: ['Ctrl+KeyY', 'Ctrl+Shift+KeyZ'] },
   // By 2 pixels, or 20 with Shift: the crop in the Source view, the place in the Output view.

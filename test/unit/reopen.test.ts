@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
-import { reopenAction, matchInFolder, sameRecording, copiesOnDisk, type OnDisk } from '../../src/main/project/reopen'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { reopenAction, matchInFolder, sameRecording, copiesOnDisk, checkSource, isPlaylist, type OnDisk } from '../../src/main/project/reopen'
 import type { ProjectMedia } from '../../src/shared/project'
 
 function media(id: string, original: string, conformed: boolean): ProjectMedia {
@@ -156,5 +158,24 @@ describe('whether a file found by name is the same recording', () => {
     expect(sameRecording(six, { durationSec: 10, width: 1920, height: 1080, hasAudio: true, audioTracks: 1 })).toBe(false)
     expect(sameRecording(six, { durationSec: 10, width: 1920, height: 1080, hasAudio: true, audioTracks: 6 })).toBe(true)
     expect(sameRecording(missing, { durationSec: 10, width: 1920, height: 1080, hasAudio: true, audioTracks: 1 })).toBe(true)
+  })
+})
+
+describe('a source that is really a playlist (audit 2026-10-10)', () => {
+  it('opens as missing, whatever it is called, so the window never plays it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'editbay-playlist-'))
+    try {
+      const fake = join(dir, 'clip.mp4')
+      await writeFile(fake, '#EXTM3U\n#EXTINF:2.0,\nfile://192.0.2.71/share/seg.ts\n#EXT-X-ENDLIST\n')
+      const real = join(dir, 'real.mp4')
+      await writeFile(real, Buffer.from([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]))
+      expect(await isPlaylist(fake)).toBe(true)
+      expect(await isPlaylist(real)).toBe(false)
+      expect(await isPlaylist(join(dir, 'gone.mp4'))).toBe(false)
+      const m = { ...media('p', fake, false), peaksPath: '', filmstripPath: '' }
+      expect(await checkSource(m)).toBe('offline')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

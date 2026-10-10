@@ -226,6 +226,9 @@ interface TrackClipProps {
   fadeable?: 'both' | 'in' | 'out' | 'none' | undefined
 }
 
+/** How wide the band drawn at each of a clip's edges is, inside its wider trim handle. */
+const EDGE_BAND_PX = 8
+
 /** How big a fade handle is, at the top corner of a sound clip. */
 const FADE_HANDLE_PX = 9
 
@@ -366,16 +369,22 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
     })
   }
 
+  // The grab area keeps its width, so a trim is as easy to catch, and the band
+  // drawn in it is narrower, at the clip's own edge: at most 8 pixels, so the
+  // two that meet at a cut read 16 wide rather than 24 (tasks 124 and 126).
+  const handleW = handleWidthFor(width)
+  const drawnW = Math.max(1, Math.min(EDGE_BAND_PX, handleW - 1))
+  const edgeColour = props.selected ? accent.base : surface.edge
   const handle = {
     position: 'absolute' as const,
     top: 0,
-    width: handleWidthFor(width),
+    width: handleW,
     height: '100%',
     cursor: 'ew-resize',
-    background: props.selected ? accent.base : surface.edge,
     opacity: 0.9,
     zIndex: 1
   }
+  const band = (side: 'left' | 'right'): string => `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, ${edgeColour} ${drawnW}px, transparent ${drawnW}px)`
   const name = props.media.originalPath.split(/[\\/]/).pop() ?? ''
   const sound = props.kind === 'audio' ? (c as SoundClip) : null
   const picture = props.kind === 'video' ? (c as Clip) : null
@@ -745,8 +754,8 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
       {/* No trimming while the painter is armed: the whole clip is what a press paints. */}
       {!props.onPaint && (
         <>
-          {props.inner?.start !== true && <div data-testid="trim-start" onPointerDown={grab('start')} style={{ ...handle, left: 0 }} />}
-          {props.inner?.end !== true && <div data-testid="trim-end" onPointerDown={grab('end')} style={{ ...handle, right: 0 }} />}
+          {props.inner?.start !== true && <div data-testid="trim-start" onPointerDown={grab('start')} style={{ ...handle, left: 0, background: band('left') }} />}
+          {props.inner?.end !== true && <div data-testid="trim-end" onPointerDown={grab('end')} style={{ ...handle, right: 0, background: band('right') }} />}
         </>
       )}
     </div>

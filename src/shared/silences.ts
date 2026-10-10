@@ -1,5 +1,6 @@
 import { allClips, asTwoPieces, closeUpStretch, newId, v1Clips, type SoundClip, type Timeline } from './project'
 import { closeUpStarts, spanEnd, type Span } from './tracks'
+import { onV1 as picturesOnV1 } from './remove-clips'
 import { peaksKey } from './sound'
 import type { PeaksData } from './types'
 
@@ -220,7 +221,7 @@ function removeStretch(t: Timeline, s: Stretch): Timeline | null {
     videoTracks: t.videoTracks.map((r) => ({ ...r, clips: r.clips.flatMap(cut) })),
     audioTracks: t.audioTracks.map((r) => ({ ...r, clips: r.clips.flatMap(cut) }))
   }
-  const meant = closeUpStarts(allClips(pieces), s.from, s.to - s.from, new Set())
+  const meant = closeUpStarts(allClips(pieces), s.from, s.to - s.from, new Set(), picturesOnV1(pieces))
   const next = closeUpStretch(pieces, s.from, s.to - s.from)
   return allClips(next).every((c) => c.timelineStart === meant.get(c.id)) ? next : null
 }

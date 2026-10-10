@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { open, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { hasPicture, isStill, trackCount, type ProjectMedia, type TrackFile } from '../../shared/project'
 import { cacheKey, derivedPaths, exists, trackPaths } from '../media/cache'
@@ -7,6 +7,7 @@ import { extractFilmstrip } from '../media/thumbnails'
 import { extractStillFilmstrip } from '../media/still'
 import { makeTrackCopies } from '../media/tracks'
 import { probeFile } from '../media/probe'
+import { looksLikePlaylist } from '../../shared/source-paths'
 
 /**
  * Opening a project without depending on the app's cache.
@@ -50,13 +51,32 @@ export function reopenAction(m: ProjectMedia, disk: OnDisk): ReopenAction {
 
 export async function checkSource(m: ProjectMedia): Promise<ReopenAction> {
   return reopenAction(m, {
-    playable: await exists(m.playablePath),
-    original: await exists(m.originalPath),
+    playable: (await exists(m.playablePath)) && !(await isPlaylist(m.playablePath)),
+    original: (await exists(m.originalPath)) && !(await isPlaylist(m.originalPath)),
     peaks: m.peaksPath !== '' && (await exists(m.peaksPath)),
     // A sound file has no picture, and so no filmstrip to miss.
     filmstrip: !hasPicture(m) || (m.filmstripPath !== '' && (await exists(m.filmstripPath))),
     tracks: await copiesOnDisk(m)
   })
+}
+
+/**
+ * Whether a file is really a playlist, whatever it is called. No recording
+ * is one, and the window's player follows what one names to any computer
+ * (audit 2026-10-10), so a source that is opens as missing.
+ */
+export async function isPlaylist(path: string): Promise<boolean> {
+  const file = await open(path, 'r').catch(() => null)
+  if (!file) return false
+  try {
+    const head = Buffer.alloc(1024)
+    const { bytesRead } = await file.read(head, 0, head.length, 0)
+    return looksLikePlaylist(head.subarray(0, bytesRead).toString('utf8'))
+  } catch {
+    return false
+  } finally {
+    await file.close().catch(() => undefined)
+  }
 }
 
 /**

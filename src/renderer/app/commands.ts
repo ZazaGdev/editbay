@@ -4,6 +4,7 @@
  */
 
 import {
+  allClips,
   closeUpClipBlockers,
   closeUpStart,
   closingOn,
@@ -47,7 +48,7 @@ export function runAction(app: AppState, action: ActionId, shift = false, key?: 
   const { timeline, phase, cancelStart, stopRecording, startRecording, togglePlay, seek, playheadSent, total, playhead, editClip,
     addTransitionAtPlayhead, kHeld, playing, rate, setRate, setPlaying, canPlay, setLoopOn, selectedCaption, selected, selectedAlone, marks, setMarks,
     removing, selectedTransition, setSelectedTransition, range, selectAfterRemoved, setSelectedCaption, gap, closeGap, selectedClips, setSilenceOpen,
-    select, silenceOpen, closeSilences, captionMove, setCaptionMove, shapeDrawing, setShapeDrawing, proj, zoomBy, fitTimeline, setView,
+    select, selectMany, silenceOpen, closeSilences, captionMove, setCaptionMove, shapeDrawing, setShapeDrawing, proj, zoomBy, fitTimeline, setView,
     setWindowSettings, windowSettings, setFullscreen, nudge, framing, picture, copiedFraming, keys, applyFraming, zoomEnd, setCopiedCrop, copiedCrop,
     setClipboard, pasteAt, setJoinAsk, setShortcutsOpen, setTutorialsOpen, setSettingsOpen, setPaletteOpen, save, setExportOpen, setCaptionsOpen,
     addText, addBlackScreen, saveFrame, saveTranscript, setVersionsAsked } = app
@@ -326,6 +327,10 @@ export function runAction(app: AppState, action: ActionId, shift = false, key?: 
       break
     case 'removeSilences':
       if (timeline && v1Clips(timeline).length > 0) setSilenceOpen(true)
+      break
+    case 'selectAll':
+      // Every clip on every track, as a box drawn over the whole timeline would take them.
+      if (timeline) selectMany(allClips(timeline).map((c) => c.id), false)
       break
     case 'selectNextClip':
     case 'selectPreviousClip': {

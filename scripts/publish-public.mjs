@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Publish the public files of this repo as one new commit in the public
 // editbay repo (plan 103). Run on each release, never on every push:
 //

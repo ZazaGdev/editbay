@@ -21,6 +21,7 @@ The keys that do most of the work, and how to change any of them.
 | `Left` `Right` | One frame. `Shift` for one second |
 | `Up` `Down` | Previous and next cut |
 | `[` `]` | Select the previous or next clip on the track, and go to its start. With nothing selected, from the playhead |
+| `Ctrl+A` | Select every clip on the timeline, on every track. `Esc` clears the selection |
 | `Home` `End` | Start and end |
 | `S` | Split at the playhead |
 | `I` `O` | Trim the clip's start or end to the playhead |

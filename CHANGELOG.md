@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1
+
+A security fix for projects sent by someone else, and smaller fixes to the timeline.
+
+### Added
+
+- `Ctrl+A` selects every clip on the timeline, on every track. It can be changed in the
+  shortcuts window, and in a text field it still selects the text.
+
+### Fixed
+
+- **Security:** a project someone sent you could make Windows sign in to their computer, and so
+  hand over your password hash, through the preview: its player read a playlist dressed as an
+  `.mp4` and followed it to a network share. Every file the window loads is now checked, and one
+  on a share you have not allowed is refused; a source that is really a playlist opens as
+  missing, as does one named `clip.m3u8.` with a dot after it.
+- Taking out, or trimming with O or a ripple drag, the shot before one whose sound starts early
+  (a J-cut) no longer leaves black frames on V1 or moves a title over the shot before. The time
+  taken out is the picture's, and an edit that cannot close up cleanly is refused with the track
+  in the way named.
+- Ctrl+wheel over the timeline keeps zooming about the pointer. While a clip played it jumped
+  back to the playhead after a notch or two, and slow notches drifted a pixel each.
+- The band drawn at a clip's edge on the timeline is narrower, 16 pixels at a cut, 8 at each
+  clip's edge. The area that grabs a trim keeps its size.
+
 ## 1.0
 
 The first public release. Everything since 0.1.0: the work of making the project public, and the features added while

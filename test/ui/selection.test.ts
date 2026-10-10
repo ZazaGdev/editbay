@@ -358,4 +358,16 @@ describe('several clips at once', () => {
     await expect.poll(() => page.locator('[data-testid="toast"]').filter({ hasText: 'follow one another' }).count(), WAIT).toBe(1)
     expect(await v1()).toEqual(before)
   })
+
+  it('selects every clip on every track with Ctrl+A, pictures and sounds', async () => {
+    await clickClip(1)
+    const ANY = '[data-testid="track"] :is([data-testid="clip"], [data-testid="sound-clip"])'
+    const all = await page.locator(ANY).count()
+    expect(await page.locator('[data-testid="track"] [data-testid="sound-clip"]').count()).toBeGreaterThan(0)
+    expect(await page.locator(`${ANY}[data-selected="yes"]`).count()).toBeLessThan(all)
+    await press('Control+a')
+    await expect.poll(() => page.locator(`${ANY}[data-selected="yes"]`).count(), WAIT).toBe(all)
+    await press('Escape')
+    await expect.poll(() => page.locator(`${ANY}[data-selected="yes"]`).count(), WAIT).toBe(0)
+  })
 })

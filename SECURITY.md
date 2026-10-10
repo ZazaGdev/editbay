@@ -30,7 +30,8 @@ There is no telemetry and no update check.
 the installer, from one pinned build that is checked against its SHA-256 when it is fetched. It builds their arguments itself and never passes a command line through a
 shell. Their inputs are limited to video, sound and picture formats, so a file named like a
 video that is really a playlist is refused rather than followed to wherever it points, and a
-project that names a playlist as a source opens with that source missing.
+project that names a playlist as a source, by its name or by what is in the file, opens with
+that source missing.
 
 **It runs a few other programs, each by its full path and with fixed arguments:**
 
@@ -64,7 +65,10 @@ build, and it only happens when something has changed.
   offline unless you say Connect. A share you import from through the file picker, relink to,
   or connect to when a project asks is remembered for good, so later projects on it open
   without asking: allow a share only if you trust every project that will name it. A share you
-  only drop files from is allowed until Editbay closes.
+  only drop files from is allowed until Editbay closes. The same holds for everything the window
+  loads, not only the paths a project names: the window's own video player also reads
+  playlists, so every file it asks for is checked as it asks, and one on a share you have not
+  allowed is refused before anything connects.
   A project never makes Editbay write outside its own cache: waveforms and other files made
   from a source always go there, whatever path the project names.
 - **The window runs sandboxed** and shows only the app's own page. It cannot open another

@@ -1075,12 +1075,14 @@ describe('closing up', () => {
     expect(findClip(closeUpClip(cut(), 'p2.1'), 'p2')).toBeNull()
   })
 
-  it('takes out from the first frame of the earliest of the group to the last frame of the latest', () => {
+  it('takes out what the group covers on V1, not a sound of it moved on past its picture', () => {
     let t = moveClip(cut(), 'p2.1', 'a1', 540, true)
     t = addSource(addTrack(t, 'video', 'V2'), { mediaId: 'b', clipId: 'cw', at: 700, onTrack: 'V2', streams: [] })
-    // From 300 to 660: 360 frames.
+    // From 300 to 420, the picture: 120 frames, as V1 closes up, so the cutaway keeps its place
+    // over the picture after. Taking out to the sound's end, 660, moved it 240 frames too far
+    // (audit 2026-10-10).
     t = closeUpClip(t, 'p2')
-    expect(placed(t, 'cw')).toEqual(['V2', 340, 0, 120])
+    expect(placed(t, 'cw')).toEqual(['V2', 580, 0, 120])
     expect(placed(t, 'p3')).toEqual(['V1', 300, 0, 120])
   })
 

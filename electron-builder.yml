@@ -102,7 +102,7 @@ win:
 nsis:
   # Releases are named with two numbers, 1.0, 1.1, where people see them; package.json keeps
   # three (1.0.0) because the build tools need it. Change this with the version.
-  artifactName: Editbay Setup 1.0.${ext}
+  artifactName: Editbay Setup 1.1.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

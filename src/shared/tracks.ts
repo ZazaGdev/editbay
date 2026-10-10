@@ -225,15 +225,23 @@ export function closedUpStart(start: number, at: number, length: number): number
 /**
  * Where every clip starts once the `length` frames from `at` are taken out
  * of the sequence, by id, leaving out the clips named in `leave`. A linked
- * group moves as one, by where its earliest clip goes, so its picture and
- * sound stay in step.
+ * group moves as one, so its picture and sound stay in step: by where its
+ * clip named in `anchors` goes, its picture on V1, or else by where its
+ * earliest clip goes. A J-cut's sound starts before its picture, and moving
+ * the group by the sound left black on V1 (audit 2026-10-10).
  */
-export function closeUpStarts(clips: Span[], at: number, length: number, leave: ReadonlySet<string>): Map<string, number> {
+export function closeUpStarts(clips: Span[], at: number, length: number, leave: ReadonlySet<string>, anchors: ReadonlySet<string> = new Set()): Map<string, number> {
   const earliest = new Map<string, number>()
   for (const c of clips) {
     if (leave.has(c.id) || c.link === undefined) continue
     earliest.set(c.link, Math.min(earliest.get(c.link) ?? Infinity, c.timelineStart))
   }
+  const anchored = new Map<string, number>()
+  for (const c of clips) {
+    if (leave.has(c.id) || c.link === undefined || !anchors.has(c.id)) continue
+    anchored.set(c.link, Math.min(anchored.get(c.link) ?? Infinity, c.timelineStart))
+  }
+  for (const [link, start] of anchored) earliest.set(link, start)
   const out = new Map<string, number>()
   for (const c of clips) {
     if (leave.has(c.id)) continue

@@ -13,6 +13,8 @@ import { cacheInUse } from './media/cache-in-use'
 import { isUnderTest, quietDialogs, quietShell, quitWithParent } from './test-mode'
 import { testLaunch } from './test-launch'
 import { keepTake } from './voiceover/takes'
+import { mayLoad, shareOf } from '../shared/source-paths'
+import { trustedShares } from './settings/trusted-shares'
 
 /**
  * How often a recovery copy is written while there are unsaved changes. The
@@ -88,6 +90,23 @@ function allowMicrophoneOnly(): void {
     if (ALLOWED.has(permission)) return true
     if (permission !== 'media') return false
     return (details as { mediaType?: string }).mediaType !== 'video'
+  })
+}
+
+/**
+ * Nothing the window loads reaches a share the user has not allowed. Its
+ * player reads a playlist even in a file named `.mp4`, and follows a line in
+ * it to `\\host\share`, which signs in there with the user's Windows account:
+ * a project someone sent could do it the moment it opened (audit 2026-10-10).
+ * Main checks every path a project names, but not what a file goes on to
+ * name, so every request is checked here as it is made.
+ */
+function noUnknownShares(): void {
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    // The app's own cache is on a share when the settings folder is redirected to one, and it is theirs.
+    const cache = shareOf(cacheRoot())
+    const allowed = cache ? new Set([...trustedShares(), cache]) : trustedShares()
+    callback({ cancel: !mayLoad(details.url, allowed) })
   })
 }
 
@@ -190,6 +209,7 @@ if (!app.requestSingleInstanceLock()) {
     // window and loses unsaved work, Ctrl+W closes it.
     Menu.setApplicationMenu(null)
     allowMicrophoneOnly()
+    noUnknownShares()
     registerIpc()
     try {
       await verifyFfmpeg()

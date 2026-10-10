@@ -36,11 +36,26 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
    */
   const asked = useRef<number | null>(null)
   /**
-   * The frame a run of Ctrl+wheel notches keeps under the pointer, and when the
-   * last one came. Held for the run rather than read again from the scroll on
-   * every notch, where each rounding to a whole pixel would add up.
+   * The frame a run of Ctrl+wheel notches keeps under the pointer, and where
+   * the last of them left the view scrolled. Held for as long as the pointer
+   * and the view stay where the notches left them, rather than read again from
+   * the scroll on every notch, where each rounding to a whole pixel would add
+   * up (task 125).
    */
-  const gesture = useRef<{ frame: number; x: number; at: number } | null>(null)
+  const gesture = useRef<{ frame: number; x: number; scroll: number | null } | null>(null)
+  /**
+   * The view moved away from the playhead while it plays, by Ctrl+wheel or the
+   * wheel: it is left there, rather than pulled back to the playhead on its
+   * next frame, which jumped a zoom about the pointer minutes back (task 125).
+   * Until playback stops or starts again.
+   */
+  const leftBehind = useRef(false)
+  const pxPerFrameRef = useRef(pxPerFrame)
+  pxPerFrameRef.current = pxPerFrame
+  const playheadOffScreen = (el: HTMLDivElement): boolean => {
+    const x = props.playhead * pxPerFrameRef.current
+    return x < el.scrollLeft || x > el.scrollLeft + el.clientWidth
+  }
 
   /**
    * The stretch of the timeline near the part in view, in pixels. The ruler's
@@ -79,6 +94,8 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
     if (about) {
       el.scrollLeft = Math.max(0, about.frame * pxPerFrame - about.x)
       scrolledTo.current = el.scrollLeft
+      if (gesture.current) gesture.current.scroll = el.scrollLeft
+      if (props.playing && playheadOffScreen(el)) leftBehind.current = true
       seeDrawn()
       return
     }
@@ -97,7 +114,7 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
   // and so is a scrub along the ruler.
   useLayoutEffect(() => {
     const el = scroller.current
-    if (!el || scrubbing.current) return
+    if (!el || scrubbing.current || (props.playing && leftBehind.current)) return
     const x = props.playhead * pxPerFrame
     const margin = props.playing ? FOLLOW_MARGIN : 0
     if (x >= el.scrollLeft && x <= el.scrollLeft + el.clientWidth - margin) return
@@ -105,6 +122,10 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
     scrolledTo.current = el.scrollLeft
     seeDrawn()
   }, [props.playhead])
+  // Playback stopped or started again: the view follows the playhead again.
+  useEffect(() => {
+    leftBehind.current = false
+  }, [props.playing])
 
   /**
    * The wheel over the timeline.
@@ -126,10 +147,13 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
       const next = Math.max(0, Math.min(ZOOM_LEVELS - 1, from - lines(e.deltaY) / 300))
       if (next === from) return
       const x = e.clientX - el.getBoundingClientRect().left
-      const now = performance.now()
       const run = gesture.current
-      const frame = run && Math.abs(run.x - x) < 1 && now - run.at < 400 ? run.frame : (el.scrollLeft + x) / pxPerFrame
-      gesture.current = { frame, x, at: now }
+      // The same run while the pointer stays put and nothing else has scrolled
+      // the view since: a notch the timeline has not drawn yet, or the view
+      // where the last notch left it.
+      const same = run !== null && Math.abs(run.x - x) < 1 && (asked.current !== null || run.scroll === el.scrollLeft)
+      const frame = same ? run.frame : (el.scrollLeft + x) / pxPerFrame
+      gesture.current = { frame, x, scroll: same ? run.scroll : null }
       anchor.current = { frame, x }
       asked.current = next
       props.onZoomTo(next)
@@ -142,6 +166,7 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
     e.preventDefault()
     el.scrollLeft += by
     scrolledTo.current = el.scrollLeft
+    if (props.playing && playheadOffScreen(el)) leftBehind.current = true
   }
   useEffect(() => {
     const el = scroller.current

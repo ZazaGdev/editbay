@@ -25,6 +25,11 @@ The difference matters more than it sounds. Closing up moves every later clip on
 Editbay checks first: if something on another track cannot move cleanly, it refuses and names the
 track in the way, rather than quietly leaving your picture and sound out of step.
 
+The time taken out is what the clip's picture covered on V1. A sound that starts early under the
+shot before, or runs on under the shot after, does not add to it, so a title over that other shot
+stays where it was. When the next shot's sound starts early under the clip you take out, closing
+up would run it over the shot before; Editbay refuses that rather than leaving black on V1.
+
 Linked picture and sound always move together, so deleting a clip takes its audio with it.
 
 Deleting leaves the playhead and the timeline where they were. The next clip along on the track is
