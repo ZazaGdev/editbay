@@ -4,6 +4,30 @@
 
 A free, local video editor.
 
+## How to install
+
+**Windows 11, 64-bit only.**
+
+1. Download `Editbay.Setup.<version>.exe` from the latest [release](../../releases/latest).
+2. Run it. Windows SmartScreen warns about an unrecognised app, because the installer is not
+   code signed: click **More info**, then **Run anyway**.
+3. Choose where it goes, or keep the folder it offers, and finish. Editbay is then in the
+   Start menu and on the desktop.
+
+Each release lists the installer's SHA-256, so you can check the download with
+`certutil -hashfile Editbay.Setup.<version>.exe SHA256`.
+
+## TL;DR
+
+- A video editor for Windows: a multi-track timeline, transitions, layers, sound and captions.
+- Free and open source. No account, no subscription, no watermark.
+- Everything stays on your computer. Nothing you open is uploaded, and there is no telemetry.
+- Quick with talking-head videos and screen recordings: it finds and cuts the pauses, writes
+  captions from the speech, and keeps a face framed as it moves.
+- Every action has a key, and every key can be changed.
+
+---
+
 Multi-track timeline, transitions, layers, sound, captions. It runs on your own machine, it
 has no account and no subscription, and nothing you open is ever uploaded anywhere.
 
@@ -98,11 +122,8 @@ assets** opens a pack's page in your browser, and Editbay itself fetches nothing
 
 ## Install
 
-Download the installer from [Releases](../../releases) and run it.
-
-Windows SmartScreen will warn you, because the installer is not code signed. A signing
-certificate costs money this project does not have. Every release publishes the installer's
-SHA-256 so you can check that what you downloaded is what was built.
+See [How to install](#how-to-install) at the top. The installer is not code signed because a
+signing certificate costs money this project does not have, which is why SmartScreen warns.
 
 ## Build from source
 
@@ -189,14 +210,6 @@ phrase over and over. `build` reads an edit list, described in
 [docs/edit-list.md](docs/edit-list.md): version 2 lays several recordings end to end as reels,
 with shots that switch a reel to the camera half or hide the corner for a stretch. It refuses
 anything it cannot honour with the entry named, and never writes over a file.
-
-## Why this exists
-
-I was renting Premiere, and using about four of its features.
-
-Renting the software you edit your own video with, forever, is a bad deal, and it gets worse
-every time the price goes up. The free editors I tried were either enormous or fought me. So
-I built the one I wanted: the parts of an editor I actually use, fast, local, and free.
 
 ## How this was built
 
