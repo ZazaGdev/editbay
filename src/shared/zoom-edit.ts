@@ -110,9 +110,18 @@ export function keyAtPlayhead(c: Clip, playhead: number, picture: string = MAIN_
  * while it has no keyframes, and otherwise the keyframe on the frame under the
  * playhead, made there if there is none. So the crop box, the Crop numbers,
  * Scale and Position and the nudge keys are one thing.
+ *
+ * That is while the zoom is being worked on, its Start or End or a keyframe
+ * picked in the Zoom panel. Otherwise a crop is only a crop: a picture that
+ * zooms has its whole zoom moved and scaled with it, keeping its motion, and
+ * gets no keyframe (task 122).
  */
-export function cropEdit(c: Clip, playhead: number, rect: Rect, picture: string = MAIN_PICTURE, end = false): ClipEdit {
+export function cropEdit(c: Clip, playhead: number, rect: Rect, picture: string = MAIN_PICTURE, end = false, zooming = true): ClipEdit {
   const pic = forPicture(c, picture)
+  if (!zooming) {
+    const from = hasKeys(c, picture) ? { from: shownCrop(c, playhead, picture) } : {}
+    return { kind: 'setCrop', clipId: c.id, rect, picture: pictureOf(c, picture), ...from }
+  }
   if (!isSimple(c, picture)) return { kind: 'setZoomKey', clipId: c.id, at: sourceFrameAt(c, playhead), crop: rect, ...pic }
   // Simple: the End chosen, or the Start of a picture that moves. A still picture's Start is its crop.
   if (onEnd(c, picture, end)) return { kind: 'setSimpleZoom', clipId: c.id, change: { end: rect }, ...pic }

@@ -180,3 +180,38 @@ describe('a title over the shot a J-cut leads in under', () => {
     expect(inStep(out)).toBe(true)
   })
 })
+
+describe('a head edge dragged longer where the next shot leads in from before it (task 121)', () => {
+  // A 0 to 80; B a short shot 80 to 86 whose sound runs 60 to 77; C from 86,
+  // its sound leading in from 77, before B's picture starts. Found by the audit fuzzer.
+  const odd = (): Timeline =>
+    sequence([
+      { id: 'A', at: 0, length: 80, soundTo: 60 },
+      { id: 'B', at: 80, length: 6, soundFrom: 60, soundTo: 77 },
+      { id: 'C', at: 86, length: 91, soundFrom: 77 }
+    ])
+
+  it('moves the next shot on whole, its lead-in with it, rather than cutting the lead-in where B starts', () => {
+    // B plays source 380 to 386: its head dragged to 375 brings in five frames.
+    const out = rippleTrim(odd(), 'B', 'start', 375)
+    expect(at(out, 'B')).toEqual([80, 91])
+    expect(at(out, 'sB')).toEqual([60, 82])
+    expect(at(out, 'C')).toEqual([91, 182])
+    expect(at(out, 'sC')).toEqual([82, 182])
+    expect(out.audioTracks[0]!.clips).toHaveLength(3)
+    expect(blackOnV1(out)).toBeNull()
+    expect(inStep(out)).toBe(true)
+  })
+})
+
+describe('I on a sound inside its lead-in, before its picture starts (task 130)', () => {
+  // C's sound leads in from 185 under B; the title at 250 sits over C. Found by the audit fuzzer, seed 28.
+  it('closes up on every track, so a title over a later shot keeps its frame', () => {
+    const out = trimToFrame(abc(250), 'sC', 'start', 193)
+    expect(at(out, 'C')).toEqual([200, 292])
+    expect(at(out, 'sC')).toEqual([185, 292])
+    expect(at(out, 'T')).toEqual([242, 250])
+    expect(blackOnV1(out)).toBeNull()
+    expect(inStep(out)).toBe(true)
+  })
+})

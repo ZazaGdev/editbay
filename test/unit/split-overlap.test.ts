@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { addSource, closeUpClip, createTimeline, linkedIds, splitClip, type ProjectMedia, type Timeline } from '../../src/shared/project'
+import {
+  addSource,
+  closeUpClip,
+  createTimeline,
+  joinClips,
+  joinRefusal,
+  linkedIds,
+  moveClip,
+  splitClip,
+  type ProjectMedia,
+  type Timeline
+} from '../../src/shared/project'
 
 /**
  * S pressed where one shot's sound overlaps the next (audit 2026-10-08, fix
@@ -78,5 +89,50 @@ describe('S inside an overlap of one shot sound with the next', () => {
     const secondSound = s.audioTracks[0]!.clips.find((c) => c.timelineStart === 90)!.id
     expect(linkedIds(s, 'Q').sort()).toEqual(['Q', secondSound].sort())
     expect(linkedIds(s, 'QS')).not.toContain('Q')
+  })
+})
+
+describe('joining back the two pieces S left inside an overlap (audit 2026-10-10, fix first 3)', () => {
+  /** Where a clip starts and ends on the timeline. */
+  const span = (t: Timeline, id: string): [number, number] => {
+    const c = [...t.videoTracks.flatMap((r) => r.clips), ...t.audioTracks.flatMap((r) => r.clips)].find((x) => x.id === id)!
+    return [c.timelineStart, c.timelineStart + c.sourceOut - c.sourceIn]
+  }
+
+  it('joins the pictures in an L-cut, keeping the picture and its sound one group that drags together', () => {
+    const s = splitClip(shots(120, 120), 110)
+    const [first, second] = [pictureAt(s, 100), pictureAt(s, 110)]
+    expect(joinRefusal(s, first, second)).toBeNull()
+    const joined = joinClips(s, [first, second])
+    expect(joined.videoTracks[0]!.clips).toHaveLength(2)
+    expect(span(joined, first)).toEqual([100, 200])
+    expect(linkedIds(joined, first).sort()).toEqual([first, 'QS'].sort())
+    const moved = moveClip(joined, first, joined.videoTracks[0]!.id, 300)
+    expect(span(moved, first)).toEqual([300, 400])
+    expect(span(moved, 'QS')).toEqual([320, 400])
+  })
+
+  it('keeps them one group when the picture is joined selected alone with Alt', () => {
+    const s = splitClip(shots(120, 120), 110)
+    const [first, second] = [pictureAt(s, 100), pictureAt(s, 110)]
+    const joined = joinClips(s, [first, second], true)
+    expect(linkedIds(joined, first).sort()).toEqual([first, 'QS'].sort())
+  })
+
+  it('joins the sounds in a J-cut, keeping the sound and its picture one group', () => {
+    const s = splitClip(shots(80, 80), 90, 'QS')
+    const secondSound = s.audioTracks[0]!.clips.find((c) => c.timelineStart === 90)!.id
+    expect(joinRefusal(s, 'QS', secondSound)).toBeNull()
+    const joined = joinClips(s, ['QS', secondSound])
+    expect(span(joined, 'QS')).toEqual([80, 200])
+    expect(linkedIds(joined, 'Q').sort()).toEqual(['Q', 'QS'].sort())
+  })
+
+  it('still refuses when a linked clip is cut at the same frame but does not carry on', () => {
+    const s = splitClip(shots(100, 100), 150)
+    const [first, second] = [pictureAt(s, 100), pictureAt(s, 150)]
+    const sounds = s.audioTracks[0]!.clips.filter((c) => c.mediaId === 'b')
+    const trimmed = { ...s, audioTracks: [{ ...s.audioTracks[0]!, clips: s.audioTracks[0]!.clips.map((c) => (c.id === sounds[1]!.id ? { ...c, sourceIn: c.sourceIn + 5 } : c)) }] }
+    expect(joinRefusal(trimmed, first, second)).not.toBeNull()
   })
 })

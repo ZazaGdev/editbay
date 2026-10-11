@@ -247,7 +247,10 @@ function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: n
       const blockers = closeUpBlockers(trimmed, point, d, ids)
       return blockers.length > 0 ? { result: p, blockers } : done(closeUpStretch(trimmed, point, d, ids))
     }
-    return done(openUpStretch(trimmed, point, -d, ids))
+    // Longer: the next shots move on whole from the picture's start, a sound
+    // leading in from before it with them, rather than cut where it starts
+    // and run over by this group's sound growing on (task 121).
+    return done(picture ? openUpAfter(trimmed, point, -d, ids, onV1) : openUpStretch(trimmed, point, -d, ids))
   }
   const point = Math.min(...members.map((m) => spanEnd(m.clip)))
   const trimmed = reshape(p, ids, (x) => ({ ...x, sourceOut: x.sourceOut + d }))
@@ -409,16 +412,19 @@ function closingTrim(
   alone = false
 ): { trimmed: Timeline; at: number; length: number; ids: ReadonlySet<string>; short: (Clip | SoundClip)[] } | null {
   const c = closingOn(p, clipId, alone)
-  if (!c || !strictlyInside(c, frame)) return null
-  const into = frame - c.timelineStart
+  if (!c) return null
+  // A frame in a sound's lead-in or tail, outside its picture, is measured on
+  // the sound, but still closes up on every track (task 130).
+  const by = strictlyInside(c, frame) ? c : findClip(p, clipId)!.clip
+  if (!strictlyInside(by, frame)) return null
+  const length = edge === 'start' ? frame - by.timelineStart : spanEnd(by) - frame
   const ids = new Set(linkedIds(p, clipId))
-  const length = edge === 'start' ? into : spanLength(c) - into
   const trimmed = reshape(p, ids, (x) =>
     edge === 'start'
       ? { ...x, sourceIn: Math.min(x.sourceIn + length, x.sourceOut - 1) }
       : { ...x, sourceOut: Math.max(x.sourceOut - length, x.sourceIn + 1) }
   )
-  return { trimmed, at: edge === 'start' ? c.timelineStart : frame, length, ids, short: tooShortFor(p, ids, length) }
+  return { trimmed, at: edge === 'start' ? c.timelineStart : spanEnd(c) - length, length, ids, short: tooShortFor(p, ids, length) }
 }
 
 /**

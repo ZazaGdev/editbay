@@ -19,7 +19,7 @@ export type InspectorProps = ComponentProps<typeof Inspector>
 
 export function useInspectorProps(app: AppState): InspectorProps | null {
   const { windowSettings, setWindowSettings, timeline, framing, alsoChanged, peaks, selected, selectedCaption, aspectLocked, setAspectLocked, picture,
-    zoomEnd, setZoomEnd, zoomTools, choosePicture, captionMove, relocateHandPlaced, setRelocateHandPlaced, painter, paint, frameSelected, textEdit,
+    zoomEnd, setZoomEnd, zoomPicked, setZoomPicked, zoomTools, choosePicture, captionMove, relocateHandPlaced, setRelocateHandPlaced, painter, paint, frameSelected, textEdit,
     blurBox, copiedCrop, savedLayouts, layoutActions, inspectorShapes, playheadStore, marks, keys, editClip, run, setCaptionMove, seek, setBlurBox,
     setView, changeColour, proj, changeText, lastTextStyle, project } = app
   const inspectorEdit = useSteady(editClip)
@@ -85,6 +85,8 @@ export function useInspectorProps(app: AppState): InspectorProps | null {
     picture,
     zoomEnd,
     onZoomEnd: setZoomEnd,
+    zoomPicked,
+    onZoomPicked: setZoomPicked,
     zoomTools,
     onPicture: choosePicture,
     onEdit: inspectorEdit,

@@ -5,14 +5,16 @@ promises about every release, and this list is how they are kept.
 
 ## Before building
 
-1. Everything is committed, and CI, started by hand from the Actions tab (Run workflow) on
-   `main`, is green. It no longer runs on its own for a push.
+1. Everything is committed and pushed. GitHub Actions is switched off for this repo, because
+   its runs used up the month's minutes, so every check below runs on the development machine.
 2. `package.json` has the new version, and `CHANGELOG.md` has a section for it in place of
    **Unreleased**. Releases are named with two numbers where people see them: 1.0, 1.1, 1.2,
    tagged `v1.1`. `package.json` keeps three, `1.1.0`, because the build tools need it, so the
    installer's name is set by hand in `electron-builder.yml` (`artifactName`) to match.
-3. `npm run test:all` passes on a quiet machine. `npm run test:smoke` needs your own footage;
-   see `docs/smoke-checklist.md`, and do its **Still manual** items too.
+3. On a quiet machine, `npm run typecheck` passes, and so does `npm run test:all`: the unit
+   tests, the e2e tests, the smoke tests and the app tests (`npm run test:ui`), all of which must
+   pass before every release. `npm run test:smoke` needs your own footage; see
+   `docs/smoke-checklist.md`, and do its **Still manual** items too.
 
 ## Building
 

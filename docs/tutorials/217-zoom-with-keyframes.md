@@ -19,7 +19,9 @@ Zoom with as many points in a clip as you like, each easing into the next.
 nothing on screen changes. `Alt+K` on a Simple clip does it too. The picture eases from each
 keyframe to the next, Smoothly unless you choose otherwise. If the picture jumps rather than
 moves, the keyframe before has [Jump]: a Punch in, and a cut zoom from an edit list, make those.
-Dragging the crop box or typing the Crop numbers makes a keyframe as well.
+Once you have put or picked a keyframe here, dragging the crop box or typing the Crop numbers
+makes a keyframe at the playhead as well. With none picked, they only crop, and every keyframe
+moves with the crop.
 
 The strip under the numbers shows the clip with a diamond for each keyframe. Click one to go to
 it, drag it to move it, press `Delete` to remove it, or right click for [Smooth], [Steady],

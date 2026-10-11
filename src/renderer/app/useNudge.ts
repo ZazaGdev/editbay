@@ -18,11 +18,12 @@ export function useNudge({
   selected,
   picture,
   zoomEnd,
+  zoomPicked,
   view,
   proj,
   editClip,
   frameSelected
-}: Pick<AppLocals, 'timeline' | 'playhead' | 'selected' | 'picture' | 'zoomEnd' | 'view' | 'proj'> &
+}: Pick<AppLocals, 'timeline' | 'playhead' | 'selected' | 'picture' | 'zoomEnd' | 'zoomPicked' | 'view' | 'proj'> &
   Pick<Selecting, 'framing' | 'frameSelected'> &
   Pick<EditClip, 'editClip'>) {
   /**
@@ -60,7 +61,7 @@ export function useNudge({
         const from = continuing ? (last.to as Rect) : now.crop
         to = moveCrop(from, dx, dy, { w: at.media.width, h: at.media.height })
         if (to.x === from.x && to.y === from.y) return
-        editClip(cropEdit(at.clip, playhead, to, pic, zoomEnd), continuing)
+        editClip(cropEdit(at.clip, playhead, to, pic, zoomEnd, zoomPicked), continuing)
       } else {
         // Places need a frame; Handoff has none.
         if (targetAspect(timeline) === null) return
@@ -72,7 +73,7 @@ export function useNudge({
       }
       lastNudge.current = { key, at: Date.now(), step: proj.step(), to }
     },
-    [timeline, framing, playhead, selected, picture, zoomEnd, view, proj, editClip, frameSelected]
+    [timeline, framing, playhead, selected, picture, zoomEnd, zoomPicked, view, proj, editClip, frameSelected]
   )
 
   return { nudge }

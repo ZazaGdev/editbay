@@ -21,6 +21,8 @@ export function SimpleZoom(props: {
   picture: string
   zoomEnd: boolean
   onZoomEnd: (end: boolean) => void
+  zoomPicked: boolean
+  onZoomPicked: (picked: boolean) => void
   onEdit: Edit
   onSeek: (frame: number) => void
   onKeyframes: () => void
@@ -62,6 +64,7 @@ export function SimpleZoom(props: {
   const pick = (which: 'start' | 'end'): void => {
     // Beside the picture, never in its place: choosing End keeps the picture chosen.
     props.onZoomEnd(which === 'end')
+    props.onZoomPicked(true)
     props.onSeek(which === 'end' ? last : first)
   }
   const closer = withScale(start, (scaleOfCrop(start) * amount) / 100, media.width, media.height, shape)
@@ -74,7 +77,7 @@ export function SimpleZoom(props: {
           testid="zoom-start"
           name="Start"
           meta="First frame"
-          chosen={!endChosen}
+          chosen={props.zoomPicked && !endChosen}
           crop={start}
           media={media}
           onClick={() => pick('start')}
@@ -83,13 +86,20 @@ export function SimpleZoom(props: {
           testid="zoom-end"
           name="End"
           meta={moving ? `Last frame, ${Math.round((scaleOfCrop(end) / scaleOfCrop(start)) * 100)}%` : 'Last frame, same as Start'}
-          chosen={endChosen}
+          chosen={props.zoomPicked && endChosen}
           crop={end}
           media={media}
           onClick={() => pick('end')}
         />
       </div>
-      <HelpTip text={`The crop box and the numbers below change the ${endChosen ? 'End' : 'Start'} picture.`} tutorial="215-zoom-in-and-out" />
+      <HelpTip
+        text={
+          props.zoomPicked
+            ? `The crop box and the numbers below change the ${endChosen ? 'End' : 'Start'} picture.`
+            : 'The numbers below change the Start picture. Pick Start or End to change it with the crop box too; until then the crop box only crops.'
+        }
+        tutorial="215-zoom-in-and-out"
+      />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
         <ZoomNumber
           label="Scale %"

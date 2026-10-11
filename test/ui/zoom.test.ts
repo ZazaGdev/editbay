@@ -679,3 +679,26 @@ describe('a Simple zoom', () => {
     await expect.poll(async () => (await keys()).map((k) => k.at), WAIT).toEqual([0, 149])
   })
 })
+
+/**
+ * Task 122: a crop with nothing picked in the Zoom panel is only a crop. Last
+ * in the file, since the crop is remembered for the recording's next clip.
+ */
+describe('a crop with nothing picked in the Zoom panel', () => {
+  it('moves the whole zoom with it and adds no keyframe', async () => {
+    await fresh()
+    await goTo(30)
+    await page.keyboard.press('Alt+KeyK')
+    await expect.poll(async () => (await keys()).map((k) => k.at), WAIT).toEqual([30])
+    // Another clip chosen and this one again: nothing picked.
+    await page.keyboard.press('Escape')
+    const clip = (await page.locator('[data-testid="clip"][data-kind="video"]').first().boundingBox())!
+    await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2)
+    await page.waitForSelector('[data-testid="zoom-group"]')
+    await goTo(90)
+    const before = (await keys())[0]!.crop
+    await typeInto('crop-x', String(before.x - 40))
+    await expect.poll(async () => (await keys())[0]!.crop.x, WAIT).toBe(before.x - 40)
+    expect((await keys()).map((k) => k.at)).toEqual([30])
+  })
+})

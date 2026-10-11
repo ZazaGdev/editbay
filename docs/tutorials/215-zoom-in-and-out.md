@@ -21,7 +21,8 @@ top chooses [Simple] or [Keyframes].
 
 Simple is two pictures. Start shows on the clip's first frame and End on its last, and the
 picture moves from one to the other. Choosing one sends the playhead to its frame, and the Source
-view names the crop box Start or End, with the other drawn dashed.
+view names the crop box Start or End, with the other drawn dashed. Until you press [Start] or
+[End], the crop box only crops: on a clip that zooms, the whole zoom moves with it.
 
 A new clip stays still: End is the same as Start. [Zoom in to 150%] and [Zoom out from 150%] start
 you off, as far as [How far] says (125%, 150% or 200%). [Cut] stays on Start and jumps to End

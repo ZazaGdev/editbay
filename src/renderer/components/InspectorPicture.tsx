@@ -49,6 +49,8 @@ export function PicturePanel(props: {
   picture: string
   zoomEnd: boolean
   onZoomEnd: (end: boolean) => void
+  zoomPicked: boolean
+  onZoomPicked: (picked: boolean) => void
   zoomTools?: ZoomTools | undefined
   /** The crop keeps its place's shape. */
   aspectLocked: boolean
@@ -117,7 +119,7 @@ export function PicturePanel(props: {
   /** The playhead a visit to the Crop numbers started at, whose keyframe they change. */
   const cropAt = useRef<number | null>(null)
   const setCropTo = (rect: { x: number; y: number; w: number; h: number }, continuing = false): void =>
-    props.onEdit(cropEdit(clip, cropAt.current ?? props.playhead?.get() ?? clip.timelineStart, rect, picture, props.zoomEnd), continuing)
+    props.onEdit(cropEdit(clip, cropAt.current ?? props.playhead?.get() ?? clip.timelineStart, rect, picture, props.zoomEnd, props.zoomPicked), continuing)
   /**
    * The crop when a crop number was entered: what the numbers typed there are
    * worked from, so a number typed past the edge and then taken back gives
@@ -447,6 +449,8 @@ export function PicturePanel(props: {
             picture={picture}
             zoomEnd={props.zoomEnd}
             onZoomEnd={props.onZoomEnd}
+            zoomPicked={props.zoomPicked}
+            onZoomPicked={props.onZoomPicked}
             tools={props.zoomTools}
             onEdit={props.onEdit}
             onSeek={props.onSeek}

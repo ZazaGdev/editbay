@@ -251,9 +251,11 @@ export function App(): JSX.Element {
    * Any other picture chosen, or another clip, starts on Start again.
    */
   const [zoomEnd, setZoomEnd] = useState(false)
+  const [zoomPicked, setZoomPicked] = useState(false)
   const choosePicture = useCallback((id: string): void => {
     setPicture(id)
     setZoomEnd(false)
+    setZoomPicked(false)
   }, [])
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   /** The selected clip's blurred box being moved on the Source view, if any (plan 85). */
@@ -455,6 +457,7 @@ export function App(): JSX.Element {
     const same = framedShape && c && slot > 0 ? c.layers[slot - 1]?.id : undefined
     setPicture(same ?? MAIN_PICTURE)
     setZoomEnd(false)
+    setZoomPicked(false)
   }, [selected, framedShape])
 
   const missingMedia = proj.missingMedia
@@ -560,7 +563,7 @@ export function App(): JSX.Element {
     project, sequenceId, timeline, peaks, silenceOpen, setSilenceOpen, silenceSettings, setPlaying, setPlayhead, seek, editClip
   })
 
-  const nudging = useNudge({ timeline, framing, playhead, selected, picture, zoomEnd, view, proj, editClip, frameSelected })
+  const nudging = useNudge({ timeline, framing, playhead, selected, picture, zoomEnd, zoomPicked, view, proj, editClip, frameSelected })
 
   /** The framing copied with Ctrl+Alt+C, ready to paste onto the clips selected. */
   const copiedFraming = useRef<Framing | null>(null)
@@ -704,7 +707,7 @@ export function App(): JSX.Element {
     relocateHandPlaced, setRelocateHandPlaced, peaks, setPeaks, view, setView, aspectLocked, setAspectLocked, trackSize, setTrackSize, monitorVolume,
     setMonitorVolume, scrubbing, setScrubbing, ffmpeg, exportOpen, setExportOpen, fullscreen, setFullscreen, recording, setRecording, phase, takeRef,
     cancelStart, windowSettings, setWindowSettings, binFolded, inspectorFolded, fold, exportRun, binColumn, inspectorColumn, timelineTracks, zoom,
-    setZoom, trackHeights, setTrackHeights, sequenceId, setSequenceId, places, setPlaces, lastTextStyle, lastFraming, picture, zoomEnd, setZoomEnd, choosePicture,
+    setZoom, trackHeights, setTrackHeights, sequenceId, setSequenceId, places, setPlaces, lastTextStyle, lastFraming, picture, zoomEnd, setZoomEnd, zoomPicked, setZoomPicked, choosePicture,
     shortcutsOpen, setShortcutsOpen, blurBox, setBlurBox, setVersionsAsked, settingsOpen, setSettingsOpen, tutorialsOpen, setTutorialsOpen,
     setPaletteOpen, captionsOpen, setCaptionsOpen, captionsScope, setCaptionsScope, captionsError, setCaptionsError, speech, exportAll, setExportAll,
     silenceOpen, setSilenceOpen, keys, enterPlace, showStepped, proj, here, save, undo, status, project, timeline, lighterCopies, total, stateNow,

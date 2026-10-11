@@ -169,6 +169,9 @@ export interface AppLocals {
   picture: string
   zoomEnd: boolean
   setZoomEnd: Set<boolean>
+  /** Task 122: Start, End or a keyframe picked in the Zoom panel, so a crop changes the zoom and not only the crop. */
+  zoomPicked: boolean
+  setZoomPicked: Set<boolean>
   choosePicture: (id: string) => void
   shortcutsOpen: boolean
   setShortcutsOpen: Set<boolean>

@@ -26,8 +26,9 @@ undo, and `Escape` puts back what it was.
 `Alt` with an arrow key nudges the box two pixels. Add `Shift` and it moves twenty. That is the
 difference between lining a face up properly and giving up.
 
-On a clip that zooms, the box and the numbers are the crop at the playhead, and changing them
-changes the zoom keyframe there, or makes one. See Zoom in and out during a clip.
+On a clip that zooms, the box and the numbers are the crop at the playhead. Changing them moves
+the whole zoom with them and adds no keyframe. To change the zoom itself, press Start or End or
+pick a keyframe in the Zoom section first. See Zoom in and out during a clip.
 
 This is how a landscape recording becomes a vertical video without squashing anything: you are
 not stretching the picture, you are choosing which part of it to keep. Source above 1080p is

@@ -94,6 +94,9 @@ interface InspectorProps {
   /** Whether that picture's End is chosen, for a Simple zoom, and choosing it or Start. */
   zoomEnd?: boolean | undefined
   onZoomEnd?: ((end: boolean) => void) | undefined
+  /** Whether Start, End or a keyframe is picked in the Zoom panel, and picking one or none. */
+  zoomPicked?: boolean | undefined
+  onZoomPicked?: ((picked: boolean) => void) | undefined
   /** How far the one click zooms go and how quickly, and the one that can be aimed now. */
   zoomTools?: ZoomTools | undefined
   /** `continuing` marks the later movements of a drag, which share its first's undo step. */
@@ -260,6 +263,8 @@ function InspectorBody(props: InspectorProps): JSX.Element | null {
           picture={props.picture}
           zoomEnd={props.zoomEnd === true}
           onZoomEnd={props.onZoomEnd ?? noZoomEnd}
+          zoomPicked={props.zoomPicked === true}
+          onZoomPicked={props.onZoomPicked ?? noZoomEnd}
           zoomTools={props.zoomTools}
           aspectLocked={props.aspectLocked}
           onAspectLock={props.onAspectLock}

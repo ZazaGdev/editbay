@@ -243,14 +243,21 @@ export function removedBetween(p: Timeline, first: string, second: string): numb
 /**
  * The pairs a join of `first` and `second` joins: that pair, and each clip
  * linked to either paired with the one that carries straight on from it at
- * the same cut. Null when one of them has no such partner, which would leave
- * the group out of step.
+ * the same cut. Null when one of them that is cut there too, ending or
+ * starting on the cut, has no such partner, which would leave the group out of
+ * step. One not cut there, as the next shot's sound in an L-cut that S left
+ * past the frame, needs none (audit 2026-10-10).
  */
 function joinPairs(p: Timeline, first: string, second: string, alone: boolean, removed = 0): [string, string][] | null {
   if (alone) return [[first, second]]
   const firsts = linkedIds(p, first)
   const seconds = linkedIds(p, second)
   const all = [...new Set([...firsts, ...seconds])]
+  const cut = spanEnd(findClip(p, first)!.clip)
+  const atCut = (id: string): boolean => {
+    const c = findClip(p, id)!.clip
+    return spanEnd(c) === cut || c.timelineStart === cut
+  }
   const pairs: [string, string][] = []
   const used = new Set<string>()
   for (const x of all) {
@@ -261,7 +268,30 @@ function joinPairs(p: Timeline, first: string, second: string, alone: boolean, r
     used.add(x)
     used.add(y)
   }
-  return used.size === all.length ? pairs : null
+  return all.every((x) => used.has(x) || !atCut(x)) ? pairs : null
+}
+
+/**
+ * The links a join makes one: each second piece's link becomes its first
+ * piece's, so the clips linked to either, such as a sound S left on the
+ * second piece's link, stay one group with the joined clip. Not when that
+ * would put two clips of the group on one track, as joining a picture alone
+ * leaves its two sound pieces.
+ */
+function mergedLinks(p: Timeline, pairs: readonly [string, string][]): Map<string, string> {
+  const merged = new Map<string, string>()
+  const gone = new Set(pairs.map(([, y]) => y))
+  for (const [x, y] of pairs) {
+    const a = findClip(p, x)!.clip.link
+    const b = findClip(p, y)!.clip.link
+    if (a === undefined || b === undefined || a === b) continue
+    const tracks = (link: string) =>
+      [...p.videoTracks, ...p.audioTracks].filter((r) => (r.clips as Span[]).some((c) => c.link === link && !gone.has(c.id))).map((r) => r.id)
+    const ta = tracks(a)
+    if (tracks(b).some((r) => ta.includes(r))) continue
+    merged.set(b, a)
+  }
+  return merged
 }
 
 /**
@@ -372,8 +402,10 @@ export function joinClips(p: Timeline, clipIds: readonly string[], alone = false
     if (!found) return out
     const ends = new Map(found.map(([x, y]) => [x, findClip(out, y)!.clip] as const))
     const gone = new Set(found.map(([, y]) => y))
-    const joined = <T extends Span & { transitionIn?: Transition; transitionOut?: Transition; exit?: Appear }>(c: T): T[] => {
-      if (gone.has(c.id)) return []
+    const links = mergedLinks(out, found)
+    const joined = <T extends Span & { transitionIn?: Transition; transitionOut?: Transition; exit?: Appear }>(x: T): T[] => {
+      if (gone.has(x.id)) return []
+      const c = x.link !== undefined && links.has(x.link) ? { ...x, link: links.get(x.link) } : x
       const end = ends.get(c.id) as T | undefined
       if (!end) return [c]
       const { transitionOut: _cut, exit: _exit, ...rest } = c

@@ -16,7 +16,7 @@ import type { AppState } from './app-state'
 
 export function MonitorArea({ app, timeline }: { app: AppState; timeline: TimelineData }): JSX.Element {
   const { skimming, peaks, proj, setSkimming, addSource, frameSelected, framing, playhead, view, windowSettings, setView, aspectLocked, playing,
-    picture, zoomEnd, aiming, aimAt, choosePicture, setWindowSettings, selected, lookingAt, captionMove, relocateHandPlaced, selectedCaption, select,
+    picture, zoomEnd, zoomPicked, aiming, aimAt, choosePicture, setWindowSettings, selected, lookingAt, captionMove, relocateHandPlaced, selectedCaption, select,
     setSelectedCaption, setCaptionMove, editClip, followEngine, onEnded, onClock, recording, recordSettings, soloList, monitorVolume, lighterCopies,
     voice, scrubbing, rate, loopRange, fullscreen, setFullscreen, assets, keys, status, importPaths, setTutorialsOpen, resized, blurBox, shapeDrawing,
     shapeDrawn, shapeLanded, shapeLine, textEdit, startTextEdit, setTextEdit, endTextEdit, setMonitorVolume, total, canPlay, phase, run, togglePlay, seek, level,
@@ -131,9 +131,10 @@ export function MonitorArea({ app, timeline }: { app: AppState; timeline: Timeli
         onCropChange={(clipId, pic, rect, continuing) => {
           // A picture's box is its crop at the playhead: for a picture
           // that zooms, the keyframe there, made if there is none, and
-          // for a Simple zoom its Start or End, whichever is chosen.
+          // for a Simple zoom its Start or End, whichever is chosen, while
+          // one is picked in the Zoom panel; otherwise only the crop.
           const c = findVideoClip(framing ?? timeline, clipId)?.clip
-          editClip(c ? cropEdit(c, playhead, rect, pic, zoomEnd) : { kind: 'setCrop', clipId, rect, picture: pic }, continuing)
+          editClip(c ? cropEdit(c, playhead, rect, pic, zoomEnd, zoomPicked) : { kind: 'setCrop', clipId, rect, picture: pic }, continuing)
         }}
         onPlaceChange={(clipId, pic, place, continuing, reshaped, fromCrop) => {
           // A box with keyframes is moved on the frame under the playhead, a

@@ -229,8 +229,12 @@ export type ClipEdit =
   | { kind: 'addTrack'; trackKind: TrackKind; trackId: string }
   /** Only an empty track goes, and never V1 or A1. */
   | { kind: 'removeTrack'; trackId: string }
-  /** The main picture's crop, or a layer's when `picture` names one. */
-  | { kind: 'setCrop'; clipId: string; rect: Rect; picture?: string }
+  /**
+   * The main picture's crop, or a layer's when `picture` names one. With
+   * `from`, the crop shown when it was changed, a zoom moves and scales as
+   * `from` became `rect`, keeping its motion (task 122).
+   */
+  | { kind: 'setCrop'; clipId: string; rect: Rect; picture?: string; from?: Rect }
   /**
    * A zoom keyframe on a frame of the recording, added or changed to this crop.
    * This and the zoom edits below are for the main picture unless `picture`

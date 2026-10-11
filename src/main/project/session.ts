@@ -712,7 +712,7 @@ function clipEdit(p: Timeline, edit: ClipEdit): Timeline {
     case 'setTrackHidden':
       return setTrackHidden(p, edit.trackId, edit.hidden)
     case 'setCrop':
-      return setCrop(p, edit.clipId, edit.rect, edit.picture)
+      return setCrop(p, edit.clipId, edit.rect, edit.picture, edit.from)
     case 'setZoomKey':
       // A small box is pinned where it is on that frame too (plan 97).
       return pinBoxWith(setZoomKey(p, edit.clipId, edit.at, edit.crop, edit.picture), edit.clipId, edit.at, edit.picture)

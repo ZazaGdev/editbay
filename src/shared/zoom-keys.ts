@@ -27,9 +27,12 @@ export function tidyCrop(rect: Rect, m: ProjectMedia): Rect {
  * named. Moving or resizing a crop leaves the layout as it was: the layout is
  * about where the boxes are.
  */
-export function setCrop(p: Timeline, clipId: string, rect: Rect, picture: string = MAIN_PICTURE): Timeline {
+export function setCrop(p: Timeline, clipId: string, rect: Rect, picture: string = MAIN_PICTURE, from?: Rect): Timeline {
   return updateVideoClip(p, clipId, (c, m) => {
     const crop = tidyCrop(rect, m)
+    // A crop changed from the one shown on a frame of a zoom: every keyframe
+    // follows it as that one did, and no keyframe is added (task 122).
+    if (from && (zoomOf(c, picture).keys?.length ?? 0) > 0) return mapCrops(c, following(from, crop, m), undefined, picture)
     if (picture === MAIN_PICTURE) {
       // With a zoom, the crop is the whole clip's framing: where it starts,
       // with every keyframe following it, moved and scaled as the start was

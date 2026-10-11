@@ -32,6 +32,9 @@ export function ZoomGroup(props: {
   /** Whether its End is chosen, for a Simple zoom, and choosing End or Start. */
   zoomEnd: boolean
   onZoomEnd: (end: boolean) => void
+  /** Whether Start, End or a keyframe is picked here, so the crop box and the Crop numbers change the zoom. */
+  zoomPicked: boolean
+  onZoomPicked: (picked: boolean) => void
   onEdit: Edit
   onSeek: (frame: number) => void
   tools?: ZoomTools | undefined

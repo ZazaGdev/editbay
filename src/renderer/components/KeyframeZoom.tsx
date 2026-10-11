@@ -55,6 +55,7 @@ export function KeyframeZoom(props: {
   onEdit: Edit
   onSeek: (frame: number) => void
   tools?: ZoomTools | undefined
+  onZoomPicked?: ((picked: boolean) => void) | undefined
 }): JSX.Element {
   const { clip, media, timeline, picture, tools } = props
   const own = picture === MAIN_PICTURE ? {} : { picture }
@@ -195,6 +196,8 @@ export function KeyframeZoom(props: {
           onClick={() => {
             const edit = toggleKeyEdit(clip, playhead, picture)
             if (edit) props.onEdit(edit)
+            // A keyframe put here is the zoom being worked on, as one picked on the strip is (task 122).
+            if (edit && key === undefined) props.onZoomPicked?.(true)
           }}
         >
           <Diamond filled={key !== undefined} />
@@ -212,7 +215,7 @@ export function KeyframeZoom(props: {
         />
       </div>
 
-      <KeyStrip clip={clip} picture={picture} playhead={playhead} fps={fps} onEdit={props.onEdit} onSeek={props.onSeek} />
+      <KeyStrip clip={clip} picture={picture} playhead={playhead} fps={fps} onEdit={props.onEdit} onSeek={props.onSeek} onPicked={props.onZoomPicked} />
 
       {leaving && (
         <div data-testid="zoom-ease-row" data-ease={leaving.ease ?? 'smooth'} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -307,7 +310,15 @@ function Diamond(props: { filled: boolean; size?: number }): JSX.Element {
  * playhead. Click a diamond to go to it, drag it to move it, Delete to take
  * it off, and right click for how it gets to the next one.
  */
-function KeyStrip(props: { clip: Clip; picture: string; playhead: number; fps: number; onEdit: Edit; onSeek: (frame: number) => void }): JSX.Element {
+function KeyStrip(props: {
+  clip: Clip
+  picture: string
+  playhead: number
+  fps: number
+  onEdit: Edit
+  onSeek: (frame: number) => void
+  onPicked?: ((picked: boolean) => void) | undefined
+}): JSX.Element {
   const { clip } = props
   const own = props.picture === MAIN_PICTURE ? {} : { picture: props.picture }
   const length = clipLength(clip)
@@ -322,6 +333,12 @@ function KeyStrip(props: { clip: Clip; picture: string; playhead: number; fps: n
   useEffect(() => {
     if (picked !== null && !keys.some((k) => k.at === picked)) setPicked(null)
   }, [keys, picked])
+  // Another clip or picture starts with none picked. A keyframe picked is the
+  // zoom being worked on, so the crop box changes it (task 122).
+  useEffect(() => setPicked(null), [clip.id, props.picture])
+  const { onPicked } = props
+  useEffect(() => onPicked?.(picked !== null), [picked, onPicked])
+  useEffect(() => () => onPicked?.(false), [onPicked])
 
   const share = (sourceFrame: number): number => (length > 0 ? (sourceFrame - clip.sourceIn + 0.5) / length : 0)
   const frameAtX = (clientX: number): number => {

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.2
+
+Cropping that only crops, and fixes to J-cuts and L-cuts on the timeline.
+
+### Fixed
+
+- Dragging a shot's head edge longer on V1, where the next shot's sound leads in from before
+  it, no longer cuts that sound in two and runs this shot's sound over it. The next shot moves
+  on whole, its sound with it.
+- Pressing I on a sound inside its lead-in, before its picture starts, now closes up on every
+  track. Before, a title on V2 over a later shot stayed where it was and ended up over a
+  different frame.
+- After S near where one shot's sound runs on under the next, or starts early under the one
+  before, Join puts the two pieces back. It used to refuse, and joining with Alt left the
+  picture and its sound apart, so dragging the picture left the sound behind.
+- Cropping a clip no longer adds zoom keyframes or starts it zooming. The crop box, the Crop
+  numbers and the nudge keys change the zoom only while Start, End or a keyframe is picked in
+  the Zoom section. Otherwise they only crop, and a clip that already zooms keeps its motion,
+  the whole zoom moving with the crop.
+
 ## 1.1
 
 A security fix for projects sent by someone else, and smaller fixes to the timeline.
