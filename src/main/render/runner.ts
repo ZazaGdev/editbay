@@ -208,7 +208,17 @@ export async function runExport(opts: RunExportOptions): Promise<string[]> {
   const total = Math.max(1, plan.totalFrames)
   let doneFrames = 0
 
-  const report = (p: ExportProgress): void => onProgress(p)
+  // Never backwards while it works: ffmpeg's own count can dip a frame or two
+  // between reports, which a slow machine shows as the bar jumping back (plan 104).
+  let furthest = 0
+  const report = (p: ExportProgress): void => {
+    if (p.stage === 'segment' || p.stage === 'join') {
+      furthest = Math.max(furthest, p.fraction)
+      onProgress({ ...p, fraction: furthest })
+    } else {
+      onProgress(p)
+    }
+  }
 
   await mkdir(scratchDir, { recursive: true })
   // ffmpeg will not create a directory for its output, it just fails. Make every
