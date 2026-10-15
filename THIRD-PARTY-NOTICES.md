@@ -22,6 +22,12 @@ this file says exactly which parts and where their source is.
   https://github.com/FFmpeg/FFmpeg/commit/946fcce07b . Build configuration and scripts:
   https://www.gyan.dev/ffmpeg/builds/ . The build's own record of its version, source commit
   and full configuration ships with the app as `licences/FFmpeg-build-and-source.txt`.
+- **Mac versions:** the same FFmpeg 9.0.2, built for Apple Silicon and Intel Macs by Martin
+  Riedl (https://ffmpeg.martin-riedl.de/, build scripts at
+  https://git.martin-riedl.de/ffmpeg/build-script), `ffmpeg` and `ffprobe` each downloaded by
+  `npm install` on a Mac and checked against its SHA-256. Also GPL-3.0, configured with
+  `--enable-gpl --enable-version3` and libx264, libass and libzimg among others; its record
+  ships as `licences/FFmpeg-build-and-source-mac.txt`.
 
 This build is configured with `--enable-gpl --enable-version3` and includes libx264, libx265,
 libvidstab, librubberband and libvmaf. Those are why the licence is GPL-3.0 rather than LGPL.
@@ -118,6 +124,9 @@ you never use captions, Editbay never makes a network request at all.
 - **Version:** release `b5130`, the Windows x64 CPU build.
 - **Licence:** MIT.
 - **Source:** https://github.com/ggml-org/whisper.cpp
+- **On a Mac** the program is not downloaded but bundled: `whisper-cli` built from the same tag
+  `b5130` by `scripts/build-whisper-mac.sh`, shipped inside the app as `whisper/whisper-cli`
+  with whisper.cpp's MIT licence beside it as `whisper/LICENSE`. Only the model is downloaded.
 
 ### Whisper speech model
 

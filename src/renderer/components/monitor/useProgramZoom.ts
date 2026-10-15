@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import type { Fit } from '../../../shared/crop-geometry'
 import type { MonitorBox } from '../../../shared/monitor-layout'
 import { MAX_OUTPUT_ZOOM, WHEEL_ZOOM, panBy, zoomAt, zoomedFit, type SourceZoom } from '../../../shared/source-zoom'
+import { zoomKey } from '../../../shared/system'
 
 /** The view's whole frame as a picture fitted to it: the view itself. */
 function whole(box: MonitorBox): { fit: Fit; size: { w: number; h: number } } {
@@ -33,7 +34,7 @@ export function useProgramZoom({ program, stageRef }: { program: MonitorBox | nu
   const onWheel = useRef<(e: WheelEvent) => void>(() => undefined)
   onWheel.current = (e: WheelEvent): void => {
     const stage = stageRef.current
-    if (!e.ctrlKey || !stage || !program) return
+    if (!zoomKey(e) || !stage || !program) return
     const box = stage.getBoundingClientRect()
     const pointer = { x: e.clientX - box.left - program.x, y: e.clientY - box.top - program.y }
     if (pointer.x < 0 || pointer.y < 0 || pointer.x > program.width || pointer.y > program.height) return

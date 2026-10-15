@@ -23,10 +23,18 @@ import { chooseExportFolder, closeExport, discardUnsavedWork, openExport } from 
  * for this test, which can be driven: the installer's own cannot.
  */
 
-// EDITBAY_PACKAGED_DIR points at another build's win-unpacked folder, for
-// checking a fresh build while the usual one is open and cannot be replaced.
-const UNPACKED = process.env.EDITBAY_PACKAGED_DIR ?? join(process.cwd(), 'release-test', 'win-unpacked')
-const EXE = join(UNPACKED, 'Editbay.exe')
+// EDITBAY_PACKAGED_DIR points at another build's win-unpacked folder, or a
+// Mac build's Editbay.app, for checking a fresh build while the usual one is
+// open and cannot be replaced.
+const MAC = process.platform === 'darwin'
+const UNPACKED =
+  process.env.EDITBAY_PACKAGED_DIR ??
+  (MAC
+    ? join(process.cwd(), 'release-test', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app')
+    : join(process.cwd(), 'release-test', 'win-unpacked'))
+// A Mac app keeps its program and its resources inside the bundle (plan 104).
+const EXE = MAC ? join(UNPACKED, 'Contents', 'MacOS', 'Editbay') : join(UNPACKED, 'Editbay.exe')
+const RESOURCES = MAC ? join(UNPACKED, 'Contents', 'Resources') : join(UNPACKED, 'resources')
 const built = existsSync(EXE)
 
 const fx = fixtureSet('packaged')
@@ -60,31 +68,41 @@ afterAll(async () => {
 
 describe.skipIf(!built)('the packaged application', () => {
   it('ships ffmpeg and ffprobe as files of their own beside the archive, and nothing else of their build', async () => {
-    expect((await readdir(join(UNPACKED, 'resources', 'ffmpeg'))).sort()).toEqual(['ffmpeg.exe', 'ffprobe.exe'])
+    expect((await readdir(join(RESOURCES, 'ffmpeg'))).sort()).toEqual(MAC ? ['ffmpeg', 'ffprobe'] : ['ffmpeg.exe', 'ffprobe.exe'])
+  })
+
+  it.runIf(MAC)("ships whisper.cpp's program inside the app on a Mac, with its licence", () => {
+    expect(existsSync(join(RESOURCES, 'whisper', 'whisper-cli'))).toBe(true)
+    expect(existsSync(join(RESOURCES, 'whisper', 'LICENSE'))).toBe(true)
   })
 
   it('ships the captions\' font as a file of its own, where the export burns captions in with it, and its licence', () => {
-    expect(existsSync(join(UNPACKED, 'resources', 'fonts', 'Montserrat-ExtraBold.ttf'))).toBe(true)
-    expect(existsSync(join(UNPACKED, 'resources', 'licences', 'Montserrat-OFL.txt'))).toBe(true)
+    expect(existsSync(join(RESOURCES, 'fonts', 'Montserrat-ExtraBold.ttf'))).toBe(true)
+    expect(existsSync(join(RESOURCES, 'licences', 'Montserrat-OFL.txt'))).toBe(true)
   })
 
   it('ships ONNX Runtime for Follow face beside the archive, CPU only, with the C++ runtime and the face model', async () => {
-    const bin = join(UNPACKED, 'resources', 'onnxruntime', 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', 'win32', 'x64')
+    const platform = MAC ? join('darwin', process.arch) : join('win32', 'x64')
+    const bin = join(RESOURCES, 'onnxruntime', 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', platform)
     const files = (await readdir(bin)).map((f) => f.toLowerCase()).sort()
-    expect(files).toContain('onnxruntime.dll')
     expect(files).toContain('onnxruntime_binding.node')
-    expect(files).toContain('vcruntime140.dll')
-    expect(files).not.toContain('directml.dll')
-    expect(existsSync(join(UNPACKED, 'resources', 'models', 'face_detection_yunet_2023mar.onnx'))).toBe(true)
-    expect(existsSync(join(UNPACKED, 'resources', 'licences', 'ONNXRuntime-MIT.txt'))).toBe(true)
+    if (MAC) {
+      expect(files).toContain('libonnxruntime.1.dylib')
+    } else {
+      expect(files).toContain('onnxruntime.dll')
+      expect(files).toContain('vcruntime140.dll')
+      expect(files).not.toContain('directml.dll')
+    }
+    expect(existsSync(join(RESOURCES, 'models', 'face_detection_yunet_2023mar.onnx'))).toBe(true)
+    expect(existsSync(join(RESOURCES, 'licences', 'ONNXRuntime-MIT.txt'))).toBe(true)
   })
 
   it('ships every licence notice, and nothing from node_modules', () => {
     for (const name of ['THIRD-PARTY-NOTICES.md', 'README.txt', 'FFmpeg-GPLv3.txt', 'Editbay-MIT.txt', 'React-MIT.txt', 'lucide-ISC.txt', 'ONNXRuntime-ThirdPartyNotices.txt']) {
-      expect(existsSync(join(UNPACKED, 'resources', 'licences', name))).toBe(true)
+      expect(existsSync(join(RESOURCES, 'licences', name))).toBe(true)
     }
     const packages = new Set(
-      listPackage(join(UNPACKED, 'resources', 'app.asar'), { isPack: false })
+      listPackage(join(RESOURCES, 'app.asar'), { isPack: false })
         .map((p) => p.replace(/\\/g, '/').match(/^\/node_modules\/(@[^/]+\/[^/]+|[^@/][^/]*)/)?.[1])
         .filter((p): p is string => p !== undefined)
     )
@@ -101,6 +119,8 @@ describe.skipIf(!built)('the packaged application', () => {
     const status = await page.textContent('[data-testid="ffmpeg-status"]')
     expect(status).toMatch(/ffmpeg version/i)
     expect(status).not.toMatch(/unusable/i)
+    // The Mac build's run keeps a picture of the window, for a person to look at (plan 104).
+    if (process.env.EDITBAY_SCREENSHOT) await page.screenshot({ path: process.env.EDITBAY_SCREENSHOT })
   })
 
   it('imports a file, which means ffprobe runs too', async () => {

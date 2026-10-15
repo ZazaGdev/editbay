@@ -32,6 +32,8 @@
     "dist": "electron-vite build && electron-builder --win --publish never",
     "dist:dir": "electron-vite build && electron-builder --win --dir --publish never",
     "dist:test": "electron-vite build && electron-builder --win --dir --publish never --config electron-builder.test.yml",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
+    "dist:mac:test": "electron-vite build && electron-builder --mac --dir --publish never --config electron-builder.test.yml",
     "test:packaged": "vitest run test/ui/packaged.test.ts",
     "cli:build": "node scripts/build-cli.mjs",
     "cli": "node out/cli/editbay-cli.cjs"

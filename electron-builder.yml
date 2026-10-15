@@ -16,44 +16,23 @@ files:
 
 # The captions' font, which ffmpeg burns them in with, as a file of its own,
 # and every licence notice, the font's included. The window has its own copy
-# of the font, bundled with its assets.
+# of the font, bundled with its assets. What differs by system, ffmpeg's
+# programs and ONNX Runtime's library, is under win and mac below, which
+# electron-builder adds to these.
 extraResources:
-  # ffmpeg and ffprobe, one gyan.dev build fetched by npm install (plan 89). As
-  # resources they are real files on disk, which they must be to be run.
-  - from: vendor/ffmpeg
-    to: ffmpeg
-    filter:
-      - ffmpeg.exe
-      - ffprobe.exe
   # Follow face (plan 100): ONNX Runtime, a native module, so it lives beside
-  # the app rather than in its bundle, CPU only (no DirectML, about 38 MB less),
-  # and the face model it runs.
+  # the app rather than in its bundle, CPU only, and the face model it runs.
+  # Its library for the system is under win and mac.
   - from: node_modules/onnxruntime-node
     to: onnxruntime/node_modules/onnxruntime-node
     filter:
       - package.json
       - dist/**/*.js
-      - bin/napi-v6/win32/x64/onnxruntime.dll
-      - bin/napi-v6/win32/x64/onnxruntime_binding.node
   - from: node_modules/onnxruntime-common
     to: onnxruntime/node_modules/onnxruntime-common
     filter:
       - package.json
       - dist/cjs/**/*
-  # The Visual C++ runtime ONNX Runtime is built against, which Electron does
-  # not carry and a PC without the redistributable lacks. Microsoft lets these
-  # files ship next to the program that uses them.
-  # One by one: a folder there cannot be scanned.
-  - from: C:/Windows/System32/msvcp140.dll
-    to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/msvcp140.dll
-  - from: C:/Windows/System32/msvcp140_1.dll
-    to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/msvcp140_1.dll
-  - from: C:/Windows/System32/msvcp140_atomic_wait.dll
-    to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/msvcp140_atomic_wait.dll
-  - from: C:/Windows/System32/vcruntime140.dll
-    to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/vcruntime140.dll
-  - from: C:/Windows/System32/vcruntime140_1.dll
-    to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/vcruntime140_1.dll
   - from: resources/models
     to: models
   - from: resources/fonts
@@ -98,6 +77,72 @@ win:
     - target: nsis
       arch:
         - x64
+  extraResources:
+    # ffmpeg and ffprobe, one gyan.dev build fetched by npm install (plan 89). As
+    # resources they are real files on disk, which they must be to be run.
+    - from: vendor/ffmpeg
+      to: ffmpeg
+      filter:
+        - ffmpeg.exe
+        - ffprobe.exe
+    # ONNX Runtime's Windows library, without DirectML (about 38 MB less).
+    - from: node_modules/onnxruntime-node/bin/napi-v6/win32/x64
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64
+      filter:
+        - onnxruntime.dll
+        - onnxruntime_binding.node
+    # The Visual C++ runtime ONNX Runtime is built against, which Electron does
+    # not carry and a PC without the redistributable lacks. Microsoft lets these
+    # files ship next to the program that uses them.
+    # One by one: a folder there cannot be scanned.
+    - from: C:/Windows/System32/msvcp140.dll
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/msvcp140.dll
+    - from: C:/Windows/System32/msvcp140_1.dll
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/msvcp140_1.dll
+    - from: C:/Windows/System32/msvcp140_atomic_wait.dll
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/msvcp140_atomic_wait.dll
+    - from: C:/Windows/System32/vcruntime140.dll
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/vcruntime140.dll
+    - from: C:/Windows/System32/vcruntime140_1.dll
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/vcruntime140_1.dll
+
+# The Mac (plan 104): a .dmg per chip, built on GitHub's Apple Silicon runners,
+# arm64 for M-series Macs and x64 for Intel ones (`npm run dist:mac -- --x64`,
+# with the Intel job's own minimum macOS and name, see .github/workflows/mac.yml).
+mac:
+  target:
+    - target: dmg
+  icon: build/icon.icns
+  category: public.app-category.video
+  # Not signed with Apple's certificate, so ad-hoc: Apple Silicon runs nothing
+  # unsigned. Hardened runtime stays off, since with an ad-hoc signature it
+  # refuses ONNX Runtime's library and silently cuts off the microphone.
+  identity: '-'
+  hardenedRuntime: false
+  # ONNX Runtime 1.30's Apple Silicon library is built for macOS 14.
+  minimumSystemVersion: '14.0'
+  artifactName: Editbay-1.2-arm64.${ext}
+  extendInfo:
+    NSMicrophoneUsageDescription: Editbay records your voice over from the microphone.
+  extraResources:
+    # ffmpeg and ffprobe for the chip, fetched by npm install (scripts/fetch-ffmpeg.mjs).
+    - from: vendor/ffmpeg
+      to: ffmpeg
+      filter:
+        - ffmpeg
+        - ffprobe
+    # whisper.cpp's program, built by scripts/build-whisper-mac.sh, and its licence.
+    - from: vendor/whisper
+      to: whisper
+      filter:
+        - whisper-cli
+        - LICENSE
+    # ONNX Runtime's library for the chip, both its names, as the binding loads one by the other's.
+    - from: node_modules/onnxruntime-node/bin/napi-v6/darwin/${arch}
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/darwin/${arch}
+      filter:
+        - '*.dylib'
+        - onnxruntime_binding.node
 
 nsis:
   # Releases are named with two numbers, 1.0, 1.1, where people see them; package.json keeps

@@ -13,6 +13,7 @@ import {
   type Timeline
 } from './project'
 import { spanEnd } from './tracks'
+import { joinIn } from './source-paths'
 import { type Place } from './layout'
 import type { BoxKey, PictureStyle, Rect } from './project'
 import { moves } from './crop-geometry'
@@ -247,8 +248,7 @@ export interface RenderPlan {
 
 
 function joinPath(dir: string, name: string): string {
-  const sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : '\\'
-  return `${dir}${sep}${name}`
+  return joinIn(dir, name)
 }
 
 function segmentArgs(opts: {

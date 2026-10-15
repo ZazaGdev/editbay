@@ -285,7 +285,8 @@ describe('making captions in the background', () => {
   })
 })
 
-describe('the speech model, the first time', () => {
+// The Windows download of the program: a Mac's comes with the app (plan 104).
+describe.runIf(process.platform === 'win32')('the speech model, the first time', () => {
   let server: Server
   let base = ''
   const files = new Map<string, Buffer>()

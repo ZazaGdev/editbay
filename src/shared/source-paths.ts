@@ -1,5 +1,6 @@
 import type { ProjectMedia, TrackFile } from './project'
 import type { Workspace } from './workspace'
+import { RUNNING_SYSTEM, type System } from './system'
 
 /**
  * Which paths a project file may make the app touch.
@@ -11,7 +12,9 @@ import type { Workspace } from './workspace'
  * pass on. So a project sent by someone else could reach out the moment it
  * was opened. A path on a share is used only once the user has allowed that
  * share; anything that is not a drive path or a share, a URL or a device
- * path, is never used.
+ * path, is never used. On a Mac a path from the root, `/Users/a.mp4`, is on
+ * this computer too (plan 104); on Windows one is never used, since Windows
+ * reads `\??\` and the like, which reach other computers, from the same shape.
  *
  * What was made from a source, its waveform, filmstrip and copies, is also
  * written when it is missing, to the path the project names. So those paths
@@ -28,26 +31,30 @@ const LOCAL = /^[A-Za-z]:[\\/]/
 // `;Redirector` prefix, would show the user one name and reach another.
 const SHARE = /^[\\/]{2}([A-Za-z0-9][A-Za-z0-9.\-@_]*)[\\/]([^\\/]+)/
 
-export function pathKind(path: string): PathKind {
+// A Mac path from the root: one slash, then a name.
+const MAC_LOCAL = /^\/(?![\\/])/
+
+export function pathKind(path: string, system: System = RUNNING_SYSTEM): PathKind {
   if (path.includes('\0')) return 'other'
   if (LOCAL.test(path)) return 'local'
   if (SHARE.test(path)) return 'share'
+  if (system === 'mac' && MAC_LOCAL.test(path)) return 'local'
   return 'other'
 }
 
 /** The share a path is on, as `\\host\share` in lower case, or null for one that is not on a share. */
-export function shareOf(path: string): string | null {
-  if (pathKind(path) !== 'share') return null
+export function shareOf(path: string, system: System = RUNNING_SYSTEM): string | null {
+  if (pathKind(path, system) !== 'share') return null
   const m = path.match(SHARE)
   return m ? `\\\\${(m[1] ?? '').toLowerCase()}\\${(m[2] ?? '').toLowerCase()}` : null
 }
 
 /** Whether the app may touch `path`: a drive path, or one on a share in `allowed`. */
-export function mayUse(path: string, allowed: ReadonlySet<string>): boolean {
-  const kind = pathKind(path)
+export function mayUse(path: string, allowed: ReadonlySet<string>, system: System = RUNNING_SYSTEM): boolean {
+  const kind = pathKind(path, system)
   if (kind === 'local') return true
   if (kind === 'other') return false
-  const share = shareOf(path)
+  const share = shareOf(path, system)
   return share !== null && allowed.has(share)
 }
 
@@ -147,6 +154,13 @@ export function mayLoad(url: string, allowed: ReadonlySet<string>): boolean {
   return path !== null && mayUse(path, allowed)
 }
 
+/** `name` in `dir`, joined with `/` for a Mac folder and `\` for any other. */
+export function joinIn(dir: string, name: string): string {
+  const mac = dir.startsWith('/') && !dir.includes('\\')
+  const sep = dir.endsWith('/') || dir.endsWith('\\') ? '' : mac ? '/' : '\\'
+  return `${dir}${sep}${name}`
+}
+
 /** A file name Windows accepts, from the last part of any path or URL. */
 function fileName(path: string): string {
   const last = path.split(/[\\/]/).filter((p) => p !== '').pop() ?? ''
@@ -184,7 +198,7 @@ export function withUsablePaths(m: ProjectMedia, rules: PathRules): ProjectMedia
     enhancedOk &&
     treatedOk
   if (fine) return m
-  const offline = (p: string): string => (ok(p) ? p : `${rules.offlineDir}\\${fileName(p)}`)
+  const offline = (p: string): string => (ok(p) ? p : joinIn(rules.offlineDir, fileName(p)))
   return {
     ...rest,
     originalPath: offline(m.originalPath),

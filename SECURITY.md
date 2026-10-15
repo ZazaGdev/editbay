@@ -51,6 +51,22 @@ build, and it only happens when something has changed.
 **It reads OBS's settings files** to find your recording folder, and nothing else in
 `%APPDATA%`.
 
+## On a Mac
+
+The Mac versions differ in a few ways:
+
+- **Nothing runs from a download.** The whisper program is built from the same pinned tag and
+  ships inside the app, so the only download is the speech model, checked against its SHA-256
+  like on Windows. No `tar`, `reg.exe` or PowerShell is run: a Mac learns the project file type
+  from the app itself.
+- **The app is signed ad-hoc, not with an Apple certificate**, and not notarised. Apple Silicon
+  runs nothing unsigned, so every program in the app carries an ad-hoc signature, which proves
+  the files have not changed since the build but not who built them. macOS asks you to allow
+  the app once (see the README). Every release publishes each `.dmg`'s SHA-256; check it with
+  `shasum -a 256` before opening one you got anywhere but this repository's releases page.
+- **The microphone** is asked for the first time you record a voice over, through macOS's own
+  prompt. A camera is never asked for.
+
 ## Things worth knowing
 
 - **The installer is not code signed.** Windows SmartScreen will warn you. Every release

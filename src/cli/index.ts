@@ -324,7 +324,8 @@ async function framesCommand(argv: string[]): Promise<unknown> {
 
 /** Where Editbay keeps the speech engine it downloaded, which `transcribe` uses rather than downloading its own. */
 function speechFolder(): string {
-  const appData = process.env.APPDATA
+  // A Mac keeps app data in the home folder's Application Support (plan 104).
+  const appData = process.platform === 'darwin' && process.env.HOME ? join(process.env.HOME, 'Library', 'Application Support') : process.env.APPDATA
   if (!appData) throw new Refusal('APPDATA is not set, so the speech engine Editbay downloaded cannot be found')
   return join(appData, 'editbay', 'speech')
 }
@@ -528,7 +529,12 @@ async function openCommand(argv: string[]): Promise<unknown> {
   if (!isProjectPath(project!)) throw new Refusal(`${project} is not an Editbay project`, 2)
   // Beside this tool, which is built into out/cli of the repository.
   const flag = args.flags.get('app')
-  const app = flag !== undefined ? given(flag) : join(__dirname, '..', '..', 'release', 'win-unpacked', 'Editbay.exe')
+  const release = join(__dirname, '..', '..', 'release')
+  const built =
+    process.platform === 'darwin'
+      ? join(release, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app', 'Contents', 'MacOS', 'Editbay')
+      : join(release, 'win-unpacked', 'Editbay.exe')
+  const app = flag !== undefined ? given(flag) : built
   if (!existsSync(app)) throw new Refusal(`Editbay is not at ${app}: build it with npm run dist:dir, or give --app <Editbay.exe>`)
   const child = spawn(app, [project!], { detached: true, stdio: 'ignore', windowsHide: false })
   await new Promise<void>((done, fail) => {

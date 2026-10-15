@@ -2,6 +2,11 @@
   "_": "Open-source check hits a person has looked at and found fine (plan 103). By file, and by the exact text matched where there is one; a file with no match is accepted whole. Add to it only after checking the hit.",
   "accepted": [
     {
+      "file": "test/unit/mac-system.test.ts",
+      "match": "/Users/me/",
+      "why": "a made-up Mac home folder the Mac path tests use, nobody's real one (plan 104)"
+    },
+    {
       "file": "resources/licences/ONNXRuntime-ThirdPartyNotices.txt",
       "why": "third-party licence text: its authors' names, emails and ordinary words"
     },

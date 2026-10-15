@@ -50,13 +50,13 @@ export function trustedShares(): ReadonlySet<string> {
  * project (audit 2026-10-01).
  */
 export function trustSharesForNow(paths: readonly string[]): void {
-  const added = paths.map(shareOf).filter((s): s is string => s !== null && !shares.has(s))
+  const added = paths.map((p) => shareOf(p)).filter((s): s is string => s !== null && !shares.has(s))
   if (added.length > 0) forNow = new Set([...forNow, ...added])
 }
 
 /** Allow the shares these paths are on. Paths that are not on a share change nothing. */
 export function trustSharesOf(paths: readonly string[]): Promise<void> {
-  return trustShares(paths.map(shareOf).filter((s): s is string => s !== null))
+  return trustShares(paths.map((p) => shareOf(p)).filter((s): s is string => s !== null))
 }
 
 /** Allow these shares, spelled as `shareOf` gives them. */

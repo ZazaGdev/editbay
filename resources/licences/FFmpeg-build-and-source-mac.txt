@@ -1,0 +1,32 @@
+FFmpeg and FFprobe in the Mac versions of Editbay
+=================================================
+
+Version: FFmpeg 9.0.2, the same release as the Windows version's, built for
+Macs by Martin Riedl and published at https://ffmpeg.martin-riedl.de/ .
+
+  Apple Silicon:  https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/
+  Intel:          https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/
+
+Each program is checked against the SHA-256 its publisher lists beside it
+before Editbay's build uses it (scripts/fetch-ffmpeg.mjs).
+
+Source: FFmpeg 9.0.2, https://github.com/FFmpeg/FFmpeg/commit/946fcce07b
+Build scripts, naming every library and its version:
+  https://git.martin-riedl.de/ffmpeg/build-script
+
+Licence: GPL version 3 (FFmpeg-GPLv3.txt, beside this file). The written
+offer for the complete source in README.txt covers these builds too.
+
+Configuration, as recorded in the programs themselves (the same for both
+chips but for the prefix):
+
+  --prefix=/Volumes/ffmpeg_arm64/out --pkg-config-flags=--static
+  --extra-version='https://www.martin-riedl.de' --enable-gray --enable-libxml2
+  --enable-version3 --enable-gpl --enable-openssl --enable-libfreetype
+  --enable-fontconfig --enable-libharfbuzz --enable-libbluray --enable-libsnappy
+  --enable-libsrt --enable-libvmaf --enable-libass --enable-libklvanc
+  --enable-libzimg --enable-libzvbi --enable-libaom --enable-libdav1d
+  --enable-libopenh264 --enable-libopenjpeg --enable-librav1e --enable-libsvtav1
+  --enable-libvpx --enable-libvvenc --enable-libwebp --enable-libx264
+  --enable-libx265 --enable-libmp3lame --enable-libopus --enable-libvorbis
+  --enable-libtheora

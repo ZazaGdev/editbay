@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, session, shell, systemPreferences } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { join, dirname } from 'node:path'
 import { registerIpc, settingsRead } from './ipc'
@@ -84,7 +84,16 @@ function allowMicrophoneOnly(): void {
       return
     }
     const types = (details as { mediaTypes?: string[] }).mediaTypes ?? []
-    callback(!types.includes('video'))
+    if (types.includes('video')) {
+      callback(false)
+      return
+    }
+    // A Mac asks the person once, the first time; after a no, only System Settings can change it.
+    if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+      void systemPreferences.askForMediaAccess('microphone').then(callback, () => callback(false))
+      return
+    }
+    callback(true)
   })
   session.defaultSession.setPermissionCheckHandler((_wc, permission, _origin, details) => {
     if (ALLOWED.has(permission)) return true
@@ -134,7 +143,7 @@ function createWindow(): void {
     // Electron's own binary, which carries Electron's icon, so that one is
     // pointed at the file. `build` is not packaged, which is why this is not
     // simply set both ways.
-    ...(app.isPackaged ? {} : { icon: join(here, '../../build/icon.ico') }),
+    ...(app.isPackaged ? {} : { icon: join(here, process.platform === 'win32' ? '../../build/icon.ico' : '../../build/icon.png') }),
     // Never able to take the focus either (task 78): whatever a test does to
     // the window, the keyboard stays with whoever is at the machine. Playwright
     // types into the page through the debugger, which needs no focus.
@@ -188,6 +197,25 @@ function createWindow(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // A Mac hands a double-clicked project, or one dropped on the Dock icon, to
+  // the app this way rather than on the command line, and can do it before the
+  // app is ready: such a one is kept for the start (plan 104).
+  let openedBeforeReady: string | null = null
+  let ready = false
+  app.on('open-file', (e, path) => {
+    e.preventDefault()
+    if (!ready) {
+      openedBeforeReady = path
+      return
+    }
+    const win = BrowserWindow.getAllWindows()[0] ?? null
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+    void openDocument(win, path)
+  })
+
   app.on('second-instance', (_e, argv, workingDirectory) => {
     const win = BrowserWindow.getAllWindows()[0] ?? null
     if (win) {
@@ -206,8 +234,12 @@ if (!app.requestSingleInstanceLock()) {
     }
     // Electron's default menu offers nothing of this app's own, and its hidden
     // accelerators would fire alongside any shortcut you bind: Ctrl+R reloads the
-    // window and loses unsaved work, Ctrl+W closes it.
-    Menu.setApplicationMenu(null)
+    // window and loses unsaved work, Ctrl+W closes it. A Mac keeps a menu bar
+    // whatever the app does, and copy, paste and undo in a text box go through
+    // its Edit menu, so it gets the app's own menu and that one only (plan 104).
+    Menu.setApplicationMenu(
+      process.platform === 'darwin' ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]) : null
+    )
     allowMicrophoneOnly()
     noUnknownShares()
     registerIpc()
@@ -218,17 +250,24 @@ if (!app.requestSingleInstanceLock()) {
       app.quit()
       return
     }
+    let startedWith: string | null = null
     try {
       // The project the app starts with is a new one in the shape you chose last.
       await settingsRead()
       resetProject()
-      await startup(app.getPath('userData'), AUTOSAVE_MS, projectPathFromArgs(process.argv, process.cwd()))
+      startedWith = openedBeforeReady
+      await startup(app.getPath('userData'), AUTOSAVE_MS, startedWith ?? projectPathFromArgs(process.argv, process.cwd()))
     } catch {
       // Whatever went wrong, a window must open: without one, this process
       // would hold the single instance lock and every later launch would hand
       // itself over to an app nobody can see.
     }
     createWindow()
+    ready = true
+    // One handed over while the app was starting, after the start had taken its project.
+    if (openedBeforeReady !== null && openedBeforeReady !== startedWith) {
+      void openDocument(BrowserWindow.getAllWindows()[0] ?? null, openedBeforeReady)
+    }
 
     // What a crash left in the temp folder and the cache, cleared in the
     // background: nothing waits on it, and whatever it cannot remove is left
@@ -239,8 +278,9 @@ if (!app.requestSingleInstanceLock()) {
       .then(() => pruneCache(cacheRoot(), cacheInUse()))
       .catch(() => undefined)
 
-    // Double-clicking a project opens this copy of the app.
-    if (shouldRegisterFileType(app.isPackaged, process.argv)) {
+    // Double-clicking a project opens this copy of the app. Windows only: a
+    // Mac learns the file type from the app's own Info.plist.
+    if (process.platform === 'win32' && shouldRegisterFileType(app.isPackaged, process.argv)) {
       void registerFileType(process.execPath).catch(() => undefined)
     }
 
@@ -249,7 +289,9 @@ if (!app.requestSingleInstanceLock()) {
     })
   })
 
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
-  })
+  // Closing the window ends the app on a Mac too. Closing stops autosave and
+  // shuts the queue opening, saving and exporting go through for good, so a
+  // second window would be dead; Editbay is a one-document app, so nothing is
+  // lost by quitting (plan 104).
+  app.on('window-all-closed', () => app.quit())
 }

@@ -13,6 +13,7 @@ import { Field } from '../ui/Field'
 import { Segmented } from '../ui/Segmented'
 import { Select } from '../ui/Select'
 import { HelpTip } from '../ui/HelpTip'
+import { RUNNING_SYSTEM } from '../../shared/system'
 
 /**
  * A text's words and how they look, in the Inspector. Every change draws the
@@ -23,8 +24,11 @@ import { HelpTip } from '../ui/HelpTip'
 const row = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, font: type.meta, color: ink.primary, padding: '3px 0' } as const
 const dim = { color: ink.muted } as const
 
-/** Fonts every Windows machine has, for when the list of installed ones cannot be read. */
-const FALLBACK_FONTS = ['Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS', 'Consolas', 'Georgia', 'Impact', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana']
+/** Fonts every Windows machine, or every Mac, has, for when the list of installed ones cannot be read. */
+const FALLBACK_FONTS =
+  RUNNING_SYSTEM === 'mac'
+    ? ['Arial', 'Arial Black', 'Avenir Next', 'Comic Sans MS', 'Courier New', 'Georgia', 'Helvetica', 'Helvetica Neue', 'Impact', 'Menlo', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana']
+    : ['Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS', 'Consolas', 'Georgia', 'Impact', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana']
 
 let installed: Promise<string[]> | null = null
 

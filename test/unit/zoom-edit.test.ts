@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// Windows' keys, pinned so the Mac runner tests the same rules.
+vi.mock('../../src/shared/system', async (original) => ({ ...(await original<typeof import('../../src/shared/system')>()), RUNNING_SYSTEM: 'windows' }))
 import { addClip, createTimeline, findVideoClip, setZoomKeys, type Clip, type ProjectMedia, type Timeline } from '../../src/shared/project'
 import {
   EASE_NAMES,

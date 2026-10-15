@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
-import { createReadStream, createWriteStream } from 'node:fs'
+import { createReadStream, createWriteStream, existsSync } from 'node:fs'
 import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { capture } from '../ffmpeg/spawn'
 
 /**
@@ -33,11 +34,19 @@ export const ENGINE_ZIP: SpeechFile = {
 }
 
 /**
+ * On a Mac (plan 104) the program comes inside the app, built from the same
+ * whisper.cpp tag, since whisper.cpp publishes no Mac program to download: only
+ * the model is downloaded there.
+ */
+const MAC = process.platform === 'darwin'
+
+/**
  * The program in ENGINE_ZIP and every library it loads, by their SHA-256 as
  * they come in it. Checked before each run, not only at the download: a file
  * changed in the data folder since would otherwise be run (audit 2026-10-01).
+ * None on a Mac, whose program is part of the app.
  */
-export const ENGINE_FILES: Readonly<Record<string, string>> = {
+export const ENGINE_FILES: Readonly<Record<string, string>> = MAC ? {} : {
   'whisper-cli.exe': '19b976e037c02c0de712fa26096842d4ebafca03c976b12e8e6123215e7aab58',
   'whisper.dll': 'b7bb4ba92bd36b8afe0c00059ca6a0f69c6767193bfb5f0761e9ed27b1087803',
   'ggml.dll': 'c6e88687d6aa0238f2e834a87958f38d2dc96075a6a7bf6fb8b9cd728a0faed2',
@@ -86,13 +95,33 @@ export const MODEL: SpeechModel = {
   dtw: 'medium.en'
 }
 
-/** What the engine is downloaded from: the program, zipped, and the model. */
+/** What the engine is downloaded from: the program, zipped, or null where it comes with the app, and the model. */
 export interface SpeechSources {
-  engine: SpeechFile
+  engine: SpeechFile | null
   model: SpeechModel
 }
 
-export const SOURCES: SpeechSources = { engine: ENGINE_ZIP, model: MODEL }
+export const SOURCES: SpeechSources = { engine: MAC ? null : ENGINE_ZIP, model: MODEL }
+
+/**
+ * The program that comes with the app on a Mac: in the installed app's
+ * resources, or in the vendor/whisper the build script made, found by walking
+ * up from this code as ffmpeg is.
+ */
+export function bundledCli(): string {
+  const resources = (process as { resourcesPath?: string }).resourcesPath
+  if (resources && existsSync(join(resources, 'whisper', 'whisper-cli'))) return join(resources, 'whisper', 'whisper-cli')
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (;;) {
+    const here = join(dir, 'vendor', 'whisper', 'whisper-cli')
+    if (existsSync(here)) return here
+    const up = dirname(dir)
+    if (up === dir) break
+    dir = up
+  }
+  // Not there: the name it would have, which is then found missing like any absent engine.
+  return join(resources ?? '', 'whisper', 'whisper-cli')
+}
 
 /** The folder the program is unpacked into, named after its build, so another build never mixes with this one. */
 const ENGINE_DIR = 'whisper-b5130'
@@ -107,7 +136,7 @@ export interface EnginePaths {
 /** Where the engine's program and model are, in the folder it is kept in. */
 export function enginePaths(folder: string, sources: SpeechSources = SOURCES): EnginePaths {
   return {
-    cli: join(folder, ENGINE_DIR, 'Release', 'whisper-cli.exe'),
+    cli: sources.engine ? join(folder, ENGINE_DIR, 'Release', 'whisper-cli.exe') : bundledCli(),
     model: join(folder, sources.model.name),
     dtw: sources.model.dtw
   }
@@ -248,7 +277,7 @@ export async function installEngine(
   const sources = opts.sources ?? SOURCES
   const paths = enginePaths(folder, sources)
   await mkdir(folder, { recursive: true })
-  const total = sources.engine.bytes + sources.model.bytes
+  const total = (sources.engine?.bytes ?? 0) + sources.model.bytes
   let done = 0
   // Told only when the whole percent changes: the window hears each one, and chunks come far faster.
   let told = -1
@@ -260,7 +289,10 @@ export async function installEngine(
     opts.onProgress(percent / 100)
   }
   const signal = opts.signal ? { signal: opts.signal } : {}
-  if (!(await isFile(paths.cli))) {
+  if (sources.engine === null) {
+    // Part of the app: nothing to download, and never unpacked with Windows' tar.
+    if (!(await isFile(paths.cli))) throw new SpeechError('The speech engine is missing from this copy of Editbay. Download Editbay again.')
+  } else if (!(await isFile(paths.cli))) {
     const zip = join(folder, sources.engine.name)
     await downloadFile(sources.engine, zip, { fetch: opts.fetch, onBytes, ...signal })
     try {

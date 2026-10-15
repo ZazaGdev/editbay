@@ -9,6 +9,7 @@ import { heldInWindows, nearestSeam, seamsOn, type TransitionSide, type Transiti
 import { MIN_CLIP_WIDTH, pxPerFrameAt, shownPart, trackHeights } from '../../shared/timeline-layout'
 import { clipLabel, clipLabels } from '../../shared/clip-name'
 import { peaksKey } from '../../shared/sound'
+import { commandKey } from '../../shared/system'
 import { useSteady } from '../state/useSteady'
 import { surface, ink, accent, meaning, track as trackColour, radius, type } from '../theme'
 import { Overview } from './Overview'
@@ -168,7 +169,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
       const length = span ? span.to - span.from : 1
       const targets = snapTargets(allTracks(), props.playhead)
       // Ctrl puts it in, opening up the sequence, on V1 only; anywhere else it is a plain drop.
-      const insert = e.ctrlKey && onto === t.videoTracks[0]!.id
+      const insert = commandKey(e) && onto === t.videoTracks[0]!.id
       // Put in, only its start matters: what is there moves on past its end.
       const frame = e.altKey ? raw : insert ? snapFrame(raw, targets, snapWithin) : snapMove(raw, length, targets, snapWithin)
       const trackId = typeof onto === 'string' ? onto : newId()
@@ -211,7 +212,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
         newTrack = true
       }
       // Ctrl takes it out and puts it in from V1 or onto it; anywhere else it is a plain move.
-      const insert = e.ctrlKey && (drag.fromV1 || trackId === t.videoTracks[0]!.id)
+      const insert = commandKey(e) && (drag.fromV1 || trackId === t.videoTracks[0]!.id)
       // Its start or end snaps to an edge or the playhead, unless Alt is held;
       // only its start when it is put in.
       const snap = e.altKey

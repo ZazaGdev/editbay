@@ -1,0 +1,120 @@
+name: Mac
+
+# Plan 104: the Mac versions, built and tested on GitHub's Apple Silicon Macs,
+# since nobody working on Editbay has a Mac. Started by hand, choosing the
+# chips, or by a push to the public repo's mac-dev branch, where Mac work is
+# tried while it is built: GitHub only starts a workflow by hand from the
+# default branch, and the public repo's main moves only at a release. On a
+# private repo each Mac minute counts ten times against the month's free ones,
+# so nothing else starts it.
+#
+# Both chips build on Apple Silicon. The Intel version is built for x64 and
+# tested through Rosetta, with an x64 Node, so it never needs one of GitHub's
+# Intel runners, which are being wound down.
+on:
+  push:
+    branches: [mac-dev]
+  workflow_dispatch:
+    inputs:
+      chips:
+        description: Which Mac versions to build
+        type: choice
+        options: [both, arm64, intel]
+        default: both
+
+jobs:
+  # The chips asked for, as the list the Mac job runs once for each of.
+  chips:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.pick.outputs.list }}
+    steps:
+      - id: pick
+        run: |
+          ARM='{"chip":"arm64","node_arch":"arm64","builder":"--arm64","whisper":"arm64","app":"mac-arm64","name":"Editbay-1.2-arm64","minimum":"14.0"}'
+          INTEL='{"chip":"intel","node_arch":"x64","builder":"--x64","whisper":"x86_64","app":"mac","name":"Editbay-1.2-intel","minimum":"13.4"}'
+          case "${{ inputs.chips }}" in
+            arm64) echo "list=[$ARM]" >> "$GITHUB_OUTPUT" ;;
+            intel) echo "list=[$INTEL]" >> "$GITHUB_OUTPUT" ;;
+            *) echo "list=[$ARM,$INTEL]" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  mac:
+    needs: chips
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.chips.outputs.list) }}
+    name: ${{ matrix.chip }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub's Apple Silicon images come with Rosetta; asked again in case one does not.
+      - if: matrix.chip == 'intel'
+        run: softwareupdate --install-rosetta --agree-to-license || true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.node_arch }}
+          cache: npm
+
+      - run: node -p "process.arch"
+
+      # Its postinstall fetches the Mac ffmpeg for this Node's chip.
+      - run: npm ci
+
+      # Face follow's engine stopped shipping for Intel Macs after 1.23; its
+      # common package is pinned to the same version, so both are put back.
+      - if: matrix.chip == 'intel'
+        run: |
+          npm install --no-save onnxruntime-node@1.23.2 onnxruntime-common@1.23.2
+          test "$(node -p "require('onnxruntime-node/package.json').version")" = 1.23.2
+          test "$(node -p "require('onnxruntime-common/package.json').version")" = 1.23.2
+          ls node_modules/onnxruntime-node/bin/napi-v6/darwin/x64
+
+      - run: vendor/ffmpeg/ffmpeg -hide_banner -buildconf | head -40
+
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:e2e
+
+      - run: sh scripts/build-whisper-mac.sh ${{ matrix.whisper }}
+
+      # The copy the packaged test drives, then the .dmg people download.
+      - run: npm run dist:mac:test -- ${{ matrix.builder }} -c.mac.minimumSystemVersion=${{ matrix.minimum }}
+      - run: npm run dist:mac -- ${{ matrix.builder }} -c.mac.minimumSystemVersion=${{ matrix.minimum }} "-c.mac.artifactName=${{ matrix.name }}.\${ext}"
+
+      - name: Every program in the app is signed
+        run: |
+          APP="release/${{ matrix.app }}/Editbay.app"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          R="$APP/Contents/Resources"
+          for f in "$R/ffmpeg/ffmpeg" "$R/ffmpeg/ffprobe" "$R/whisper/whisper-cli" "$R"/onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/darwin/*/*; do
+            echo "== $f"
+            codesign -dv "$f" 2>&1 | grep -E "Identifier|Signature|flags"
+          done
+          lipo -archs "$APP/Contents/MacOS/Editbay" "$R/ffmpeg/ffmpeg" "$R/whisper/whisper-cli"
+          /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" -c "Print :NSMicrophoneUsageDescription" "$APP/Contents/Info.plist"
+
+      - name: The packaged app starts, exports and makes captions
+        run: npm run test:packaged
+        env:
+          EDITBAY_SCREENSHOT: ${{ github.workspace }}/screenshot-${{ matrix.chip }}.png
+
+      - name: SHA-256
+        run: |
+          cd release
+          shasum -a 256 ${{ matrix.name }}.dmg | tee ${{ matrix.name }}.dmg.sha256
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.name }}
+          if-no-files-found: ignore
+          path: |
+            release/${{ matrix.name }}.dmg
+            release/${{ matrix.name }}.dmg.sha256
+            screenshot-${{ matrix.chip }}.png

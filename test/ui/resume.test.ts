@@ -289,7 +289,8 @@ async function crash(app: ElectronApplication): Promise<void> {
 /** Autosave every half second rather than every minute, so a crash can follow quickly. */
 const FAST_AUTOSAVE = { EDITBAY_AUTOSAVE_MS: '500' }
 
-describe('after a crash', () => {
+// Crashed with Windows' taskkill.
+describe.runIf(process.platform === 'win32')('after a crash', () => {
   it('offers the last autosave of a saved project, and Restore brings the edit back', async () => {
     const { userData, files } = await workspaceDir()
     const target = join(files, 'demo.editbay')

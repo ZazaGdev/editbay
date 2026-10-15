@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// These are Windows' keys; the Mac's are in mac-system.test.ts. Pinned so the Mac runner tests the same rules.
+vi.mock('../../src/shared/system', async (original) => ({ ...(await original<typeof import('../../src/shared/system')>()), RUNNING_SYSTEM: 'windows' }))
+
 import {
   ACTIONS,
   comboFromEvent,

@@ -11,6 +11,7 @@ import { Waveform } from './Waveform'
 import { ClipKeyframes } from './ClipKeyframes'
 import { Icon, type IconName } from '../ui/Icon'
 import { marksFit, pictureMarks, soundMarks, type ClipMark, type ClipMarkKind } from '../../shared/clip-marks'
+import { COMMAND_KEY_NAME, commandKey } from '../../shared/system'
 import { surface, ink, accent, meaning, danger, clip as clipColour, radius, type } from '../theme'
 
 /**
@@ -290,7 +291,7 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
       // longer clip brings its footage back and a shorter one leaves no gap
       // (plan 82). Ctrl trims it alone, stopping at the next clip. A clip
       // taken on its own trims alone too: closing up would take its group.
-      const closesUp = props.ripples && !e.ctrlKey && !trim.alone
+      const closesUp = props.ripples && !commandKey(e) && !trim.alone
       const frame = e.altKey
         ? asked
         : snapTrim({
@@ -646,7 +647,7 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
           {props.ripples && (
             <span data-testid="edge-mode" style={{ font: type.meta, color: ink.secondary, textAlign: 'center' }}>
               {/* Saying so when something stops the rest following, and the drag trims only (audit 2026-10-01). */}
-              {trimAt.closesUp ? (props.trimBlocked ? `Trim only: ${props.trimBlocked} is in the way` : 'The rest follows. Ctrl: trim only') : 'Trim only'}
+              {trimAt.closesUp ? (props.trimBlocked ? `Trim only: ${props.trimBlocked} is in the way` : `The rest follows. ${COMMAND_KEY_NAME}: trim only`) : 'Trim only'}
             </span>
           )}
           <span style={{ font: type.monoSmall, color: ink.muted, textAlign: 'center' }}>

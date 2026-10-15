@@ -6,6 +6,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ZOOM_LEVELS, drawnSpan, type PxSpan } from '../../../shared/timeline-layout'
+import { zoomKey } from '../../../shared/system'
 import type { TimelineProps } from './props'
 
 /** How near the right edge the playhead comes while playing before the timeline scrolls on, in pixels. */
@@ -140,7 +141,7 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
     const el = scroller.current
     if (!el) return
     const lines = (d: number): number => (e.deltaMode === 1 ? d * 33 : d)
-    if (e.ctrlKey) {
+    if (zoomKey(e)) {
       if (!props.onZoomTo) return
       e.preventDefault()
       const from = asked.current ?? props.zoom

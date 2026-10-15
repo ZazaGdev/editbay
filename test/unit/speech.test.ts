@@ -145,7 +145,8 @@ describe('the mix', () => {
   })
 })
 
-describe('downloading the engine', () => {
+// Windows only: the program is downloaded and unpacked with Windows' tar there, and comes with the app on a Mac (plan 104).
+describe.runIf(process.platform === 'win32')('downloading the engine', () => {
   let server: Server
   let base = ''
   const files = new Map<string, Buffer>()
@@ -241,7 +242,7 @@ describe('downloading the engine', () => {
   })
 })
 
-describe('the engine before each run (audit 2026-10-01)', () => {
+describe.runIf(process.platform === 'win32')('the engine before each run (audit 2026-10-01)', () => {
   it('runs only while its program and libraries are the ones downloaded, and is taken away when one has changed', async () => {
     const folder = await mkdtemp(join(tmpdir(), 'editbay-engine-'))
     try {

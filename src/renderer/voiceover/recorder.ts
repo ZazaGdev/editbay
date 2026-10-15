@@ -1,5 +1,6 @@
 import { lineUp } from '../../shared/voiceover'
 import type { FinishedTake } from '../../shared/types'
+import { RUNNING_SYSTEM } from '../../shared/system'
 
 /**
  * A voice over take from the microphone. The sound comes in through an
@@ -81,6 +82,11 @@ export class MicrophoneRefused extends Error {}
 
 function refusal(err: unknown): MicrophoneRefused {
   const name = err instanceof DOMException ? err.name : ''
+  if ((name === 'NotAllowedError' || name === 'SecurityError') && RUNNING_SYSTEM === 'mac') {
+    return new MicrophoneRefused(
+      'macOS is not letting Editbay use the microphone. Allow it in System Settings, Privacy & Security, Microphone, then try again.'
+    )
+  }
   if (name === 'NotAllowedError' || name === 'SecurityError') {
     return new MicrophoneRefused(
       'Windows is not letting Editbay use the microphone. Allow it in Settings, Privacy & security, Microphone, under "Let desktop apps access your microphone".'

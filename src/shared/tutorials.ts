@@ -6,6 +6,21 @@
  * files themselves live in `docs/tutorials` and are bundled at build time; see
  * that folder's README for how to write one.
  */
+import { COMMAND_KEY_NAME, RUNNING_SYSTEM, type System } from './system'
+
+/**
+ * A tutorial's text as the keys read on this system. The files name Windows
+ * keys; on a Mac (plan 104) Ctrl reads Cmd and Alt reads Option, the keys the
+ * shortcuts are on there, and Home, End and F1 gain the Mac's own.
+ */
+export function forSystem(text: string, system: System = RUNNING_SYSTEM): string {
+  if (system !== 'mac') return text
+  return text
+    .replace(/\bCtrl\b/g, 'Cmd')
+    .replace(/\bAlt\b/g, 'Option')
+    .replace(/`Home` `End`/g, '`Home` `End` (`Cmd+←` `Cmd+→`)')
+    .replace(/`F1`/g, '`F1` (or `Cmd+?`)')
+}
 
 /**
  * The tabs, in the order they are drawn.
@@ -112,7 +127,7 @@ export const NEEDS = {
   shape: 'Draw a shape first, with the shapes button left of the timeline, then press Show me again.',
   sound: 'Drop a sound or a video with sound on the timeline first, then press Show me again.',
   linked: 'Drop a video with sound on the timeline first, then press Show me again.',
-  group: 'Group two clips first: select them and press Ctrl+G, then press Show me again.',
+  group: `Group two clips first: select them and press ${COMMAND_KEY_NAME}+G, then press Show me again.`,
   cut: 'Put two clips side by side on a track first, then press Show me again.',
   caption: 'Make captions first, with Captions in the top bar, then press Show me again.',
   transition: 'Add a transition at a cut first, then press Show me again.',

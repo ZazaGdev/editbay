@@ -6,7 +6,7 @@ A free, local video editor.
 
 ## How to install
 
-**Windows 11, 64-bit only.**
+**Windows 11, 64-bit.**
 
 1. Download `Editbay.Setup.<version>.exe` from the latest [release](../../releases/latest).
 2. Run it. Windows SmartScreen warns about an unrecognised app, because the installer is not
@@ -16,6 +16,21 @@ A free, local video editor.
 
 Each release lists the installer's SHA-256, so you can check the download with
 `certutil -hashfile Editbay.Setup.<version>.exe SHA256`.
+
+**Mac.** Being tested now, and on the Releases page from the next release:
+`Editbay-<version>-arm64.dmg` for Macs with an M chip (macOS 14 Sonoma or later) and
+`Editbay-<version>-intel.dmg` for Intel Macs (macOS 13.4 Ventura or later).
+
+1. Open the `.dmg` and drag Editbay into Applications.
+2. Double-click Editbay. macOS says it could not verify it, because the app is not signed with
+   an Apple certificate: click **Done**.
+3. Open **System Settings**, **Privacy & Security**, scroll down, and click **Open Anyway** next
+   to Editbay (it shows for about an hour after step 2). Enter your Mac's password, then
+   **Open**. From then on Editbay opens normally.
+
+If you are comfortable with Terminal, this one line does the same as steps 2 and 3:
+`xattr -dr com.apple.quarantine /Applications/Editbay.app`. Check the download against the
+SHA-256 the release lists with `shasum -a 256 Editbay-<version>-arm64.dmg`.
 
 ## TL;DR
 
@@ -34,7 +49,7 @@ has no account and no subscription, and nothing you open is ever uploaded anywhe
 <!-- DEMO: replace this comment with the capture of a real edit being made -->
 <!-- DEMO 2: a short capture of F1, a word typed, results from another category -->
 
-> **Windows 11 x64 only.** There is no macOS or Linux build yet. See
+> **Windows 11 x64**, and Mac versions from the next release. There is no Linux build. See
 > [Status](#status-and-limits) before you download.
 
 ## What it does
@@ -116,7 +131,8 @@ Two requests, in the entire lifetime of the application:
 
 Both happen only if you ask for captions, and both are checked against a SHA-256 recorded in
 the source before anything runs them. There is no telemetry, no account, no update check and
-no cloud render queue. If you never use captions, Editbay never opens a socket. The face model for Follow face
+no cloud render queue. If you never use captions, Editbay never opens a socket. On a Mac the
+whisper program comes inside the app, so the model is the only download. The face model for Follow face
 ships with the app, so it downloads nothing. The one other way out is a link: **Get free
 assets** opens a pack's page in your browser, and Editbay itself fetches nothing from it.
 
@@ -137,7 +153,10 @@ npm run dev
 ```
 
 `npm install` downloads ffmpeg and ffprobe, which do the encoding: one pinned gyan.dev build,
-checked against its SHA-256, into `vendor/ffmpeg`.
+checked against its SHA-256, into `vendor/ffmpeg`. On a Mac it downloads a pinned
+martin-riedl.de build for your chip instead, and `sh scripts/build-whisper-mac.sh arm64` (or
+`x86_64`) builds the speech program the Mac app carries; `npm run dist:mac` then makes the
+`.dmg`. `.github/workflows/mac.yml` does all of that on GitHub's Macs.
 
 To produce an installer:
 
@@ -225,9 +244,11 @@ with a plan file.
 
 Version 1.0. It works, it is used daily, and it has rough edges.
 
-- **Windows 11 x64 only.** A macOS build needs a different whisper binary, notarisation, a
-  replacement for the Windows registry file association and a different way to find
-  recordings. Help welcome.
+- **Windows 11 x64, and the Mac from the next release.** The Mac versions are built and
+  tested on GitHub's Mac machines, as nobody working on Editbay has a Mac, and they are not
+  signed with an Apple certificate, so macOS asks you to allow them once. Fast export on the
+  graphics card is NVIDIA only, so a Mac exports on the processor. The Intel Mac version keeps
+  working until Apple's own Intel support runs out, then stays at its last release.
 - **English captions only.** The bundled model is `medium.en`. Another language will produce
   nothing useful.
 - **The installer is unsigned**, so expect a SmartScreen warning.
