@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { join } from 'node:path'
 import { trackCopyArgs } from '../../src/main/media/tracks'
 import { trackPaths } from '../../src/main/media/cache'
 
@@ -38,8 +39,8 @@ describe('copying a recording\'s other audio tracks', () => {
 
   it('names each copy by its track number, so the second track is track-2', () => {
     expect(trackPaths('C:\\cache\\k', 1)).toEqual({
-      path: 'C:\\cache\\k\\track-2.m4a',
-      peaksPath: 'C:\\cache\\k\\peaks-2.bin'
+      path: join('C:\\cache\\k', 'track-2.m4a'),
+      peaksPath: join('C:\\cache\\k', 'peaks-2.bin')
     })
   })
 })

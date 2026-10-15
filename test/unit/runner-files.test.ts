@@ -96,7 +96,9 @@ describe('a file of its own for each clip', () => {
     const broken = async (): Promise<void> => {
       throw new Error('broken')
     }
-    vi.mocked(runFfmpeg).mockImplementationOnce(broken).mockImplementationOnce(broken)
+    // Tried twice only where there is a card to try first; a failure left queued would break the next test.
+    const once = vi.mocked(runFfmpeg).mockImplementationOnce(broken)
+    if (process.platform === 'win32') once.mockImplementationOnce(broken)
     await expect(run(batch())).rejects.toThrow()
     expect(await readFile(join(folder, 'a.mp4'), 'utf8')).toBe('new')
     expect((await readdir(folder)).filter((n) => n !== 'a.mp4')).toEqual([])

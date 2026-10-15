@@ -36,7 +36,8 @@ beforeEach(() => {
   readable = true
 })
 
-describe('the recordings watcher', () => {
+// Watches a made-up Windows folder, which only Windows' path rules read (plan 104).
+describe.runIf(process.platform === 'win32')('the recordings watcher', () => {
   it('lists what is there, newest first, and never announces it', async () => {
     write('old.mkv', 100, clock - 60_000)
     write('older.mkv', 100, clock - 120_000)

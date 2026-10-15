@@ -484,7 +484,8 @@ describe('whether the project has unsaved changes', () => {
   })
 })
 
-describe('the project name', () => {
+// Named from Windows paths, which only Windows' path rules read (plan 104).
+describe.runIf(process.platform === 'win32')('the project name', () => {
   it('takes the name of what was written, not of the file it went to', () => {
     session.resetProject()
     expect(session.projectName()).toBe('Untitled')

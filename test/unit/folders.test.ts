@@ -44,7 +44,8 @@ describe('a folder in Sources', () => {
   it('never reads outside itself', async () => {
     expect(insideOf(join(root, 'fx'), '..')).toBeNull()
     expect(insideOf(join(root, 'fx'), '../rec')).toBeNull()
-    expect(insideOf(join(root, 'fx'), 'C:\\Windows')).toBeNull()
+    // A drive is another place only on Windows; on a Mac this is a name like any other.
+    if (process.platform === 'win32') expect(insideOf(join(root, 'fx'), 'C:\\Windows')).toBeNull()
     expect(insideOf(join(root, 'fx'), 'whooshes')).toBe(join(root, 'fx', 'whooshes'))
     expect((await readLevel(join(root, 'fx'), '../rec', false)).files).toBeNull()
   })

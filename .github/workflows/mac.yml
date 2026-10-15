@@ -71,8 +71,12 @@ jobs:
       - if: matrix.chip == 'intel'
         run: |
           npm install --no-save onnxruntime-node@1.23.2 onnxruntime-common@1.23.2
-          test "$(node -p "require('onnxruntime-node/package.json').version")" = 1.23.2
-          test "$(node -p "require('onnxruntime-common/package.json').version")" = 1.23.2
+          # Read as files: onnxruntime-common's exports do not include its package.json.
+          for p in onnxruntime-node onnxruntime-common; do
+            v="$(node -p "JSON.parse(require('fs').readFileSync('node_modules/$p/package.json','utf8')).version")"
+            echo "$p $v"
+            test "$v" = 1.23.2
+          done
           ls node_modules/onnxruntime-node/bin/napi-v6/darwin/x64
 
       - run: vendor/ffmpeg/ffmpeg -hide_banner -buildconf | head -40

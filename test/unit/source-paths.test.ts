@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// Windows' rules; the Mac's are in mac-system.test.ts. Pinned so the Mac runner tests the same rules.
+vi.mock('../../src/shared/system', async (original) => ({ ...(await original<typeof import('../../src/shared/system')>()), RUNNING_SYSTEM: 'windows' }))
 import { MEDIA_FIELDS, fileUrlPath, insideDir, looksLikePlaylist, mayLoad, mayUse, pathKind, shareOf, sharesToAsk, usableProject, withUsablePaths, withWithheld, type PathRules } from '../../src/shared/source-paths'
 import type { ProjectMedia } from '../../src/shared/project'
 import { defaultWorkspace, type Workspace } from '../../src/shared/workspace'

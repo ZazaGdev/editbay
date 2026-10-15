@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { projectPathFromArgs } from '../../src/main/project/launch'
 
-describe('the project file the app was started with', () => {
+// Windows command lines, which only Windows' path rules read; a Mac hands the file over by its open-file event (plan 104).
+describe.runIf(process.platform === 'win32')('the project file the app was started with', () => {
   it('is found when Windows passes it after the program', () => {
     expect(projectPathFromArgs(['C:\\Apps\\Editbay.exe', 'D:\\trips\\holiday.editbay'], 'C:\\')).toBe(
       resolve('D:\\trips\\holiday.editbay')
