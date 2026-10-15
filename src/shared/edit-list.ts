@@ -49,6 +49,12 @@ import { cropAtKeys } from './crop-geometry'
 import { markerAt } from './markers'
 import { secondsToFrames } from './time'
 import type { PipCorner } from './pip'
+import { STILL_SEC } from './drawn-media'
+import { at, flag, fractionRect, list, noOverlaps, notNegative, object, oneOf, refuse, seconds, stretch, text, type Fields } from './edit-list-fields'
+import { LAYER_TRACK, layLayers, readLayer, type EditLayer } from './edit-list-layers'
+
+export { EditListError } from './edit-list-fields'
+export type { EditLayer, LayerBox } from './edit-list-layers'
 
 /**
  * The edit list: a rough cut described in plain JSON, written by a person or
@@ -149,6 +155,8 @@ export interface EditReel {
   cuts: EditCut[]
   zooms: EditZoom[]
   markers: EditMarker[]
+  /** Pictures and overlay clips laid over the cut (task 137). */
+  layers?: EditLayer[]
   /** Only in a version 2 list's reels. */
   shots?: EditShot[]
 }
@@ -188,89 +196,6 @@ export function cutsReport(list: EditList): { reel: number; fromSec: number; toS
   )
 }
 
-/** A list that cannot be read or honoured. The message starts with the field it is about. */
-export class EditListError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'EditListError'
-  }
-}
-
-function refuse(where: string, why: string): never {
-  throw new EditListError(where === '' ? why : `${where}: ${why}`)
-}
-
-type Fields = Record<string, unknown>
-
-/** An object, with nothing in it but the fields named: a misspelt field would otherwise be lost without a word. */
-function object(raw: unknown, where: string, required: readonly string[], optional: readonly string[] = []): Fields {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) refuse(where, 'must be an object')
-  const o = raw as Fields
-  for (const key of Object.keys(o)) {
-    if (!required.includes(key) && !optional.includes(key)) {
-      refuse(at(where, key), `is not a field of the edit list here; expected ${[...required, ...optional].join(', ')}`)
-    }
-  }
-  for (const key of required) if (!(key in o)) refuse(at(where, key), 'is missing')
-  return o
-}
-
-function at(where: string, key: string): string {
-  return where === '' ? key : `${where}.${key}`
-}
-
-function seconds(raw: unknown, where: string): number {
-  if (typeof raw !== 'number' || !Number.isFinite(raw)) refuse(where, 'must be a number of seconds')
-  return raw
-}
-
-function notNegative(raw: unknown, where: string): number {
-  const n = seconds(raw, where)
-  if (n < 0) refuse(where, 'must not be negative')
-  return n
-}
-
-function text(raw: unknown, where: string): string {
-  if (typeof raw !== 'string' || raw.trim() === '') refuse(where, 'must be some text')
-  return raw
-}
-
-function oneOf<T extends string>(raw: unknown, where: string, allowed: readonly T[]): T {
-  if (typeof raw !== 'string' || !allowed.includes(raw as T)) refuse(where, `must be one of ${allowed.join(', ')}`)
-  return raw as T
-}
-
-function flag(raw: unknown, where: string): boolean {
-  if (typeof raw !== 'boolean') refuse(where, 'must be true or false')
-  return raw
-}
-
-function list(raw: unknown, where: string): unknown[] {
-  if (!Array.isArray(raw)) refuse(where, 'must be a list')
-  return raw
-}
-
-/** A stretch from `fromSec` to `toSec`, which must come after it. */
-function stretch(o: Fields, where: string): { fromSec: number; toSec: number } {
-  const fromSec = notNegative(o.fromSec, at(where, 'fromSec'))
-  const toSec = notNegative(o.toSec, at(where, 'toSec'))
-  if (toSec <= fromSec) refuse(where, `ends at ${toSec} s, which is not after where it starts, ${fromSec} s`)
-  return { fromSec, toSec }
-}
-
-/** None of these stretches overlapping another; the later one of a pair is named, with the one it overlaps. */
-function noOverlaps(items: readonly { fromSec: number; toSec: number }[], name: string): void {
-  const order = items.map((s, i) => ({ s, i })).sort((a, b) => a.s.fromSec - b.s.fromSec)
-  for (let k = 1; k < order.length; k++) {
-    const before = order[k - 1]!
-    const now = order[k]!
-    if (now.s.fromSec < before.s.toSec) {
-      const [first, second] = before.i < now.i ? [before.i, now.i] : [now.i, before.i]
-      refuse(`${name}[${second}]`, `overlaps ${name}[${first}]`)
-    }
-  }
-}
-
 function readSource(raw: unknown, where: string): EditSource {
   const o = object(raw, where, ['id', 'path', 'offsetSec'])
   return { id: text(o.id, at(where, 'id')), path: text(o.path, at(where, 'path')), offsetSec: seconds(o.offsetSec, at(where, 'offsetSec')) }
@@ -288,21 +213,10 @@ function readCut(raw: unknown, where: string): EditCut {
   }
 }
 
-function fraction(raw: unknown, where: string): number {
-  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0 || raw > 1) refuse(where, 'must be a fraction from 0 to 1')
-  return raw
-}
-
 function readZoom(raw: unknown, where: string): EditZoom {
   const o = object(raw, where, ['fromSec', 'toSec', 'rect', 'how'], ['why', 'mark'])
   const span = stretch(o, where)
-  const r = object(o.rect, at(where, 'rect'), ['x', 'y', 'w', 'h'])
-  const rw = at(where, 'rect')
-  const rect = { x: fraction(r.x, at(rw, 'x')), y: fraction(r.y, at(rw, 'y')), w: fraction(r.w, at(rw, 'w')), h: fraction(r.h, at(rw, 'h')) }
-  if (rect.w === 0) refuse(at(rw, 'w'), 'must be more than 0')
-  if (rect.h === 0) refuse(at(rw, 'h'), 'must be more than 0')
-  // A little over 1 is rounding in whatever wrote it, not a rectangle off the picture.
-  if (rect.x + rect.w > 1 + 1e-6 || rect.y + rect.h > 1 + 1e-6) refuse(rw, 'reaches past the edge of the picture')
+  const rect = fractionRect(o.rect, at(where, 'rect'))
   return {
     ...span,
     rect,
@@ -318,7 +232,7 @@ function readMarker(raw: unknown, where: string): EditMarker {
 }
 
 const REEL_FIELDS = ['sources', 'main', 'sound', 'cuts', 'zooms', 'markers'] as const
-const REEL_OPTIONAL = ['soundTrack', 'view', 'corner', 'range'] as const
+const REEL_OPTIONAL = ['soundTrack', 'view', 'corner', 'range', 'layers'] as const
 
 function readShot(raw: unknown, where: string, hasCorner: boolean): EditShot {
   const o = object(raw, where, ['fromSec', 'toSec', 'why'], ['view', 'corner', 'mark'])
@@ -389,6 +303,7 @@ function readReel(o: Fields, where: string, withShots: boolean): EditReel {
   const zooms = list(o.zooms, f('zooms')).map((z, i) => readZoom(z, f(`zooms[${i}]`)))
   noOverlaps(zooms, f('zooms'))
   const markers = list(o.markers, f('markers')).map((m, i) => readMarker(m, f(`markers[${i}]`)))
+  const layers = o.layers === undefined ? undefined : list(o.layers, f('layers')).map((x, i) => readLayer(x, f(`layers[${i}]`)))
   let shots: EditShot[] | undefined
   if (withShots && o.shots !== undefined) {
     shots = list(o.shots, f('shots')).map((x, i) => readShot(x, f(`shots[${i}]`), corner !== undefined))
@@ -406,6 +321,7 @@ function readReel(o: Fields, where: string, withShots: boolean): EditReel {
     cuts,
     zooms,
     markers,
+    ...(layers ? { layers } : {}),
     ...(shots ? { shots } : {})
   }
 }
@@ -453,6 +369,8 @@ export interface SourceFacts {
   hasVideo: boolean
   /** How many audio tracks it has; OBS records up to six. */
   audioTracks: number
+  /** A picture rather than a recording, which the app gives the nominal length every picture has. */
+  still?: boolean
 }
 
 /**
@@ -485,6 +403,9 @@ interface Removed {
  * converted copy and track copies are the app's own.
  */
 function unimported(id: string, path: string, f: SourceFacts): ProjectMedia {
+  if (f.still) {
+    return { id, originalPath: path, playablePath: '', conformed: true, conformReasons: [], durationSec: STILL_SEC, width: f.width, height: f.height, fps: PROJECT_FPS, codec: f.codec, hasAudio: false, peaksPath: '', filmstripPath: '', audioTracks: 0, still: true }
+  }
   return {
     id,
     originalPath: path,
@@ -631,7 +552,7 @@ export function mediaIdOf(list: EditList, reel: number, sourceId: string): strin
  * their moments land in the cut. `where` is put before every field a
  * refusal names.
  */
-function layReel(base: Timeline, reel: EditReel, media: ReadonlyMap<string, ProjectMedia>, where: string, shape: string): Timeline {
+function layReel(base: Timeline, reel: EditReel, media: ReadonlyMap<string, ProjectMedia>, layerMedia: readonly ProjectMedia[], where: string, shape: string): Timeline {
   const f = (key: string): string => (where === '' ? key : `${where}.${key}`)
   const byId = (id: string): ProjectMedia => media.get(id)!
   const indexOf = (id: string): number => reel.sources.findIndex((s) => s.id === id)
@@ -769,6 +690,27 @@ function layReel(base: Timeline, reel: EditReel, media: ReadonlyMap<string, Proj
   if (removableStretches(t, out).length !== out.length) refuse(f('cuts'), 'Editbay could not take every cut out of the timeline')
   t = settleZoomKeys(removeStretches(t, out), t)
 
+  // The layers, over the cut once it is made, so a clip plays unbroken from where it lands.
+  const laid = layLayers(
+    t,
+    reel.layers ?? [],
+    layerMedia,
+    {
+      start: (sec, w) => {
+        const frame = frames(sec)
+        if (frame >= end) refuse(w, `is at ${sec} s, after the main source ends at ${main.durationSec} s`)
+        const gone = stretches.find((r) => frame >= r.from && frame < r.to)
+        if (gone) refuse(w, `is at ${sec} s, inside ${gone.by}, which is taken out`)
+        return landing(removed, frame)
+      },
+      end: (sec) => landing(removed, Math.min(end, frames(sec))),
+      reelEnd: v1End(t)
+    },
+    (i) => f(`layers[${i}]`),
+    shape
+  )
+  t = laid.timeline
+
   // Markers, where their moments land in the cut. Two on one frame share it, both named.
   const mark = (frame: number, label: string): void => {
     t = markOn(t, frame, label)
@@ -785,6 +727,7 @@ function layReel(base: Timeline, reel: EditReel, media: ReadonlyMap<string, Proj
     if (z.mark) mark(landing(removed, frames(z.fromSec)), why !== '' ? `Zoom: ${why}` : 'Zoom')
   }
   for (const s of shots) if (s.shot.mark) mark(landing(removed, Math.max(s.a, from)), `Shot: ${s.shot.why.trim()}`)
+  for (const m of laid.marks) mark(m.frame, m.label)
   reel.markers.forEach((m, i) => {
     const w = f(`markers[${i}]`)
     const at = frames(m.atSec)
@@ -846,6 +789,24 @@ export function buildFromEditList(list: EditList, facts: ReadonlyMap<string, Sou
     })
     return own
   })
+  // A layer's file is one source of the project however many times it is laid, as the subscribe animation three times.
+  const byPath = new Map<string, ProjectMedia>()
+  const taken = new Set(media.map((m) => m.id))
+  const perReelLayers = reels.map((reel, r) =>
+    (reel.layers ?? []).map((l, i) => {
+      const known = byPath.get(l.path)
+      if (known) return known
+      const found = facts.get(l.path)
+      if (!found) refuse(at(r, `layers[${i}]`), `${l.path} was not probed`)
+      let id = `layer${byPath.size + 1}`
+      while (taken.has(id)) id = `_${id}`
+      taken.add(id)
+      const m = unimported(id, l.path, found)
+      byPath.set(l.path, m)
+      media.push(m)
+      return m
+    })
+  )
   const first = perReel[0]!.get(reels[0]!.main)!
   const even = (n: number): number => Math.max(2, Math.floor(n / 2) * 2)
   const output = outputFor(list.shape, { width: even(first.width), height: even(first.height) })
@@ -856,11 +817,14 @@ export function buildFromEditList(list: EditList, facts: ReadonlyMap<string, Sou
   let t = empty
   const placed: ReelPlaced[] = []
   reels.forEach((reel, r) => {
-    const laid = layReel(empty, reel, perReel[r]!, where(r), list.shape)
+    const laid = layReel(empty, reel, perReel[r]!, perReelLayers[r]!, where(r), list.shape)
     const start = v1End(t)
     t = r === 0 ? laid : appendReel(t, laid, start)
     placed.push({ startFrame: start, endFrame: start + v1End(laid) })
   })
+  // The layer tracks above every other picture track, as a later reel's corner track would otherwise land over them.
+  const isLayer = (id: string): boolean => id.startsWith(LAYER_TRACK)
+  t = { ...t, videoTracks: [...t.videoTracks.filter((r) => !isLayer(r.id)), ...t.videoTracks.filter((r) => isLayer(r.id))] }
   return { project: withTimeline(project, FIRST_SEQUENCE_ID, t), reels: placed }
 }
 

@@ -100,7 +100,7 @@ jobs:
             echo "== $f"
             codesign -dv "$f" 2>&1 | grep -E "Identifier|Signature|flags"
           done
-          lipo -archs "$APP/Contents/MacOS/Editbay" "$R/ffmpeg/ffmpeg" "$R/whisper/whisper-cli"
+          for f in "$APP/Contents/MacOS/Editbay" "$R/ffmpeg/ffmpeg" "$R/whisper/whisper-cli"; do echo "$f: $(lipo -archs "$f")"; done
           /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" -c "Print :NSMicrophoneUsageDescription" "$APP/Contents/Info.plist"
 
       - name: The packaged app starts, exports and makes captions

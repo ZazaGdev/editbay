@@ -170,7 +170,9 @@ describe('transcribing', () => {
           { text: 'Hello', start: 1.0, end: 1.4 },
           { text: 'world.', start: 2.5, end: 3.0 }
         ]),
-        EDITBAY_FAKE_WHISPER_LOG: log
+        EDITBAY_FAKE_WHISPER_LOG: log,
+        // A pause between its progress lines, as the real engine has: without one a fast machine reads them all in one go.
+        EDITBAY_FAKE_WHISPER_DELAY_MS: '20'
       }),
       model: join(work, 'model.bin'),
       dtw: 'medium.en',

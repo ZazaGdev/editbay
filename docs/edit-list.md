@@ -85,6 +85,10 @@ and for every piece of picture which reel it came from, so times can be given in
   ],
   "markers": [
     { "atSec": 140.2, "label": "Unsure: two takes of the intro, kept both" }
+  ],
+  "layers": [
+    { "path": "D:/Sketches/floor-plan.png", "fromSec": 95.0, "toSec": 104.0, "box": "left-half", "why": "the sketch beside the result", "mark": true },
+    { "path": "D:/Assets/subscribe-green.mp4", "fromSec": 300.0, "key": "green", "why": "subscribe", "mark": true }
   ]
 }
 ```
@@ -123,6 +127,39 @@ and for every piece of picture which reel it came from, so times can be given in
   `rect` that is not closer than the frame already is, closer than 400%, or on the other half
   of a side-by-side canvas. Two zooms may meet on one frame, but not overlap.
 - `markers`: free markers, named by `label`.
+- `layers` (optional): pictures and clips laid over the cut, described below.
+
+## Layers: pictures and overlay clips
+
+A layer is a still picture, such as a hand sketch (PNG, JPEG, WebP, BMP or GIF), or a video
+clip, such as a subscribe animation, shown over the cut for a while. Each lands as an ordinary
+clip on a picture track above the cut, as a drop from Sources would, so it can still be moved,
+trimmed, keyed or deleted in the app.
+
+- `path`: the file. A path that is not whole is taken from the edit list's own folder, as a
+  source's is. The same file may be laid any number of times; the project holds it once.
+- `fromSec`: where it comes in, on the reel's main recording's clock, as a marker's `atSec`.
+  It lands where that moment lands in the cut. A moment inside a cut or outside the `range` is
+  refused, as a marker there is.
+- `toSec`: where it goes, on the same clock; a moment taken out lands on its join. Needed for a
+  picture. A clip left without it plays whole, from its start, unbroken by any cut after
+  `fromSec`; with it, the clip is trimmed to end there, and refused if that is longer than the
+  clip.
+- `box` (optional): the part of the frame it is fitted inside, keeping its own shape and
+  centred: `full` (the default), `left-half`, `right-half`, or `{ "x", "y", "w", "h" }` in
+  fractions of the frame, as `{ "x": 0.6, "y": 0.05, "w": 0.35, "h": 0.4 }` for the top right.
+- `key` (optional): `green`, `blue` or `black`, the plain background taken out, as Remove
+  background does in the app. Use the green-screen render of an animation with `"key": "green"`,
+  not a transparent WebM: the export reads a WebM without its transparency, so the clip would
+  cover the cut in black.
+- `why` (optional) and `mark`: `mark` puts a marker where it comes in, named by `why`, or by the
+  file's name without one.
+
+A clip's sound comes with it, on an audio track of its own, linked to its picture. Layers go on
+the lowest layer track with room, so ones that overlap stack in the order given, a later one
+over an earlier one; layer tracks are above the corner's. A layer that would run past the end
+of its reel in the cut is refused, as is one on a shape with no frame (`handoff`). `build`
+reports every layer laid as `layers`, with its `atSec` and `toSec` in seconds of the cut.
 
 Everything after the main source's end, or outside `range`, is left out. The tool refuses
 a list it cannot honour and says which entry and why; it never quietly drops one.

@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import path, { basename, dirname, extname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
-import { EditListError, buildFromEditList, cutsReport, readEditList, reelsOf, type EditList, type EditSource, type SourceFacts } from '../shared/edit-list'
+import { EditListError, buildFromEditList, cutsReport, readEditList, reelsOf, type EditList, type EditListV1, type EditReel, type SourceFacts } from '../shared/edit-list'
+import { LAYER_TRACK } from '../shared/edit-list-layers'
 import { joinProjectFile } from '../shared/project-file'
 import { defaultWorkspace } from '../shared/workspace'
 import { A1_ID, addSource, createTimeline, timelineOf, upsertTimelineMedia, v1Clips, type ProjectMedia, type Timeline } from '../shared/project'
@@ -13,7 +14,7 @@ import { peaksKey } from '../shared/sound'
 import { loudnessEnvelope, matchBySound, refineMatch } from '../shared/sync-by-sound'
 import { isProjectPath } from '../shared/project-ext'
 import type { PeaksData } from '../shared/types'
-import { probeAny, type ProbeResult, type SoundProbe } from '../main/media/probe'
+import { isStillPath, probeAny, type ProbeResult, type SoundProbe } from '../main/media/probe'
 import { detectVfr } from '../main/media/vfr'
 import { targetFrameRate } from '../main/media/conform'
 import { decodePeaks, extractPeaks } from '../main/media/waveform'
@@ -124,6 +125,23 @@ async function probe(file: string): Promise<Probed> {
   if (found.kind === 'sound') return found
   const v = found.probe.video
   return { kind: 'video', probe: found.probe, variableFrameRate: await detectVfr(file, v.nominalFps, v.averageFps) }
+}
+
+/**
+ * What a project needs to know about a picture: its size upright, as the app's
+ * import makes it, so a phone photo turned by its EXIF keeps its shape.
+ */
+async function pictureFacts(file: string): Promise<SourceFacts> {
+  let found: Awaited<ReturnType<typeof probeAny>>
+  try {
+    found = await probeAny(file)
+  } catch (err) {
+    throw new Refusal(`${file} could not be read as a picture: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  if (found.kind !== 'video') throw new Refusal(`${file} has no picture in it`)
+  const v = found.probe.video
+  const turned = Math.abs(v.rotationDeg) % 180 === 90
+  return { durationSec: 0, width: turned ? v.height : v.width, height: turned ? v.width : v.height, fps: 0, codec: v.codec, hasAudio: false, hasVideo: true, audioTracks: 0, still: true }
 }
 
 /** What a project needs to know about a source, from its probe. */
@@ -477,9 +495,9 @@ async function buildCommand(argv: string[]): Promise<unknown> {
     throw err
   }
   // A source's path is taken from the list's own folder when it is not a whole path.
-  const whole = (sources: EditSource[]): EditSource[] => sources.map((s) => ({ ...s, path: resolve(dirname(listPath!), s.path) }))
-  const resolved: EditList =
-    list.version === 1 ? { ...list, sources: whole(list.sources) } : { ...list, reels: list.reels.map((r) => ({ ...r, sources: whole(r.sources) })) }
+  const whole = <T extends { path: string }>(files: T[]): T[] => files.map((s) => ({ ...s, path: resolve(dirname(listPath!), s.path) }))
+  const wholeReel = <R extends EditReel | EditListV1>(r: R): R => ({ ...r, sources: whole(r.sources), ...(r.layers ? { layers: whole(r.layers) } : {}) })
+  const resolved: EditList = list.version === 1 ? wholeReel(list) : { ...list, reels: list.reels.map(wholeReel) }
   // Each file probed once, however many reels or roles it has.
   const facts = new Map<string, SourceFacts>()
   for (const [r, reel] of reelsOf(resolved).entries()) {
@@ -487,6 +505,11 @@ async function buildCommand(argv: string[]): Promise<unknown> {
       if (facts.has(s.path)) continue
       if (!existsSync(s.path)) throw new Refusal(`${resolved.version === 1 ? '' : `reels[${r}].`}sources[${i}].path: ${s.path} does not exist`)
       facts.set(s.path, factsOf(await probe(s.path)))
+    }
+    for (const [i, l] of (reel.layers ?? []).entries()) {
+      if (facts.has(l.path)) continue
+      if (!existsSync(l.path)) throw new Refusal(`${resolved.version === 1 ? '' : `reels[${r}].`}layers[${i}].path: ${l.path} does not exist`)
+      facts.set(l.path, isStillPath(l.path) ? await pictureFacts(l.path) : factsOf(await probe(l.path)))
     }
   }
 
@@ -517,8 +540,13 @@ async function buildCommand(argv: string[]): Promise<unknown> {
     pieces: pieces.map((c) => ({ reel: reelOf(c.timelineStart), fromSec: sec(c.sourceIn / fps), toSec: sec(c.sourceOut / fps), atSec: sec(c.timelineStart / fps) })),
     // Every stretch taken out, `fromSec` and `toSec` on the reel's main recording's clock, with its words.
     cuts: cutsReport(resolved),
-    corner: t.videoTracks.length > 1,
+    corner: t.videoTracks.some((r) => r.id !== t.videoTracks[0]!.id && !r.id.startsWith(LAYER_TRACK)),
     zooms: reelsOf(resolved).reduce((n, r) => n + r.zooms.length, 0),
+    // Each picture and overlay clip laid, where it is in the cut.
+    layers: t.videoTracks
+      .filter((r) => r.id.startsWith(LAYER_TRACK))
+      .flatMap((r) => r.clips.map((c) => ({ path: project.media.find((m) => m.id === c.mediaId)?.originalPath, atSec: sec(c.timelineStart / fps), toSec: sec((c.timelineStart + c.sourceOut - c.sourceIn) / fps) })))
+      .sort((a, b) => a.atSec - b.atSec),
     markers: t.markers.map((m) => ({ atSec: sec(m.frame / fps), name: m.name }))
   }
 }
