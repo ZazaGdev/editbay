@@ -87,7 +87,8 @@ describe.skipIf(!built)('the packaged application', () => {
     const files = (await readdir(bin)).map((f) => f.toLowerCase()).sort()
     expect(files).toContain('onnxruntime_binding.node')
     if (MAC) {
-      expect(files).toContain('libonnxruntime.1.dylib')
+      // 1.30 for Apple Silicon ships it under two names, 1.23 for Intel under one.
+      expect(files.some((f) => /^libonnxruntime\..*dylib$/.test(f))).toBe(true)
     } else {
       expect(files).toContain('onnxruntime.dll')
       expect(files).toContain('vcruntime140.dll')
