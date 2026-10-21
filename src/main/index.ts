@@ -169,6 +169,9 @@ function createWindow(): void {
     win.setIgnoreMouseEvents(true)
     win.once('ready-to-show', () => win.showInactive())
   }
+  // Nothing heard either (task 1097): the page plays and its sound is worked
+  // out as ever, so a test can still record it, but none reaches the speakers.
+  if (UNDER_TEST) win.webContents.setAudioMuted(true)
   guardClose(win)
   stayOnThePage(win)
   // The window's process gone, crashed or killed: drawn again on the project
@@ -236,9 +239,12 @@ if (!app.requestSingleInstanceLock()) {
     // accelerators would fire alongside any shortcut you bind: Ctrl+R reloads the
     // window and loses unsaved work, Ctrl+W closes it. A Mac keeps a menu bar
     // whatever the app does, and copy, paste and undo in a text box go through
-    // its Edit menu, so it gets the app's own menu and that one only (plan 104).
+    // its Edit menu, so it gets the app's own menu and that one only (plan 104),
+    // with the Window menu every Mac app has, for Cmd+M and Cmd+W (task 1388).
     Menu.setApplicationMenu(
-      process.platform === 'darwin' ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]) : null
+      process.platform === 'darwin'
+        ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
+        : null
     )
     allowMicrophoneOnly()
     noUnknownShares()

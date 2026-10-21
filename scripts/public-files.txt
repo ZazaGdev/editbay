@@ -12,6 +12,9 @@ docs/tutorials/
 docs/edit-list.md
 docs/releasing.md
 docs/smoke-checklist.md
+docs/index.html
+docs/site/
+docs/.nojekyll
 
 README.md
 LICENSE

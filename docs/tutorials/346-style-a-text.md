@@ -18,7 +18,10 @@ Set a text's font, colours, outline, shadow, glow and a box behind it.
 The [Text] section holds everything about a text:
 
 - **The words.** Several lines are fine; the preview follows as you type.
-- **Font, size and colour**, bold and italic. Any font installed on your PC.
+- **Font, size and colour**, bold and italic. [Font] lists the thirty fonts that come with the
+  app first, such as Inter, Roboto, Montserrat, Oswald and Playfair Display, which look the same
+  on any computer, then the common fonts on your PC, such as Arial and Segoe UI. A font a text
+  already uses stays in its list even when it is not one of these.
 - **Align** the lines left, centre or right, and set the **line spacing**.
 - **Outline** and **Shadow**, so it reads over bright and busy footage.
 - **Glow**, a blurred halo round the letters, as far as you set it reaching, in its own colour.

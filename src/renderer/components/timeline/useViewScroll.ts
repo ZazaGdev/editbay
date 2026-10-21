@@ -45,16 +45,16 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
    */
   const gesture = useRef<{ frame: number; x: number; scroll: number | null } | null>(null)
   /**
-   * The view moved away from the playhead while it plays, by Ctrl+wheel or the
-   * wheel: it is left there, rather than pulled back to the playhead on its
-   * next frame, which jumped a zoom about the pointer minutes back (task 125).
-   * Until playback stops or starts again.
+   * The view zoomed by Ctrl+wheel while it plays, or moved away from the
+   * playhead by the wheel: it is left there, rather than pulled back to the
+   * playhead on its next frame, which jumped a zoom about the pointer minutes
+   * back (tasks 125 and 1099). Until playback stops or starts again.
    */
   const leftBehind = useRef(false)
   const pxPerFrameRef = useRef(pxPerFrame)
   pxPerFrameRef.current = pxPerFrame
   const playheadOffScreen = (el: HTMLDivElement): boolean => {
-    const x = props.playhead * pxPerFrameRef.current
+    const x = props.playhead.get() * pxPerFrameRef.current
     return x < el.scrollLeft || x > el.scrollLeft + el.clientWidth
   }
 
@@ -93,16 +93,24 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
     const about = anchor.current
     anchor.current = null
     if (about) {
-      el.scrollLeft = Math.max(0, about.frame * pxPerFrame - about.x)
+      const want = about.frame * pxPerFrame - about.x
+      el.scrollLeft = Math.max(0, want)
       scrolledTo.current = el.scrollLeft
-      if (gesture.current) gesture.current.scroll = el.scrollLeft
-      if (props.playing && playheadOffScreen(el)) leftBehind.current = true
+      if (gesture.current) {
+        gesture.current.scroll = el.scrollLeft
+        // Against either end, the view could not go far enough: what is under
+        // the pointer now is what the next notches keep. Holding on to the
+        // moment it could not keep slid the view minutes away from the pointer
+        // as it zoomed back in (task 1099).
+        if (Math.abs(el.scrollLeft - want) > 1) gesture.current.frame = (el.scrollLeft + about.x) / pxPerFrame
+      }
       seeDrawn()
       return
     }
-    const wasAt = props.playhead * before - scrolledTo.current
+    const at = props.playhead.get()
+    const wasAt = at * before - scrolledTo.current
     const keepAt = wasAt >= 0 && wasAt <= el.clientWidth ? wasAt : el.clientWidth / 2
-    el.scrollLeft = Math.max(0, props.playhead * pxPerFrame - keepAt)
+    el.scrollLeft = Math.max(0, at * pxPerFrame - keepAt)
     scrolledTo.current = el.scrollLeft
     // Now rather than when the scroll event comes, so the new part is drawn before it is seen.
     seeDrawn()
@@ -112,16 +120,24 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
   // The playhead kept in view: moved to a frame outside the part in view, as
   // it plays on past the right edge or jumps, the timeline scrolls so it is a
   // tenth of the way in. Scrolling by hand while it stays still is left alone,
-  // and so is a scrub along the ruler.
+  // and so is a scrub along the ruler. Told by the playhead's store, so a tick
+  // that leaves it in view draws nothing of the timeline again.
+  const playing = useRef(props.playing)
+  playing.current = props.playing
   useLayoutEffect(() => {
-    const el = scroller.current
-    if (!el || scrubbing.current || (props.playing && leftBehind.current)) return
-    const x = props.playhead * pxPerFrame
-    const margin = props.playing ? FOLLOW_MARGIN : 0
-    if (x >= el.scrollLeft && x <= el.scrollLeft + el.clientWidth - margin) return
-    el.scrollLeft = Math.max(0, x - el.clientWidth / 10)
-    scrolledTo.current = el.scrollLeft
-    seeDrawn()
+    const store = props.playhead
+    const follow = (): void => {
+      const el = scroller.current
+      if (!el || scrubbing.current || (playing.current && leftBehind.current)) return
+      const x = store.get() * pxPerFrameRef.current
+      const margin = playing.current ? FOLLOW_MARGIN : 0
+      if (x >= el.scrollLeft && x <= el.scrollLeft + el.clientWidth - margin) return
+      el.scrollLeft = Math.max(0, x - el.clientWidth / 10)
+      scrolledTo.current = el.scrollLeft
+      seeDrawn()
+    }
+    follow()
+    return store.subscribe(follow)
   }, [props.playhead])
   // Playback stopped or started again: the view follows the playhead again.
   useEffect(() => {
@@ -156,6 +172,10 @@ export function useViewScroll(props: TimelineProps, pxPerFrame: number) {
       const frame = same ? run.frame : (el.scrollLeft + x) / pxPerFrame
       gesture.current = { frame, x, scroll: same ? run.scroll : null }
       anchor.current = { frame, x }
+      // While it plays the view stays where the zoom puts it, the playhead on
+      // screen or not: following it off the right edge then turned the view a
+      // whole screen on in the middle of the zoom, minutes when zoomed out (task 1099).
+      if (props.playing) leftBehind.current = true
       asked.current = next
       props.onZoomTo(next)
       return

@@ -10,7 +10,7 @@ Write your sequence out as a video file.
 
 1. Press [Export...] in the top bar, or `Ctrl+E`. {show: open-export}
 2. Choose this sequence or all of them, and one video or one file per clip. {show: open-export "Open Export, then choose what to export and how many files"}
-3. Pick a folder, and a name. {show: open-export "Open Export, then choose a folder"}
+3. Press [Choose...] beside the folder to pick where the files go, and give them a name. The small folder icon next to it opens that folder. {show: open-export "Open Export, then choose a folder"}
 4. Check the list of files it will write, then press [Export]. {show: open-export "Open Export, then press Export at the bottom"}
 
 ## Details

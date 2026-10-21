@@ -14,11 +14,12 @@ type Picture = { crop: Rect; place: Place; style?: PictureStyle; keys?: ZoomKey[
  */
 export function picturesAt(
   pictures: readonly Picture[],
-  move: { keys: ZoomKey[]; sourceIn: number; startFrame: number } | undefined,
+  move: { keys: ZoomKey[]; sourceIn: number; startFrame: number; speed?: number } | undefined,
   frame: number
 ): (Picture & { box?: { place: Place; opacity: number } })[] {
   if (!move) return [...pictures]
-  const at = move.sourceIn + frame - move.startFrame
+  // At the clip's speed, as the export counts it (plan 105).
+  const at = move.sourceIn + (frame - move.startFrame) * (move.speed ?? 1)
   return pictures.map((q, i) => {
     const keys = i === 0 ? move.keys : q.keys
     const zoomed = keys && keys.length > 0 ? { ...q, crop: cropAtKeys(q.crop, keys, at) } : q

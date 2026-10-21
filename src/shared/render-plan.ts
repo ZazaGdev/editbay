@@ -12,7 +12,7 @@ import {
   type Project,
   type Timeline
 } from './project'
-import { spanEnd } from './tracks'
+import { spanEnd, spanLength, sourceAt, speedOf } from './tracks'
 import { joinIn } from './source-paths'
 import { type Place } from './layout'
 import type { BoxKey, PictureStyle, Rect } from './project'
@@ -36,7 +36,10 @@ import {
   inputArgs,
   mediaOf,
   pictureGraph,
-  videoFilter
+  seekFrom,
+  timingOf,
+  videoFilter,
+  type Timing
 } from './render-pictures'
 import { AUDIO_RATE, heardInputs, round6, soundGraph, type Heard, type SoundShape, soundShape, heardOver } from './render-sound'
 import { blendFilters, fadePartway, overlayGraph, partway, xfadePartway, type Animation, type Overlay } from './render-overlays'
@@ -283,9 +286,9 @@ function segmentArgs(opts: {
 
   const args: string[] = []
   if (base) {
-    const into = piece.from - base.timelineStart
-    // Input seek before -i is frame accurate when re-encoding, and fast.
-    args.push(...inputArgs(mediaOf(timeline, base), framesToSeconds(Math.max(0, base.sourceIn + into), fps).toFixed(6), fps))
+    // Input seek before -i is frame accurate when re-encoding, and fast. At the
+    // clip's speed (plan 105), from the whole frame its head sits in.
+    args.push(...inputArgs(mediaOf(timeline, base), seekFrom(sourceAt(base, piece.from), fps).fromSec, fps))
   } else {
     args.push('-f', 'lavfi', '-t', durationSec, '-i', `color=c=black:s=${width}x${height}:r=${fps}`)
   }
@@ -321,20 +324,28 @@ function segmentArgs(opts: {
     return { anim: { pattern: framesPattern(m), rate: m.frameRate!, start: at.frame, into: at.into, ...(m.once === true ? { once: true } : {}) } }
   }
   /** Where a clip's own source is at the start of this piece, and how many frames it is short of it. */
-  const reach = (c: Clip): { fromSec: string; hold: number } => {
-    const at = c.sourceIn + (piece.from - c.timelineStart)
-    // A picture is the same frame wherever it is read, so nothing is held.
-    const hold = still(c) ? 0 : Math.max(0, -at)
-    return { fromSec: framesToSeconds(Math.max(0, at), fps).toFixed(6), hold }
+  const reach = (c: Clip): { fromSec: string; hold: number; part?: number } => {
+    const at = sourceAt(c, piece.from)
+    // A picture is the same frame wherever it is read, so nothing is held. The
+    // frames held are frames of the piece, at the clip's speed (plan 105).
+    const hold = still(c) ? 0 : Math.max(0, Math.ceil(-at / speedOf(c) - 1e-9))
+    const { fromSec, part } = seekFrom(at, fps)
+    return { fromSec, hold, ...(part > 0 && !still(c) ? { part } : {}) }
   }
   /** A clip's move, on the clock of this piece. */
   const moveOf = (c: Clip): { move?: Move; clock?: Clock } => {
-    const clock = { first: c.sourceIn + (piece.from - c.timelineStart), frames: piece.to - piece.from }
+    const clock = { first: sourceAt(c, piece.from), frames: piece.to - piece.from, ...(c.speed !== undefined ? { speed: c.speed } : {}) }
     return {
       ...(c.transform.keys && moves(c.transform.keys) ? { move: { keys: c.transform.keys, ...clock } } : {}),
       // Only when a further picture moves of its own, or a box moves (plan 97), which is all the clock is for.
       ...(c.layers.some((l) => (l.keys && moves(l.keys)) || boxMoves(l.boxKeys)) || boxMoves(c.transform.boxKeys) ? { clock } : {})
     }
+  }
+
+  /** A clip's speed, for the head of its chain, when it has one of its own (plan 105). */
+  const timingField = (c: Clip): { timing: Timing } | Record<string, never> => {
+    const timing = timingOf(c)
+    return timing ? { timing } : {}
   }
 
   const asPictures = (c: Clip): { crop: Rect; place: Place; style?: PictureStyle; boxKeys?: BoxKey[] }[] => [
@@ -357,6 +368,7 @@ function segmentArgs(opts: {
           ...(still(c) ? { still: true, ...cleanOverlay(c.transform), ...animationOf(c) } : {}),
           pictures: asPictures(c),
           ...moveOf(c),
+          ...timingField(c),
           ...(c.blurFill === true ? { blurFill: true } : {}),
           ...colourField(c),
           ...blurField(timeline, c),
@@ -364,7 +376,7 @@ function segmentArgs(opts: {
             ? {
                 appear: {
                   lead: piece.from - c.timelineStart,
-                  length: c.sourceOut - c.sourceIn,
+                  length: spanLength(c),
                   ...(c.enter ? { enter: c.enter } : {}),
                   ...(c.exit ? { exit: c.exit } : {})
                 }
@@ -379,6 +391,7 @@ function segmentArgs(opts: {
                   ...(still(blend.into) ? { still: true, ...cleanOverlay(blend.into.transform), ...animationOf(blend.into) } : {}),
                   pictures: asPictures(blend.into),
                   ...moveOf(blend.into),
+                  ...timingField(blend.into),
                   ...(blend.into.blurFill === true ? { blurFill: true } : {}),
                   ...colourField(blend.into),
                   ...blurField(timeline, blend.into),
@@ -430,26 +443,26 @@ function segmentArgs(opts: {
   // pictures of the same track mixed. Neither ever happens to the same clip in
   // the same piece: a window is one or the other.
   const washed = baseWash ? 'w' : under
-  const onePicture = (c: Clip, out: string, at: { input: number; hold: number }, tag: string): string =>
+  const onePicture = (c: Clip, out: string, at: { input: number; hold: number; part?: number }, tag: string): string =>
     // A blurred background fills round the picture, which the single chain's black bars cannot.
     framed && (hasLayout(c) || c.blurFill === true)
-      ? pictureGraph(fps, c, width, height, out, { input: at.input, startHold: at.hold, tag, still: still(c), ...animStartOf(c), ...moveOf(c), ...blurField(timeline, c) })
+      ? pictureGraph(fps, c, width, height, out, { input: at.input, startHold: at.hold, ...(at.part ? { part: at.part } : {}), tag, still: still(c), ...animStartOf(c), ...moveOf(c), ...blurField(timeline, c) })
       : // A plain clip keeps its single chain. Under Handoff, which has no
         // frame to place anything in, a clip exports its main picture only.
-        `[${at.input}:v]${videoFilter(fps, c.transform.crop, width, height, at.hold, moveOf(c).move, colourKey(c), still(c), animationOf(c).anim, blurField(timeline, c).headBlur, out)}[${out}]`
+        `[${at.input}:v]${videoFilter(fps, c.transform.crop, width, height, at.hold, moveOf(c).move, colourKey(c), still(c), animationOf(c).anim, blurField(timeline, c).headBlur, out, timingOf(c), at.part)}[${out}]`
 
   const filters: string[] = []
   if (!base) filters.push(`[0:v]setsar=1,${LABELLED_BT709}[${washed}]`)
   else if (baseInto) {
     // Both sides through the same chain first, so they are the same size, rate
     // and pixel format, which `xfade` will not work without.
-    filters.push(onePicture(base, 'xa', { input: 0, hold: reach(base).hold }, 'a'))
-    filters.push(onePicture(baseInto.clip, 'xb', { input: baseInto.input, hold: baseInto.hold }, 'b'))
+    filters.push(onePicture(base, 'xa', { input: 0, ...reach(base) }, 'a'))
+    filters.push(onePicture(baseInto.clip, 'xb', { input: baseInto.input, hold: baseInto.hold, ...(baseInto.part ? { part: baseInto.part } : {}) }, 'b'))
     filters.push(
       `[xa]format=yuv420p[xa1];[xb]format=yuv420p[xb1];` +
         xfadePartway('xa1', 'xb1', washed, baseBlend!.xfade, partway(piece.from, baseBlend!, fps), 'xab', blendFilters(baseBlend!.kind, partway(piece.from, baseBlend!, fps), fps, width, false))
     )
-  } else filters.push(onePicture(base, washed, { input: 0, hold: reach(base).hold }, ''))
+  } else filters.push(onePicture(base, washed, { input: 0, ...reach(base) }, ''))
   if (baseWash) filters.push(`[w]${fadePartway(baseWash.dir, baseWash.colour, partway(piece.from, baseWash, fps), baseWash.late)}[${under}]`)
   if (overlays.length > 0) filters.push(overlayGraph(fps, under, overlays, firstOverlay, width, height, pictured, piece.from))
   if (sharpen) filters.push(`[p]${SHARPEN}[${finished}]`)

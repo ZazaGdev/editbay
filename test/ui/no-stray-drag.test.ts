@@ -68,7 +68,7 @@ describe('a press on a control inside selected text', () => {
     expect(await drags()).toBe(0)
     await expect.poll(async () => Number(await slider.getAttribute('data-value')), WAIT).not.toBe(before)
     expect(await selected()).toBe('')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 
   it('selects nothing when the pointer is dragged across the Inspector\'s labels', async () => {

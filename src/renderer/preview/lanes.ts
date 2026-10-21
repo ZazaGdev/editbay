@@ -2,6 +2,7 @@ import type { Appear } from '../../shared/appear'
 import type { BlurRegion } from '../../shared/blur'
 import { fileUrl } from '../../shared/file-url'
 import type { BoxKey, PictureStyle, ZoomKey } from '../../shared/project'
+import type { ColourAdjust } from '../../shared/looks'
 import { SEEK_DRIFT_SEC, syncAction } from '../../shared/sound'
 
 /**
@@ -119,21 +120,44 @@ export function keepInStep(el: HTMLMediaElement, seconds: number, speed = 1): vo
     nextSeek.delete(el)
     el.currentTime = Math.max(0, seconds)
     // Catching up again from a standing start, as when it first plays.
-    el.playbackRate = STARTING_RATE * speed
+    el.playbackRate = starting(speed)
     return
   }
-  if (el.playbackRate !== action.rate) el.playbackRate = action.rate
+  const rate = Math.min(FASTEST, Math.max(SLOWEST, action.rate))
+  if (el.playbackRate !== rate) el.playbackRate = rate
+}
+
+/** The speed a player starts at to catch up, kept inside what a player can do. */
+function starting(speed: number): number {
+  return Math.min(FASTEST, STARTING_RATE * speed)
 }
 
 /** Where a clip's player should be at `t` of the sequence: never before its recording's first frame. */
 function timeIn(clip: LaneClip, t: number): number {
-  const at = clip.fileAtStart + (t - clip.startSec)
+  const at = clip.fileAtStart + (t - clip.startSec) * (clip.rate ?? 1)
   return clip.firstSec === undefined ? at : Math.max(clip.firstSec, at)
 }
 
 /** Whether `t` is before the clip's recording has any footage: a transition reaching back past its first frame. */
 function holding(clip: LaneClip, t: number): boolean {
-  return clip.firstSec !== undefined && clip.fileAtStart + (t - clip.startSec) < clip.firstSec - 1e-6
+  return clip.firstSec !== undefined && clip.fileAtStart + (t - clip.startSec) * (clip.rate ?? 1) < clip.firstSec - 1e-6
+}
+
+/**
+ * The fastest and slowest a player plays. Chromium refuses a speed outside
+ * these, and a clip at 16x played at 2x would ask for 32.
+ */
+const FASTEST = 16
+const SLOWEST = 0.0625
+
+/** How fast a player plays a clip while the sequence plays at `speed`: both speeds at once, kept inside what a player can do. */
+export function playerRate(clip: LaneClip | undefined, speed: number): number {
+  return Math.min(FASTEST, Math.max(SLOWEST, speed * (clip?.rate ?? 1)))
+}
+
+/** Where the sequence is when a clip's player is at `fileSec` of its file: the other way round from `timeIn`. */
+export function sequenceTimeOf(clip: LaneClip, fileSec: number): number {
+  return clip.startSec + (fileSec - clip.fileAtStart) / (clip.rate ?? 1)
 }
 
 /** One clip on a track, as its player needs it, in seconds of the sequence. */
@@ -145,6 +169,11 @@ export interface LaneClip {
   endSec: number
   /** Where its file is at its start, in the player's own time. */
   fileAtStart: number
+  /**
+   * Seconds of its file a second of the sequence plays: its clip's speed
+   * (plan 105). The player plays that much faster, its pitch kept. Absent for 1.
+   */
+  rate?: number
   /**
    * Where the recording's own first frame is, in the player's own time. A
    * transition reaching back past it has no footage there: the player holds
@@ -174,6 +203,10 @@ export interface PictureLaneClip extends LaneClip {
     keys?: ZoomKey[]
     /** Its box's keyframes (plan 97), read on the same clock. */
     boxKeys?: BoxKey[]
+    /** A further picture's own look, on top of the clip's (task 1188). */
+    look?: string
+    lookStrength?: number
+    adjust?: ColourAdjust
   }[]
   /** Its bars filled with itself, blurred. */
   blurFill?: boolean
@@ -184,7 +217,7 @@ export interface PictureLaneClip extends LaneClip {
    * moves, a further picture by its own keys on this same clock. Absent for a
    * clip that stays where it is put, which is almost all of them.
    */
-  move?: { keys: ZoomKey[]; sourceIn: number; startFrame: number }
+  move?: { keys: ZoomKey[]; sourceIn: number; startFrame: number; speed?: number }
   /** Its look, from `LOOKS`. Absent for the recording's own colour. */
   look?: string
   /** What of the recording it blurs, in the recording's pixels (plan 85). Absent for none. */
@@ -363,7 +396,8 @@ export class Lane<C extends LaneClip = LaneClip> {
         el.pause()
         continue
       }
-      if (el.playbackRate !== 1) el.playbackRate = 1
+      const rate = playerRate(wanted, 1)
+      if (el.playbackRate !== rate) el.playbackRate = rate
       void el.play().catch(() => undefined)
     }
   }
@@ -491,12 +525,12 @@ export class Lane<C extends LaneClip = LaneClip> {
         if (Math.abs(el.currentTime - want) > 0.05) setMediaTime(el, want)
       } else if (el.paused) {
         if (Math.abs(el.currentTime - want) > 0.05) setMediaTime(el, want)
-        el.playbackRate = source ? speed : STARTING_RATE * speed
+        el.playbackRate = source ? playerRate(clip, speed) : starting(playerRate(clip, speed))
         void el.play().catch(() => undefined)
       } else if (source) {
-        if (el.playbackRate !== speed) el.playbackRate = speed
+        if (el.playbackRate !== playerRate(clip, speed)) el.playbackRate = playerRate(clip, speed)
       } else if (correct) {
-        keepInStep(el, want, speed)
+        keepInStep(el, want, playerRate(clip, speed))
       }
     }
     const idle = 1 - this.active
@@ -511,9 +545,9 @@ export class Lane<C extends LaneClip = LaneClip> {
         if (holding(other, t)) {
           if (!el.paused) el.pause()
         } else if (el.paused) {
-          el.playbackRate = STARTING_RATE * speed
+          el.playbackRate = starting(playerRate(other, speed))
           void el.play().catch(() => undefined)
-        } else if (correct) keepInStep(el, timeIn(other, t), speed)
+        } else if (correct) keepInStep(el, timeIn(other, t), playerRate(other, speed))
       }
       return
     }

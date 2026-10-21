@@ -4,7 +4,7 @@
  */
 
 import { newId } from './ids'
-import { closeUpStarts, withStarts, type TrackOf, type Span, spanEnd, hasRoom, gapClosable } from './tracks'
+import { closeUpStarts, withStarts, type TrackOf, type Span, spanEnd, hasRoom, gapClosable, sourceAt } from './tracks'
 import type { Timeline, Clip, SoundClip } from './project'
 import { findClip, linkedIds, allClips, trackOf } from './timeline-query'
 import { asTwoPieces, splitEverything } from './split-join'
@@ -111,7 +111,7 @@ export function openUpStretch(
     if (leave.has(c.id)) return [c]
     if (c.timelineStart >= at) return [{ ...c, timelineStart: c.timelineStart + length }]
     if (!cutting.has(c.id)) return [c]
-    const cut = c.sourceIn + (at - c.timelineStart)
+    const cut = sourceAt(c, at)
     const { link: old, ...rest } = c
     const fresh = old === undefined ? undefined : links.get(old)
     const [firstLink, secondLink] = old !== undefined && moving.has(old) ? [fresh, old] : [old, fresh]

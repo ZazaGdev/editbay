@@ -26,7 +26,14 @@ let page: Page
 
 /** Put on the page before React loads: counts the clips drawn in each commit. */
 function countClipRenders(): void {
-  const w = window as unknown as { __clipRenders: number; __inspectorRenders: number; __transitionRenders: number; __REACT_DEVTOOLS_GLOBAL_HOOK__: unknown }
+  const w = window as unknown as {
+    __clipRenders: number
+    __inspectorRenders: number
+    __transitionRenders: number
+    __timelineRenders: number
+    __playheadLineRenders: number
+    __REACT_DEVTOOLS_GLOBAL_HOOK__: unknown
+  }
   w.__clipRenders = 0
   w.__inspectorRenders = 0
   w.__transitionRenders = 0
@@ -62,6 +69,17 @@ function countClipRenders(): void {
     const value = c && c.tag === CONTEXT_PROVIDER ? (c.memoizedProps?.['value'] as Record<string, unknown> | undefined) : undefined
     return value !== undefined && value !== null && 'folds' in value && 'onFold' in value
   }
+  // The timeline itself, by props only it is given.
+  const isTimeline = (f: Fiber): boolean =>
+    (f.tag === FUNCTION || f.tag === SIMPLE_MEMO) && f.memoizedProps !== null && 'onRemoveSilences' in f.memoizedProps && 'timeline' in f.memoizedProps
+  // The playhead's line over the tracks: what a tick is meant to draw again.
+  const isPlayheadLine = (f: Fiber): boolean => {
+    if (f.tag !== FUNCTION && f.tag !== SIMPLE_MEMO) return false
+    const c = f.child
+    return c !== null && c.tag === HOST && c.memoizedProps?.['data-testid'] === 'playhead-line'
+  }
+  w.__timelineRenders = 0
+  w.__playheadLineRenders = 0
   const renderers = new Map<number, unknown>()
   w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
     supportsFiber: true,
@@ -87,6 +105,8 @@ function countClipRenders(): void {
         if (isClip(next) && drawn) w.__clipRenders++
         if (isInspector(next) && drawn) w.__inspectorRenders++
         if (isTransition(next) && drawn) w.__transitionRenders++
+        if (isTimeline(next) && drawn) w.__timelineRenders++
+        if (isPlayheadLine(next) && drawn) w.__playheadLineRenders++
         if (prev !== null && next.child === prev.child) continue
         for (let c = next.child; c; c = c.sibling) stack.push([c, c.alternate])
       }
@@ -184,6 +204,39 @@ describe('the timeline while the playhead moves', () => {
 
     await page.mouse.move(box.x + box.width / 2, box.y - 200)
     await expect.poll(skim, { timeout: 5000 }).toBe('')
+  })
+})
+
+describe('the timeline while it plays (audit 2026-10-19, fix first 4)', () => {
+  it('draws only the playhead again on a tick of playback, never the whole timeline', async () => {
+    await blur()
+    await page.keyboard.press('Home')
+    const playhead = async (): Promise<number> => Number(await page.getAttribute('[data-testid="timecode"]', 'data-playhead'))
+    await expect.poll(playhead).toBe(0)
+    // The counters work: the timeline and its playhead line have been drawn.
+    const counts = (): Promise<{ timeline: number; line: number }> =>
+      page.evaluate(() => {
+        const w = window as unknown as { __timelineRenders: number; __playheadLineRenders: number }
+        return { timeline: w.__timelineRenders, line: w.__playheadLineRenders }
+      })
+    expect((await counts()).timeline).toBeGreaterThan(0)
+    await page.evaluate(() => {
+      const w = window as unknown as { __timelineRenders: number; __playheadLineRenders: number }
+      w.__timelineRenders = 0
+      w.__playheadLineRenders = 0
+    })
+    await page.keyboard.press('Space')
+    await page.waitForFunction(() => document.querySelector('[data-testid="play-pause"]')?.getAttribute('data-playing') === 'yes')
+    await expect.poll(playhead, { timeout: 10_000 }).toBeGreaterThan(20)
+    const played = await counts()
+    await page.keyboard.press('Space')
+    await page.waitForFunction(() => document.querySelector('[data-testid="play-pause"]')?.getAttribute('data-playing') === 'no')
+    const frames = await playhead()
+    console.log(`playback: ${frames} frames, timeline drawn ${played.timeline} times, playhead line ${played.line} times`)
+    // The line followed the playhead, a draw for each tick.
+    expect(played.line).toBeGreaterThan(10)
+    // Before, the whole timeline was drawn again on every tick: as many times as the line.
+    expect(played.timeline).toBeLessThan(5)
   })
 })
 

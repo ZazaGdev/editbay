@@ -202,7 +202,7 @@ describe('credits for the description', () => {
       await capture(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `sine=frequency=${hz}:sample_rate=48000:duration=1`, file])
     }
     await writeFile(join(assetsDir, 'Audio', 'ZapSplat', 'credit.txt'), `${zapLine}\n`)
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.waitForFunction(async () => (await window.api.currentProject()).sequences[0]!.videoTracks.every((t) => t.clips.length === 0))
     for (const file of [zap, free]) {
       const before = (await clips()).length

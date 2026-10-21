@@ -20,7 +20,7 @@ captions sit. Colour is your own choice rather than a fixed theme colour, becaus
 part of the picture and not part of the app's interface.
 
 [Font] lists the four that come with the app first, Montserrat ExtraBold, Anton, Bebas Neue and
-Poppins Black, then every font installed on this computer. The four that come with the app look
+Poppins Black, then the common fonts on this computer, such as Arial and Segoe UI. The four that come with the app look
 the same on any computer. A font of your own exports the same on this one; carried to a computer
 that does not have it, the captions still break into lines in the same places, but the export
 draws them in another font and says so when it finishes. Texts can use the same four fonts, at

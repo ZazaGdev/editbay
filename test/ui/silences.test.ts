@@ -164,7 +164,7 @@ describe('Remove silences', () => {
     expect(Number(await page.locator('[data-testid="timecode"]').getAttribute('data-total'))).toBe(180 - cut)
     await expect.poll(() => page.locator('[data-testid="toast"]').filter({ hasText: 'Removed 1 pause' }).count(), WAIT).toBe(1)
 
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(v1, WAIT).toEqual([[0, 0, 180]])
   })
 })

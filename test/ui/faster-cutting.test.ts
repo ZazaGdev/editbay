@@ -183,7 +183,7 @@ describe('the Source and Output side by side', () => {
     await page.mouse.click(source.x + 6, source.y + source.height - 6)
     await page.waitForSelector(`${SOURCE}[data-focused="yes"]`, WAIT)
     expect(await page.getAttribute('[data-testid="view-source"]', 'aria-pressed')).toBe('true')
-    await press('Control+z')
+    await press('ControlOrMeta+z')
   })
 
   it('shows one view at a time when Side by side is turned off, and both again when it is turned on', async () => {

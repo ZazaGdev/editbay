@@ -86,7 +86,7 @@ async function v1(): Promise<[number, number][]> {
 }
 
 async function undo(): Promise<void> {
-  await press('Control+z')
+  await press('ControlOrMeta+z')
 }
 
 describe('Ctrl+wheel over the timeline', () => {
@@ -194,8 +194,8 @@ describe('a drag near the edge of the timeline', () => {
     await page.mouse.move(from.x, from.y)
     await page.mouse.down()
     await page.keyboard.down('Alt')
-    // Ctrl: a trim only, leaving a gap, rather than the rest following (plan 82).
-    await page.keyboard.down('Control')
+    // Ctrl (Cmd on a Mac): a trim only, leaving a gap, rather than the rest following (plan 82).
+    await page.keyboard.down('ControlOrMeta')
     const edgeX = view.x + view.width - 10
     for (let i = 1; i <= 8; i++) await page.mouse.move(from.x + ((edgeX - from.x) * i) / 8, from.y)
     await expect.poll(scrolled, WAIT).toBeGreaterThan(0)
@@ -210,7 +210,7 @@ describe('a drag near the edge of the timeline', () => {
     expect(letGo).toBeLessThan(view.x + view.width - 60)
     await page.mouse.move(letGo, from.y)
     await page.mouse.up()
-    await page.keyboard.up('Control')
+    await page.keyboard.up('ControlOrMeta')
     await page.keyboard.up('Alt')
     // The second clip now starts where it was let go, leaving a gap before it.
     await expect.poll(async () => Math.abs((await v1())[1]![0] - want), WAIT).toBeLessThanOrEqual(1)

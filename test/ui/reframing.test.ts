@@ -43,7 +43,7 @@ async function fresh(source?: string): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), source ?? cleanPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -345,7 +345,7 @@ describe('keys', () => {
     await cropXIs(start.x - 2)
     await page.keyboard.press('Alt+Shift+ArrowLeft')
     await cropXIs(start.x - 22)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await cropXIs(start.x)
 
     // Apart by more than a second: two steps, and one undo takes back only the second.
@@ -354,7 +354,7 @@ describe('keys', () => {
     await page.waitForTimeout(1200)
     await page.keyboard.press('Alt+ArrowLeft')
     await cropXIs(start.x - 4)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await cropXIs(start.x - 2)
   })
 
@@ -367,7 +367,7 @@ describe('keys', () => {
       }
     })
     await cropXIs(start.x - 10)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await cropXIs(start.x)
   })
 
@@ -393,7 +393,7 @@ describe('keys', () => {
     expect(await page.getAttribute('[data-testid="layout"]', 'data-layout')).toBe('pip')
     await page.keyboard.press('g')
     // Nor an undo step: one undo takes back the layout itself.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => document.querySelector('[data-testid="layout"]')?.getAttribute('data-layout') === 'single')
   })
 
@@ -435,13 +435,13 @@ describe('keys', () => {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"][data-kind="video"]').length === 2)
     await page.click('[data-testid="layout-pip"]')
     await page.waitForFunction(() => document.querySelector('[data-testid="layout"]')?.getAttribute('data-layout') === 'pip')
-    await page.keyboard.press('Control+Alt+c')
+    await page.keyboard.press('ControlOrMeta+Alt+c')
     await page.waitForSelector('[data-testid="toast"][data-kind="framing"]')
 
     const second = (await page.locator('[data-testid="clip"][data-kind="video"]').nth(1).boundingBox())!
     await page.mouse.click(second.x + second.width / 2, second.y + second.height / 2)
     await page.waitForFunction(() => document.querySelector('[data-testid="layout"]')?.getAttribute('data-layout') === 'single')
-    await page.keyboard.press('Control+Alt+v')
+    await page.keyboard.press('ControlOrMeta+Alt+v')
     await page.waitForFunction(() => document.querySelector('[data-testid="layout"]')?.getAttribute('data-layout') === 'pip')
     await page.click('[data-testid="toast"][data-kind="setFraming"] [data-testid="toast-undo"]')
     await page.waitForFunction(() => document.querySelector('[data-testid="layout"]')?.getAttribute('data-layout') === 'single')
@@ -470,7 +470,7 @@ describe('keys', () => {
     expect(await crop()).toEqual(copied)
     // The crop alone: the layout stays the one this clip had.
     expect(await page.getAttribute('[data-testid="layout"]', 'data-layout')).toBe('pip')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction((w) => (document.querySelector('[data-testid="crop-w"]') as HTMLInputElement).value === String(w), own.w)
     expect(await page.getAttribute('[data-testid="layout"]', 'data-layout')).toBe('pip')
   })
@@ -527,7 +527,7 @@ describe('the crop in numbers', () => {
   it('puts a typed number on the picture as the typing pauses, and one undo takes the whole visit back', async () => {
     const before = await crop()
     await page.click('[data-testid="crop-x"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('10')
     await cropXIs(10)
     await page.keyboard.type('0')
@@ -535,14 +535,14 @@ describe('the crop in numbers', () => {
     // Still typing: the field kept its focus all along.
     expect(await focused()).toBe('crop-x')
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await cropXIs(before.x)
     expect(await crop()).toEqual(before)
   })
 
   it('never rewrites a number while it is typed, and tidies it on leaving', async () => {
     await page.click('[data-testid="crop-x"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('99')
     await cropXIs(100)
     expect(await page.inputValue('[data-testid="crop-x"]')).toBe('99')
@@ -553,7 +553,7 @@ describe('the crop in numbers', () => {
   it('puts back the crop it was entered with on Escape, after changes made while typing', async () => {
     const before = await crop()
     await page.click('[data-testid="crop-x"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('40')
     await cropXIs(40)
     await page.keyboard.press('Escape')
@@ -770,7 +770,7 @@ describe('full screen', () => {
   it('gives way to a dialog opened from it, so the dialog can be seen', async () => {
     await page.click('[data-testid="fullscreen"]')
     await page.waitForSelector('[data-testid="monitor-stage"][data-fullscreen="yes"]')
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForFunction(() => document.fullscreenElement === null)
     await page.waitForSelector('[data-testid="monitor-stage"][data-fullscreen="no"]')
     expect(await page.locator('[data-testid="export-panel"]').isVisible()).toBe(true)

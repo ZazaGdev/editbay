@@ -208,7 +208,7 @@ describe('Show me on a project with one of everything', () => {
     const v1 = page.locator('[data-testid="track"][data-track-id="v1"] [data-testid="clip"]')
     await v1.nth(0).click()
     await v1.nth(1).click({ modifiers: ['Shift'] })
-    await page.keyboard.press('Control+g')
+    await page.keyboard.press('ControlOrMeta+g')
     await page.waitForSelector('[data-testid="clip"][data-group]:not([data-group=""])', WAIT).catch(() => undefined)
     await page.keyboard.press('Home')
   }, 300_000)

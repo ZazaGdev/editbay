@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import type { ZoomPreset } from '../../shared/project'
 import type { ClipEdit } from '../../shared/types'
-import { ink, radius, space, type, wash } from '../theme'
+import { ink, radius, space, surface, type, wash } from '../theme'
 import { Segmented } from '../ui/Segmented'
 import { ZOOM_AMOUNTS, type ZoomAmount, type ZoomSpeed } from '../state/useSettings'
 
@@ -49,6 +49,26 @@ export const callout: React.CSSProperties = {
 }
 
 export const note: React.CSSProperties = { font: type.meta, color: ink.muted, margin: 0 }
+
+/**
+ * One part of the Zoom group, named, with a line on what it is for, so the
+ * framing, the one click zooms and the face tools read as three things rather
+ * than one block (task 1093).
+ */
+export function ZoomPart(props: { testid: string; name: string; hint: string; children: ReactNode }): JSX.Element {
+  return (
+    <div
+      data-testid={props.testid}
+      style={{ display: 'flex', flexDirection: 'column', gap: space.xs, borderTop: `1px solid ${surface.lineStrong}`, paddingTop: space.sm, marginTop: 2 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+        <strong style={{ font: type.meta, fontWeight: 600, color: ink.primary }}>{props.name}</strong>
+        <span style={{ font: type.meta, color: ink.muted }}>{props.hint}</span>
+      </div>
+      {props.children}
+    </div>
+  )
+}
 
 /** How far the one click zooms go, and for Zoom in and Zoom in and out how quickly. Both remembered. */
 export function AmountRow(props: { tools: ZoomTools; speed?: boolean }): JSX.Element {

@@ -93,7 +93,7 @@ describe('saved layouts', () => {
     await expect.poll(async () => (await framed(1)).layout, WAIT).toBe('split')
     expect(await framed(1)).toEqual(await framed(0))
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await framed(1)).layout, WAIT).not.toBe('split')
   })
 
@@ -151,7 +151,7 @@ describe('saved layouts', () => {
     await expect.poll(async () => (await framed(1)).layout, WAIT).toBe('split')
     expect(await framed(1)).toEqual(await framed(0))
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => (document.querySelector('[data-testid="export-preset"]') as HTMLSelectElement).value === 'landscape', undefined, WAIT)
     expect((await framed(1)).layout).not.toBe('split')
   })

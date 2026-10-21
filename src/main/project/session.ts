@@ -4,6 +4,7 @@ import { MEDIA_FIELDS } from '../../shared/source-paths'
 import { stripProjectExt } from '../../shared/project-ext'
 import { PRESETS } from '../../shared/presets'
 import { lockedTrackChanged } from '../../shared/tracks'
+import { setSpeed } from '../../shared/speed-edit'
 import type { ClipEdit, ProjectEdit } from '../../shared/types'
 import type { MediaAsset } from '../../shared/types'
 import {
@@ -650,7 +651,7 @@ function clipEdit(p: Timeline, edit: ClipEdit): Timeline {
     case 'closeUpGap':
       return closeUpGap(p, edit.gap)
     case 'removeStretches':
-      return removeStretches(p, edit.stretches)
+      return removeStretches(p, edit.stretches, edit.listen ?? [])
     case 'moveClip':
       return moveClipTo(p, edit.clipId, edit.trackId, edit.start, {
         alone: edit.alone === true,
@@ -797,6 +798,12 @@ function clipEdit(p: Timeline, edit: ClipEdit): Timeline {
       return swapPictures(p, edit.clipId)
     case 'applyLayoutToSource':
       return applyLayoutToSource(p, edit.clipId)
+    case 'setSpeed':
+      return setSpeed(p, edit.clipId, {
+        ...(edit.speed !== undefined ? { speed: edit.speed } : {}),
+        ...(edit.keepSound !== undefined ? { keepSound: edit.keepSound } : {}),
+        ...(edit.plainFrames !== undefined ? { plainFrames: edit.plainFrames } : {})
+      })
     case 'setClipAudio':
       return setClipAudio(p, edit.clipId, { gain: edit.gain, muted: edit.muted })
     case 'applySoundToSource':

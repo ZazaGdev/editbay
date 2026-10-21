@@ -121,9 +121,9 @@ describe('the effects folder', () => {
     expect(await page.getAttribute(`[data-testid="clip"][data-clip-id="${red}"]`, 'data-selected')).toBe('yes')
     // Put on and keyed in one step: one Undo takes it all away, never leaving it green over the clip.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await pictures()).length, WAIT).toBe(1)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(async () => (await pictures()).find((c) => c.id === effect.id)?.removal, WAIT).toBe('green')
   })
 

@@ -87,6 +87,20 @@ does not allow selling the font on its own, which nothing here does.
 repository, are the other fonts captions can be drawn in, used as Montserrat is: burned in by
 FFmpeg and drawn by the app window from its own copy. Texts can use them too.
 
+### The text fonts
+
+- **Licence:** SIL Open Font License 1.1, each, except Roboto Slab and Permanent Marker, which
+  are under the Apache License 2.0.
+- **Copyright:** each font's own authors, as named in its licence file.
+- **Full text:** one file per font in `resources/licences`, named after it, such as
+  `Inter-OFL.txt` and `RobotoSlab-Apache.txt`, also installed with the app.
+
+Archivo Black, Barlow, DM Sans, Dancing Script, Fira Sans, Inter, JetBrains Mono, Lato, Lobster,
+Merriweather, Noto Sans, Nunito, Open Sans, Oswald, PT Serif, Pacifico, Permanent Marker,
+Playfair Display, Quicksand, Raleway, Roboto, Roboto Slab, Rubik, Source Sans 3, Space Grotesk
+and Work Sans, each its regular face from Google Fonts, in `resources/text-fonts`. The app window
+draws texts in them from its own copy; the export takes the drawn text, not the font.
+
 ### ONNX Runtime
 
 - **Version:** 1.30.0, the `onnxruntime-node` and `onnxruntime-common` npm packages, the

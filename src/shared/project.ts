@@ -237,6 +237,15 @@ export interface Layer {
   simple?: SimpleEase
   /** Its box's keyframes, sorted by `at` (plan 97). Absent for a box that stays on `place`. */
   boxKeys?: BoxKey[]
+  /**
+   * A look of its own, as a clip's `look`, on this picture alone and on top
+   * of its clip's (task 1188): the face circle graded as the camera while the
+   * screen under it stays as recorded. Absent, with its strength and sliders,
+   * for the clip's colour alone.
+   */
+  look?: string
+  lookStrength?: number
+  adjust?: ColourAdjust
 }
 
 /**
@@ -266,6 +275,13 @@ export interface Clip {
   sourceOut: number
   /** Where it starts in the sequence. */
   timelineStart: number
+  /**
+   * Its speed (plan 105): how many frames of the recording one frame of the
+   * timeline plays, 0.1 to 16. Absent for 1. See `Span.speed`.
+   */
+  speed?: number
+  /** Slowed down, it repeats frames rather than blending them. Absent for blended. */
+  plainFrames?: true
   /** The main picture: its crop, and its place in the frame, full frame unless laid out. */
   transform: {
     mode: 'crop'
@@ -380,6 +396,13 @@ export interface SoundClip {
   /** Exclusive. */
   sourceOut: number
   timelineStart: number
+  /** Its speed, the same as its picture's (plan 105). Absent for 1. */
+  speed?: number
+  /**
+   * Heard even at a speed outside 0.5x to 2x, where a sound is silent unless
+   * kept. Absent for silent there.
+   */
+  keepSound?: true
   gain: number
   muted: boolean
   /** Shared by the clips that came onto the timeline together, a picture and its sound. */
@@ -399,6 +422,12 @@ export interface SoundClip {
    * Clean up noise is on too. Absent when off.
    */
   voice?: VoiceStrength
+  /**
+   * One side of its track played on both, for a voice recorded on one side
+   * only (task 1188): `left` puts the left channel in both ears. In the
+   * preview and the export alike. Absent for the track as recorded.
+   */
+  channel?: 'left' | 'right'
   /** A fade over this clip's start, against the sound before it or against silence. */
   transitionIn?: Transition
   /** A fade over this clip's end. */
@@ -523,7 +552,7 @@ export {
 } from './remove-clips'
 export type { ClipsRefusal, Gap } from './remove-clips'
 export {
-  plannedMove, moveClip, setClipIn, setClipOut, rippleTrim, rippleTrimBlockers, rearrangeClip, moveClipTo,
+  plannedMove, moveClip, setClipIn, setClipOut, rippleTrim, rippleTrimBlockers, rearrangeClip, rearrangeBlockers, moveClipTo,
   trimStart, trimEnd, trimToFrame, closingOn, trimToFrameBlockers
 } from './move-trim'
 export type { Landing } from './move-trim'

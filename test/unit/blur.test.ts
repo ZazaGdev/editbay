@@ -82,7 +82,7 @@ describe('blur on a clip', () => {
 
   it('is written at the head of the clip in the export, before its crop', () => {
     const [graph] = graphs(setBlurBoxes(setBlur(oneClip(), 'c', 30), 'c', [newBox()]))
-    expect(graph).toMatch(/fps=30:start_time=0,format=yuv444p,gblur=sigma=8\.10,format=yuv420p,split=2\[bxv\w*a0\]/)
+    expect(graph).toMatch(/fps=30:start_time=0,setparams=colorspace=bt709,format=yuv444p,gblur=sigma=8\.10,format=yuv420p,split=2\[bxv\w*a0\]/)
     // The boxes are laid back before the clip's own crop, so they follow the footage.
     expect(graph).toMatch(/overlay=\d+:\d+,crop=/)
   })

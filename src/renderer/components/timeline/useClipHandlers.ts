@@ -8,7 +8,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type { Clip, SoundClip, Timeline as TimelineData } from '../../../shared/project'
 import { findClip, newId } from '../../../shared/project'
 import { groupedIds } from '../../../shared/groups'
-import { captionTargets, snapTargets, type Span } from '../../../shared/tracks'
+import { captionTargets, snapTargets, spanLength, type Span } from '../../../shared/tracks'
 import { useSteady } from '../../state/useSteady'
 import type { Drag } from './drag'
 import type { TimelineProps } from './props'
@@ -37,7 +37,7 @@ export function useClipHandlers({ props, t, total, drag, setDrag, setClosingUp, 
   })
   // A caption snaps to every clip's edges, the other captions' and the playhead, as a clip does.
   const captionSnaps = useSteady((except: string, edgeAt?: number): number[] =>
-    captionTargets(allTracks(), t.captions.clips, props.playhead, except, edgeAt)
+    captionTargets(allTracks(), t.captions.clips, props.playhead.get(), except, edgeAt)
   )
   const clipClosingUp = useSteady((clipId: string, on: boolean, trim?: { edge: 'start' | 'end'; frame: number; alone: boolean }): void =>
     setClosingUp((was) => (on && trim ? { clipId, ...trim, base: was?.clipId === clipId ? was.base : t } : null))
@@ -84,8 +84,8 @@ export function useClipHandlers({ props, t, total, drag, setDrag, setClosingUp, 
       startScroll: scroller.current?.scrollLeft ?? 0,
       startY: y,
       fromStart: clip.timelineStart,
-      length: clip.sourceOut - clip.sourceIn,
-      targets: snapTargets(allTracks(), props.playhead, moving),
+      length: spanLength(clip),
+      targets: snapTargets(allTracks(), props.playhead.get(), moving),
       trackId: found.track.id,
       landings: null,
       start: clip.timelineStart,

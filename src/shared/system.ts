@@ -29,6 +29,9 @@ export function commandKey(e: { ctrlKey: boolean; metaKey: boolean }, system: Sy
 /** That key's name, for text that names it. */
 export const COMMAND_KEY_NAME = RUNNING_SYSTEM === 'mac' ? 'Cmd' : 'Ctrl'
 
+/** Alt's name, for text that names it: Option on a Mac's keyboard (task 1388). */
+export const ALT_KEY_NAME = RUNNING_SYSTEM === 'mac' ? 'Option' : 'Alt'
+
 /**
  * Whether a wheel turn zooms: Ctrl held, which is also how a pinch on a
  * trackpad arrives, or on a Mac Cmd too.

@@ -50,7 +50,7 @@ async function openSettings(tab: string): Promise<void> {
 
 async function openPalette(): Promise<void> {
   await blur()
-  await page.keyboard.press('Control+k')
+  await page.keyboard.press('ControlOrMeta+k')
   await page.waitForSelector('[data-testid="command-palette"]')
 }
 
@@ -64,7 +64,7 @@ describe('the Settings window', () => {
     await closeSettings()
 
     await blur()
-    await page.keyboard.press('Control+Comma')
+    await page.keyboard.press('ControlOrMeta+Comma')
     await page.waitForSelector('[data-testid="settings"]')
     await closeSettings()
 
@@ -370,7 +370,7 @@ describe('switches in the palette', () => {
 describe('skimming the timeline', () => {
   it('shows the frame under the pointer, and does not once it is turned off', async () => {
     await blur()
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate((p) => window.api.importFiles([p]), cleanPath)
     await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
     await page.locator('[data-testid="add-to-timeline"]').first().click()

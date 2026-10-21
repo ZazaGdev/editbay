@@ -11,10 +11,17 @@ import type { TransitionSide } from '../../../shared/transitions'
 import type { TrackSize } from '../../../shared/timeline-layout'
 import type { ClipEdit, PeaksData } from '../../../shared/types'
 import type { Marker } from '../../../shared/markers'
+import type { PlayheadStore } from '../../state/playheadStore'
 
 export interface TimelineProps {
   timeline: TimelineData
-  playhead: number
+  /**
+   * The playhead, as a store rather than a frame: a tick of playback then
+   * draws again only the line, the head and the timecode that follow it, never
+   * the whole timeline (audit 2026-10-19, fix first 4). Read it with `get()`
+   * in a handler.
+   */
+  playhead: PlayheadStore
   /** Whether the sequence is playing: the timeline then scrolls on a little before the playhead reaches its right edge. */
   playing?: boolean
   /** The selected clip and the clips linked to it, drawn selected together. */

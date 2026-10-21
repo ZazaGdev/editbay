@@ -69,7 +69,7 @@ describe('a shortcut on a mouse button', () => {
   })
 
   it('runs what it is put on, from anywhere in the editor', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await pressButton(3)
     await page.waitForSelector('[data-testid="clip"]', { timeout: 10_000 })
     const box = (await page.locator('[data-testid="timeline-scroll"]').boundingBox())!

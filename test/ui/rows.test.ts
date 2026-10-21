@@ -70,7 +70,7 @@ async function soundLength(): Promise<number> {
 
 async function undo(): Promise<void> {
   await page.locator('[data-testid="timecode"]').click()
-  await page.keyboard.press('Control+z')
+  await page.keyboard.press('ControlOrMeta+z')
 }
 
 /**
@@ -159,7 +159,7 @@ describe('a song on an audio track', () => {
     await expect.poll(soundStart).toBe(150)
     await undo()
     await expect.poll(soundStart).toBe(0)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(soundStart).toBe(150)
   })
 
@@ -205,7 +205,7 @@ describe('a song on an audio track', () => {
   it('is kept on its track when the project is saved and opened again', async () => {
     await answerSaveDialog(app, saved)
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+s')
+    await page.keyboard.press('ControlOrMeta+s')
     await page.waitForFunction(() => document.title.startsWith('rows '), undefined, WAIT)
     const closed = app.waitForEvent('close', { timeout: 30_000 })
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close())
@@ -236,31 +236,34 @@ describe('a song on an audio track', () => {
       }
     })
 
+    // The song is played by the sound engine (plan 106), whose place in the
+    // sequence, what is being heard, the monitor shows beside the picture.
+    const songClip = project.sequences[0]!.audioTracks.flatMap((r) => r.clips).find((c) => c.mediaId === songId)!.id
     await page.locator('[data-testid="timecode"]').click()
     await page.keyboard.press('Home')
     await page.keyboard.press('Space')
     const samples = await page.evaluate(
-      async ({ clips, fps }) => {
+      async ({ clips, fps, songClip }) => {
         const out: { at: number; drift: number }[] = []
         const from = performance.now()
+        const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')!
         while (performance.now() - from < 5800) {
           await new Promise((r) => setTimeout(r, 50))
           const video = Array.from(document.querySelectorAll<HTMLVideoElement>('[data-testid="monitor-stage"] video')).find(
             (v) => !v.paused && v.readyState >= 3
           )
-          // The first clip's own sound plays from its picture's player; the song from its own.
-          const players = Array.from(document.querySelectorAll<HTMLAudioElement>('[data-testid="track-player"]')).filter((a) => !a.paused)
-          if (!video || players.length !== 1) continue
+          const heard = Number(canvas.dataset.heardSec || NaN)
+          if (!video || !Number.isFinite(heard) || !(canvas.dataset.heardClips ?? '').split(',').includes(songClip)) continue
           const src = decodeURIComponent(video.src)
           const clip = clips.find((c) => src.endsWith(c.file))
           if (!clip) continue
-          // Where the sequence is, from the picture, and so where the song should be.
+          // Where the sequence is, from the picture, against where the song being heard is.
           const t = clip.start / fps + (video.currentTime - clip.startSec) - clip.sourceIn / fps
-          out.push({ at: performance.now() - from, drift: players[0]!.currentTime - t })
+          out.push({ at: performance.now() - from, drift: heard - t })
         }
         return out
       },
-      { clips, fps }
+      { clips, fps, songClip }
     )
     await page.keyboard.press('Space')
 
@@ -302,20 +305,24 @@ describe('past the end of V1', () => {
       await page.keyboard.press('Shift+ArrowRight')
       await expect.poll(playhead).toBe(30 * s)
     }
+    // Heard from the sound engine (plan 106): where in the song, from where in the sequence is being heard.
+    const project = await page.evaluate(() => window.api.currentProject())
+    const songClip = project.sequences[0]!.audioTracks.flatMap((r) => r.clips).find((c) => c.mediaId === songId)!
     await page.keyboard.press('Space')
-    const seen = await page.evaluate(async () => {
+    const seen = await page.evaluate(async ({ id, startSec }) => {
       const out: { playhead: number; song: number | null }[] = []
       const from = performance.now()
+      const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')!
       while (performance.now() - from < 4000) {
         await new Promise((r) => setTimeout(r, 100))
-        const player = Array.from(document.querySelectorAll<HTMLAudioElement>('[data-testid="track-player"]')).find((a) => !a.paused)
+        const heard = (canvas.dataset.heardClips ?? '').split(',').includes(id) ? Number(canvas.dataset.heardSec) : null
         out.push({
           playhead: Number(document.querySelector('[data-testid="timecode"]')?.getAttribute('data-playhead')),
-          song: player ? player.currentTime : null
+          song: heard === null ? null : heard - startSec
         })
       }
       return out
-    })
+    }, { id: songClip.id, startSec: songClip.timelineStart / project.fps })
     const past = seen.filter((s) => s.playhead > 215 && s.playhead < 265)
     expect(past.length).toBeGreaterThan(5)
     // The song plays on, where the playhead says: it starts at 90, so at frame f it is (f - 90) / 30 s in.
@@ -327,7 +334,9 @@ describe('past the end of V1', () => {
     // And stops at the end of the sequence, with nothing left playing.
     await expect.poll(playhead).toBe(270)
     await page.waitForFunction(
-      () => Array.from(document.querySelectorAll<HTMLAudioElement>('[data-testid="track-player"]')).every((a) => a.paused),
+      () =>
+        Array.from(document.querySelectorAll<HTMLAudioElement>('[data-testid="track-player"]')).every((a) => a.paused) &&
+        document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')?.dataset.heardSec === undefined,
       undefined,
       WAIT
     )

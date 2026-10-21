@@ -54,7 +54,7 @@ async function tracks(): Promise<{ video: Placed[][]; audio: Placed[][] }> {
 
 async function undo(): Promise<void> {
   await page.locator('[data-testid="timecode"]').click()
-  await page.keyboard.press('Control+z')
+  await page.keyboard.press('ControlOrMeta+z')
 }
 
 async function playheadAt(frame: number): Promise<void> {
@@ -123,13 +123,13 @@ afterAll(async () => {
 })
 
 /**
- * How far the playing copy of a stream is from where the picture says it
- * should be, sampled every 50 ms for `ms` while it plays. Each sample reads
- * both players in one go, so the reading itself adds almost nothing.
+ * How far the sound being heard is from where the picture says it should be,
+ * sampled every 50 ms for `ms` while it plays. Each sample reads both in one
+ * go, so the reading itself adds almost nothing.
  *
- * Returns the median of the samples from `settledAfter` on, once the stream
- * has had time to be brought into step, and the worst of them all. A stream
- * starts a few tens of milliseconds behind its picture, at the start and at
+ * Returns the median of the samples from `settledAfter` on, once the picture
+ * has had time to be brought into step with the sound, and the worst of them
+ * all. The picture starts a few tens of milliseconds out, at the start and at
  * every cut, and is eased into step over the next second or so.
  */
 async function drift(ms: number, settledAfter: number): Promise<{ settled: number; worst: number }> {
@@ -142,9 +142,12 @@ async function drift(ms: number, settledAfter: number): Promise<{ settled: numbe
       while (performance.now() < until) {
         await new Promise((r) => setTimeout(r, 50))
         const video = Array.from(document.querySelectorAll<HTMLVideoElement>('[data-testid="monitor-stage"] video')).find((v) => !v.paused)
-        const players = Array.from(document.querySelectorAll<HTMLAudioElement>('[data-testid="track-player"]')).filter((a) => !a.paused)
-        if (!video || players.length !== 1 || video.readyState < 3) continue
-        out.push({ at: performance.now() - from, drift: players[0]!.currentTime - (video.currentTime - startSec) })
+        // The streams are played by the sound engine (plan 106): where in the
+        // sequence is being heard, which the monitor shows beside the picture.
+        const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')
+        const heard = Number(canvas?.dataset.heardSec || NaN)
+        if (!video || !Number.isFinite(heard) || video.readyState < 3) continue
+        out.push({ at: performance.now() - from, drift: heard - (video.currentTime - startSec) })
       }
       return out
     },
@@ -438,12 +441,12 @@ describe('adding a track (task 62)', () => {
   it('adds one with Ctrl+Shift+V and Ctrl+Shift+A, and from the Ctrl+K search', async () => {
     const before = await ids()
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+Shift+V')
+    await page.keyboard.press('ControlOrMeta+Shift+V')
     await expect.poll(async () => (await ids()).video.length).toBe(before.video.length + 1)
-    await page.keyboard.press('Control+Shift+A')
+    await page.keyboard.press('ControlOrMeta+Shift+A')
     await expect.poll(async () => (await ids()).audio.length).toBe(before.audio.length + 1)
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     await page.fill('[data-testid="command-search"]', 'audio track')
     await page.waitForSelector('[data-testid="command"]')

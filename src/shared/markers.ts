@@ -143,6 +143,8 @@ export interface ChapterPlacement {
   sourceOut: number
   /** Where that first frame sits in the sequence. */
   timelineStart: number
+  /** Its speed (plan 105). Absent for 1. */
+  speed?: number
 }
 
 /**
@@ -176,7 +178,7 @@ export function chapterMarkers(
     const inSource = Math.round((chapter.atSec - startSec) * fps)
     for (const clip of clips) {
       if (inSource < clip.sourceIn || inSource >= clip.sourceOut) continue
-      out = addMarker(out, clip.timelineStart + (inSource - clip.sourceIn), chapter.title)
+      out = addMarker(out, clip.timelineStart + Math.round((inSource - clip.sourceIn) / (clip.speed ?? 1)), chapter.title)
     }
   }
   return inOrder(out)

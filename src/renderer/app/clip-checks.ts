@@ -1,6 +1,7 @@
 /** Questions about one clip that the menus and the commands ask. */
 
 import { findClip, isText, type Timeline as TimelineData } from '../../shared/project'
+import { spanEnd } from '../../shared/tracks'
 
 /**
  * Whether Split here would cut this clip: the playhead has to be inside it,
@@ -10,7 +11,7 @@ export function splitsHere(t: TimelineData, clipId: string, playhead: number): b
   const found = findClip(t, clipId)
   if (!found) return false
   const c = found.clip
-  return playhead > c.timelineStart && playhead < c.timelineStart + (c.sourceOut - c.sourceIn)
+  return playhead > c.timelineStart && playhead < spanEnd(c)
 }
 
 /** Whether a clip is a text. */

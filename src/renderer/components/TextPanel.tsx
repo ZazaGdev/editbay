@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { CAPTION_FONTS } from '../../shared/caption-fonts'
+import { TEXT_FONTS, popularOf } from '../../shared/popular-fonts'
 
 import { DEFAULT_TEXT, cleanTextStyle, TEXT_MAX_SIZE, TEXT_MIN_SIZE, type TextAlign, type TextStyle } from '../../shared/text'
 import { Button } from '../ui/Button'
@@ -32,13 +33,12 @@ const FALLBACK_FONTS =
 
 let installed: Promise<string[]> | null = null
 
-/** The font families on this PC, read once. Captions offer them too (plan 87). */
+/** The popular font families on this PC, read once (task 1087). Captions offer them too (plan 87). */
 export function installedFonts(): Promise<string[]> {
   installed ??= (async () => {
     try {
       const query = (window as unknown as { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts
-      const fonts = query ? await query() : []
-      const families = [...new Set(fonts.map((f) => f.family))].sort((a, b) => a.localeCompare(b))
+      const families = popularOf((query ? await query() : []).map((f) => f.family))
       return families.length > 0 ? families : FALLBACK_FONTS
     } catch {
       return FALLBACK_FONTS
@@ -189,8 +189,8 @@ export function TextPanel(props: {
   latest.current = style
 
   const set = (change: Partial<TextStyle>, continuing = false): void => props.onChange(cleanTextStyle({ ...latest.current, ...change }), continuing)
-  // The fonts that come with the app first, then the ones on this PC.
-  const bundled = CAPTION_FONTS.map((f) => f.family)
+  // The fonts that come with the app first, then the popular ones on this PC.
+  const bundled = [...CAPTION_FONTS.map((f) => f.family), ...TEXT_FONTS.map((f) => f.family)]
   const fontChoices = [...bundled, ...fonts.filter((f) => !bundled.includes(f))]
   if (!fontChoices.includes(style.font)) fontChoices.unshift(style.font)
 

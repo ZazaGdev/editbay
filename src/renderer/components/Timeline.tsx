@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { TIMELINE_LEAVES, TIMELINE_MIN } from '../state/useSettings'
 import type { Clip, Landing, SoundClip, Timeline as TimelineData, TrackKind } from '../../shared/project'
 import { allClips, findClip, groupsOnV1, linkedIds, markedSpan, mediaDurationFrames, newId, plannedMove, timelineDuration, trackLabel, trackOf,
-  rippleTrimBlockers, transitionsOf
+  rearrangeBlockers, rippleTrimBlockers, transitionsOf
 } from '../../shared/project'
 import { MAX_AUDIO_TRACKS, MAX_VIDEO_TRACKS, gapAt, snapFrame, snapFrameTo, snapMove, snapMoveTo, snapReach, snapTargets, spanEnd, trimTargets, type Span } from '../../shared/tracks'
 import { heldInWindows, nearestSeam, seamsOn, type TransitionSide, type TransitionWindow } from '../../shared/transitions'
@@ -18,7 +18,7 @@ import { TrackClip } from './TrackClip'
 import { ClipTransition, SeamButton, SEAM_REACH_PX, SEAM_ROOM_PX, seamButtonSize } from './ClipTransition'
 import { CaptionTrack } from './CaptionTrack'
 import { BOX_THRESHOLD_PX, DRAG_THRESHOLD_PX, EFFECT_TYPE, LANE_HEIGHT, SOURCE_TYPE, TAIL_PX, type Drag } from './timeline/drag'
-import { fadeableSides, innerOf, touching } from './timeline/clip-sides'
+import { touching, trackSides } from './timeline/clip-sides'
 import type { TimelineProps } from './timeline/props'
 import { useViewScroll } from './timeline/useViewScroll'
 import { useEdgeScroll } from './timeline/useEdgeScroll'
@@ -29,7 +29,15 @@ import { TimelineOverlays } from './timeline/TimelineOverlays'
 
 export { SOURCE_TYPE, EFFECT_TYPE } from './timeline/drag'
 
-export function Timeline(props: TimelineProps): JSX.Element {
+/**
+ * Memoised, and given the playhead as a store: a tick of playback draws again
+ * only the playhead's line, head and timecode, never the tracks (audit
+ * 2026-10-19, fix first 4). Every prop it is given has to keep its identity
+ * from one tick to the next for that to hold.
+ */
+export const Timeline = memo(TimelineView)
+
+function TimelineView(props: TimelineProps): JSX.Element {
   const t = props.timeline
   const heights = trackHeights(props.trackSize)
   /** How tall one track is drawn: what it has been dragged to, or what its kind gets. */
@@ -68,7 +76,22 @@ export function Timeline(props: TimelineProps): JSX.Element {
     () => (closingUp ? rippleTrimBlockers(closingUp.base, closingUp.clipId, closingUp.edge, closingUp.frame, closingUp.alone) : []),
     [closingUp]
   )
-  const inTheWay = useMemo(() => new Set(blockers.map((c) => c.id)), [blockers])
+  // A Ctrl+drag is asked the same as it moves: what would stop it being put
+  // in where it is, which was refused on letting go with no word (audit 2026-10-19).
+  const insertAt = drag?.moved && drag.insert ? { clipId: drag.clipId, trackId: drag.trackId, start: drag.start } : null
+  const insertBlockers = useMemo(
+    () => (insertAt ? rearrangeBlockers(t, insertAt.clipId, insertAt.trackId, insertAt.start) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, insertAt?.clipId, insertAt?.trackId, insertAt?.start]
+  )
+  const insertBlocked = useMemo(() => {
+    const first = insertBlockers[0]
+    if (!first) return null
+    const track = [...t.videoTracks, ...t.audioTracks].find((r) => (r.clips as { id: string }[]).some((c) => c.id === first.id))
+    const name = clipLabel(t, first.id)
+    return track ? `${name} on ${trackLabel(t, track.id)}` : name
+  }, [insertBlockers, t])
+  const inTheWay = useMemo(() => new Set([...blockers, ...insertBlockers].map((c) => c.id)), [blockers, insertBlockers])
   const trimBlocked = useMemo(() => {
     const first = blockers[0]
     if (!first || !closingUp) return null
@@ -110,7 +133,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
     const seen = targets.filter((f) => f >= from && f <= to)
     // Never nothing: an edge with nothing in sight keeps the start of the
     // sequence and the playhead, which are where a cut is usually wanted.
-    return seen.length > 0 ? seen : targets.filter((f) => f === 0 || f === props.playhead)
+    return seen.length > 0 ? seen : targets.filter((f) => f === 0 || f === props.playhead.get())
   }
 
   /** What a trim of a clip snaps to: only what stays put while it moves. */
@@ -119,7 +142,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
     if (!found) return []
     // A trim that closes up always takes the whole group with it.
     const moving = new Set(alone && !closesUp ? [clipId] : linkedIds(t, clipId))
-    return trimTargets(allTracks(), found.clip, edge, props.playhead, { closesUp, moving })
+    return trimTargets(allTracks(), found.clip, edge, props.playhead.get(), { closesUp, moving })
   })
   const onScreenSteady = useSteady(onScreen)
   /** The same for every clip, and the same object until the zoom changes how near is near. */
@@ -153,7 +176,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
         e.stopPropagation()
         const box = e.currentTarget.getBoundingClientRect()
         const raw = Math.max(0, Math.round((e.clientX - box.left) / pxPerFrame))
-        const frame = e.altKey ? raw : snapFrame(raw, snapTargets(allTracks(), props.playhead), snapWithin)
+        const frame = e.altKey ? raw : snapFrame(raw, snapTargets(allTracks(), props.playhead.get()), snapWithin)
         props.onDropEffect?.(effect, typeof onto === 'string' ? onto : newId(), frame, typeof onto === 'string' ? {} : { newTrack: onto.newTrack })
         return
       }
@@ -167,7 +190,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
       // What lands: the part marked on it, or a picture's five seconds, not the whole source.
       const span = m ? markedSpan(m, t.fps) : null
       const length = span ? span.to - span.from : 1
-      const targets = snapTargets(allTracks(), props.playhead)
+      const targets = snapTargets(allTracks(), props.playhead.get())
       // Ctrl puts it in, opening up the sequence, on V1 only; anywhere else it is a plain drop.
       const insert = commandKey(e) && onto === t.videoTracks[0]!.id
       // Put in, only its start matters: what is there moves on past its end.
@@ -489,7 +512,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
           const selected = props.selectedIds.has(clip.id)
           // Every prop a primitive, or an object that only changes when the
           // clip does: this is drawn again only when something about it changed.
-          const width = Math.max(MIN_CLIP_WIDTH, (clip.sourceOut - clip.sourceIn) * pxPerFrame)
+          const width = Math.max(MIN_CLIP_WIDTH, (spanEnd(clip) - clip.timelineStart) * pxPerFrame)
           const shown = shownPart(clip.timelineStart * pxPerFrame, width, drawn)
           return (
             <TrackClip
@@ -525,9 +548,9 @@ export function Timeline(props: TimelineProps): JSX.Element {
               zoomPicture={selected ? props.picture : undefined}
               showKeys={props.showClipKeys !== false}
               ripples={onV1.has(clip.id)}
-              inner={innerOf(track.clips as (Clip | SoundClip)[], clip)}
+              inner={trackSides(track.clips as (Clip | SoundClip)[]).inner(clip)}
               onTrim={clipTrim}
-              {...(kind === 'audio' ? { onFade: clipFade, fadeable: fadeableSides(track.clips, clip) } : {})}
+              {...(kind === 'audio' ? { onFade: clipFade, fadeable: trackSides(track.clips as (Clip | SoundClip)[]).fadeable(clip) } : {})}
               onDragStart={clipDragStart}
               shownFrom={shown.from}
               shownTo={shown.to}
@@ -586,7 +609,16 @@ export function Timeline(props: TimelineProps): JSX.Element {
               pointerEvents: 'none',
               zIndex: 4
             }}
-          />
+          >
+            {insertBlocked && (
+              <span
+                data-testid="insert-blocked"
+                style={{ position: 'absolute', left: 6, top: 2, whiteSpace: 'nowrap', font: type.meta, color: ink.primary, background: surface.raised, padding: '1px 6px', borderRadius: radius.control }}
+              >
+                Can't put it in here: {insertBlocked} is in the way
+              </span>
+            )}
+          </div>
         )}
         {landingsOn(kind, index).map((l) => {
           const moved = drag ? l.start - drag.fromStart : 0
@@ -683,7 +715,7 @@ export function Timeline(props: TimelineProps): JSX.Element {
   const videoOrder = t.videoTracks.map((_, i) => i).reverse()
   // The caption track is there once the sequence has captions.
   const captioned = t.captions.clips.length > 0
-  const lastFrame = useMemo(() => Math.max(total, ...allClips(t).map((c) => c.timelineStart + c.sourceOut - c.sourceIn)), [total, t])
+  const lastFrame = useMemo(() => Math.max(total, ...allClips(t).map((c) => spanEnd(c))), [total, t])
 
   return (
     <section

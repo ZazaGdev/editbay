@@ -193,7 +193,7 @@ describe('a picture on a video row', () => {
     await page.mouse.up()
     await expect.poll(placeOf).not.toBe(before)
     await focusTimeline()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(placeOf).toBe(before)
   })
 
@@ -241,7 +241,7 @@ describe('a picture on a video row', () => {
     await expect.poll(() => onVideoTrack().first().getAttribute('data-start')).toBe('150')
     await waitFor(CORNER, 'red')
     await focusTimeline()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(() => onVideoTrack().first().getAttribute('data-start')).toBe('30')
     await waitFor(CORNER, 'green')
   })

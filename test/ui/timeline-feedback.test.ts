@@ -276,7 +276,7 @@ describe('mute, solo and lock', () => {
     await expect.poll(() => lock.getAttribute('aria-pressed'), WAIT).toBe('false')
     await page.keyboard.press('Delete')
     await expect.poll(clipsNow, WAIT).toBe(before - 1)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(clipsNow, WAIT).toBe(before)
   })
 
@@ -343,7 +343,7 @@ describe('what a drag tells you', () => {
     await page.mouse.up()
     // It goes as soon as the drag lets go.
     await expect.poll(() => page.locator('[data-testid="edge-frame"]').count(), WAIT).toBe(0)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 
   it('draws a line at what a drag snapped to, and takes it away when it lets go', async () => {
@@ -377,7 +377,7 @@ describe('what a drag tells you', () => {
     expect(Math.abs(moved)).toBeGreaterThan(0)
     await page.keyboard.press('Escape')
     await page.mouse.up()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 })
 
@@ -432,7 +432,7 @@ describe('a menu on a clip', () => {
     await page.click('[data-testid="clip-menu-delete"]')
     await page.waitForSelector('[data-testid="clip-menu"]', { state: 'detached' })
     await expect.poll(() => page.locator('[data-testid="clip"][data-kind="video"]').count(), WAIT).toBe(before - 1)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(() => page.locator('[data-testid="clip"][data-kind="video"]').count(), WAIT).toBe(before)
   })
 })

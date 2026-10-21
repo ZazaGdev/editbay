@@ -68,7 +68,7 @@ function colourOf(r: number, g: number, b: number): Colour {
 async function fresh(mode: 'simple' | 'keys' = 'keys'): Promise<void> {
   await closeExport(page)
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), targetPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -232,6 +232,29 @@ describe('the Zoom group', () => {
     }
     expect(await page.locator('[data-testid="picture"][data-picture-id="zoom"]').count()).toBe(0)
     await expect.poll(() => page.inputValue('[data-testid="zoom-scale"]'), WAIT).toBe('100')
+  })
+
+  it('splits Keyframes into three named parts, Framing, One-click zooms and Face, each holding its own controls (task 1093)', async () => {
+    await fresh()
+    const parts = await page.locator('[data-testid="zoom-group"] [data-testid^="zoom-part-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
+    expect(parts).toEqual(['zoom-part-framing', 'zoom-part-presets', 'zoom-part-face'])
+    for (const [part, control] of [
+      ['framing', 'zoom-scale'],
+      ['framing', 'zoom-key'],
+      ['presets', 'zoom-punch'],
+      ['presets', 'zoom-amount'],
+      ['face', 'follow-face'],
+      ['face', 'centre-face']
+    ]) {
+      expect(await page.locator(`[data-testid="zoom-part-${part}"] [data-testid="${control}"]`).count()).toBeGreaterThan(0)
+    }
+    // The section is a card of its own, its heading on a band of another colour.
+    const [card, band] = await page.locator('[data-inspector-group][data-group="Zoom"]').first().evaluate((g) => [
+      getComputedStyle(g).backgroundColor,
+      getComputedStyle(g.querySelector('[data-testid="inspector-group-heading"]')!).backgroundColor
+    ])
+    expect(card).not.toBe('rgba(0, 0, 0, 0)')
+    expect(band).not.toBe(card)
   })
 
   it("does the owner's Check: in at 2.5 s, out at 4.5 s, seen in the preview, on the timeline and in the export", async () => {
@@ -454,7 +477,7 @@ describe('the diamonds on the clip (bugs and notes 2, note 15)', () => {
     await expect.poll(async () => (await keys()).map((k) => k.at), WAIT).toEqual([0, 209])
 
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await keys()).map((k) => k.at), WAIT).toEqual([0, moved])
   })
 })
@@ -534,7 +557,7 @@ describe('the presets', () => {
     await expect.poll(() => page.locator('[data-testid="aim-layer"]').count(), WAIT).toBe(0)
     // One undo takes the zoom and its aim back together.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await keys()).length, WAIT).toBe(0)
   })
 
@@ -606,8 +629,8 @@ describe('a Simple zoom', () => {
     await expect.poll(simple, WAIT).toBeUndefined()
     const after = await page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.videoTracks[0]!.clips[0]!.transform.crop)
     expect(after).toEqual(was[0]!.crop)
-    await page.keyboard.press('Control+z')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await keys())[1]!.crop, WAIT).toEqual(was[1]!.crop)
     await page.click('[data-testid="view-program"]')
   })

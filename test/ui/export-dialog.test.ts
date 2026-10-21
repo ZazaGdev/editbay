@@ -90,7 +90,7 @@ async function freshProject(copies = 1, source = cleanPath): Promise<string> {
   await closeExport(page)
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), source)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -145,7 +145,7 @@ async function addSequenceIn(shape: string): Promise<void> {
 describe('the Export dialog', () => {
   it('opens with Ctrl+E, with a folder to export to already filled in', async () => {
     await freshProject()
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')
     // The default arrives from main a moment after the dialog opens.
     await page.waitForFunction(() => {
@@ -157,6 +157,29 @@ describe('the Export dialog', () => {
     await closeExport(page)
   })
 
+  it('picks the folder to export into from Choose..., starting at the folder shown', async () => {
+    await freshProject()
+    await chooseFolder()
+    const first = picked
+    const second = await mkdtemp(join(root, 'chosen-'))
+    await app.evaluate(async ({ dialog }, d) => {
+      const g = globalThis as { pickedFrom?: string | undefined }
+      dialog.showOpenDialog = async (...args: unknown[]) => {
+        const options = args[args.length - 1] as { defaultPath?: string }
+        g.pickedFrom = options.defaultPath
+        return { canceled: false, filePaths: [d] }
+      }
+    }, second)
+    await page.locator('[data-testid="export-folder-choose"]').click()
+    await page.waitForFunction(
+      (dir) => document.querySelector('[data-testid="export-folder"]')?.getAttribute('title') === dir,
+      second
+    )
+    expect(await app.evaluate(() => (globalThis as { pickedFrom?: string }).pickedFrom)).toBe(first)
+    expect(await page.isDisabled('[data-testid="export-folder-show"]')).toBe(false)
+    await closeExport(page)
+  })
+
   it('names the file it will write', async () => {
     await freshProject()
     await chooseFolder()
@@ -165,14 +188,14 @@ describe('the Export dialog', () => {
 
   it('offers to sharpen the picture a little, off at first, and keeps the choice', async () => {
     await freshProject()
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')
     const box = page.locator('[data-testid="export-sharpen"]')
     expect(await box.isChecked()).toBe(false)
     await page.locator('[data-testid="export-sharpen"]').click()
     await expect.poll(() => box.isChecked()).toBe(true)
     await closeExport(page)
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')
     expect(await page.locator('[data-testid="export-sharpen"]').isChecked()).toBe(true)
     // Off again, so nothing after this is sharpened.
@@ -183,7 +206,7 @@ describe('the Export dialog', () => {
 
   it('offers a Fast export on the graphics card, Best quality at first, and keeps the choice', async () => {
     await freshProject()
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')
     const best = page.locator('[data-testid="export-speed-best"]')
     const fast = page.locator('[data-testid="export-speed-fast"]')
@@ -201,7 +224,7 @@ describe('the Export dialog', () => {
     expect(toggle!.width).toBeLessThan(choices[0]!.width + choices[1]!.width + 16)
     expect(toggle!.width).toBeLessThan(panel!.width / 2)
     await closeExport(page)
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')
     await expect.poll(() => page.locator('[data-testid="export-speed-fast"]').getAttribute('aria-pressed'), WAIT).toBe('true')
     await page.locator('[data-testid="export-speed-best"]').click()
@@ -213,7 +236,7 @@ describe('the Export dialog', () => {
       ipcMain.removeHandler('export:gpu')
       ipcMain.handle('export:gpu', () => false)
     })
-    await page.keyboard.press('Control+e')
+    await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')
     const fast = page.locator('[data-testid="export-speed-fast"]')
     await expect.poll(() => fast.getAttribute('title'), WAIT).toContain('NVIDIA')
@@ -568,7 +591,7 @@ describe('a cover image', () => {
     // The button is gone from the Export window: the key does it from anywhere.
     expect(await page.locator('[data-testid="export-save-frame"]').count()).toBe(0)
     await closeExport(page)
-    await page.keyboard.press('Control+Alt+s')
+    await page.keyboard.press('ControlOrMeta+Alt+s')
     let png: string | undefined
     // Made by a one frame export, which takes a few seconds.
     for (let i = 0; i < 300 && !png; i++) {

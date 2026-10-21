@@ -60,6 +60,15 @@ Anton, Bebas Neue and Poppins, the other caption fonts, are used under the SIL
 Open Font License 1.1. Their full texts and copyright notices are in
 Montserrat-OFL.txt, Anton-OFL.txt, BebasNeue-OFL.txt and Poppins-OFL.txt.
 
+The fonts texts can be drawn in come from Google Fonts. Archivo Black, Barlow,
+DM Sans, Dancing Script, Fira Sans, Inter, JetBrains Mono, Lato, Lobster,
+Merriweather, Noto Sans, Nunito, Open Sans, Oswald, PT Serif, Pacifico,
+Playfair Display, Quicksand, Raleway, Roboto, Rubik, Source Sans 3, Space
+Grotesk and Work Sans are used under the SIL Open Font License 1.1, and Roboto
+Slab and Permanent Marker under the Apache License 2.0. Each one's full text
+and copyright notice is in the file named after it, such as Inter-OFL.txt or
+RobotoSlab-Apache.txt.
+
 ONNX Runtime, which runs the face model for Follow face, and YuNet, that face
 model, are MIT licensed. Their full texts and copyright notices are in
 ONNXRuntime-MIT.txt and YuNet-MIT.txt, and the libraries built into ONNX

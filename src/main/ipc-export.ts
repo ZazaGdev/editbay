@@ -64,6 +64,9 @@ interface PlannedExport {
  * someone else could name their own computer, which Windows signs in to as you.
  */
 async function exportFolderAllowed(dir: string): Promise<boolean> {
+  // A Windows project's last folder, opened on a Mac, would be written as a
+  // folder named `D:\...` under wherever the app was started (task 1388).
+  if (process.platform === 'darwin' && /^[A-Za-z]:[\\/]/.test(dir)) return false
   const yours = [session.getProjectPath(), (await settings).exportFolder].flatMap((p) => {
     const share = p ? shareOf(p) : null
     return share ? [share] : []
@@ -72,6 +75,9 @@ async function exportFolderAllowed(dir: string): Promise<boolean> {
 }
 
 function notAllowed(dir: string): string {
+  if (process.platform === 'darwin' && /^[A-Za-z]:[\\/]/.test(dir)) {
+    return `${dir} is a Windows folder, not one on this Mac. Choose a folder to export to.`
+  }
   return `${dir} is on another computer this project has not been given. Choose the folder again to export there.`
 }
 

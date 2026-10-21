@@ -120,7 +120,7 @@ describe('putting a look on a clip', () => {
 describe('the look in the export', () => {
   it('is written once at the head of a plain clip, before its crop', () => {
     const [graph] = graphs(setLook(oneClip(), 'c', 'mono'))
-    expect(graph).toContain('fps=30:start_time=0,hue=s=0,crop=')
+    expect(graph).toContain('fps=30:start_time=0,setparams=colorspace=bt709,hue=s=0,crop=')
     expect(count(graph!, 'hue=s=0')).toBe(1)
   })
 
@@ -132,7 +132,7 @@ describe('the look in the export', () => {
     let t = oneClip(media('obs', { width: 3840, height: 1080 }))
     t = setLook(applyLayout(t, 'c', 'split'), 'c', 'mono')
     const [graph] = graphs(t)
-    expect(graph).toContain('[0:v]fps=30:start_time=0,hue=s=0,split=2[s0][s1]')
+    expect(graph).toContain('[0:v]fps=30:start_time=0,setparams=colorspace=bt709,hue=s=0,split=2[s0][s1]')
   })
 
   it('is on the clip laid over and not on the one underneath', () => {
@@ -143,7 +143,7 @@ describe('the look in the export', () => {
     t = setLook(t, 'over', 'mono')
     const withOverlay = graphs(t).find((g) => g.includes('overlay'))!
     // The overlay is input 2 onwards: the picture underneath and its sound come first.
-    expect(withOverlay).toMatch(/\[\d+:v\]fps=30:start_time=0,hue=s=0,crop=/)
+    expect(withOverlay).toMatch(/\[\d+:v\]fps=30:start_time=0,setparams=colorspace=bt709,hue=s=0,crop=/)
     expect(withOverlay).not.toMatch(/\[0:v\]fps=30:start_time=0,hue=s=0/)
     expect(count(withOverlay, 'hue=s=0')).toBe(1)
   })
@@ -249,7 +249,7 @@ describe('the strength and the sliders on a clip (plan 85)', () => {
 
   it('writes the matrix at the head of the clip in the export, between the conversions to RGB and back', () => {
     const [graph] = graphs(setColourAdjust(setLook(oneClip(), 'c', 'sepia'), 'c', { warmth: 30 }))
-    expect(graph).toMatch(/fps=30:start_time=0,scale=in_color_matrix=bt709:in_range=tv,format=rgba,colorchannelmixer=[^,]+,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,crop=/)
+    expect(graph).toMatch(/fps=30:start_time=0,setparams=colorspace=bt709,scale=in_color_matrix=bt709:in_range=tv,format=rgba,colorchannelmixer=[^,]+,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,crop=/)
   })
 
   it('is saved and read back, and a stored value out of range is tidied rather than refused', () => {

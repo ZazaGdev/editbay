@@ -32,7 +32,7 @@ import { editedAt, nextAfterRemoved, trimToPlayhead, trimToPlayheadRefusal } fro
 import { neighbourKey, shownCrop, sourceFrameAt, toggleKeyEdit } from '../../shared/zoom-edit'
 import { copyClips } from '../../shared/clipboard'
 import { groupRefusal } from '../../shared/groups'
-import { MAX_AUDIO_TRACKS, MAX_VIDEO_TRACKS, spanEnd } from '../../shared/tracks'
+import { MAX_AUDIO_TRACKS, MAX_VIDEO_TRACKS, sourceAt, spanEnd } from '../../shared/tracks'
 import { showToast } from '../state/toasts'
 import { guidesTurned } from '../state/useSettings'
 import { inTheWay } from './edit-words'
@@ -421,7 +421,7 @@ export function runAction(app: AppState, action: ActionId, shift = false, key?: 
       const c = at.clip
       const from = range ? range.from : playhead
       const to = range ? range.to - 1 : playhead + Math.round(OUT_OF_THE_WAY_HOLD * framing!.fps)
-      const onRecording = (f: number): number => c.sourceIn + f - c.timelineStart
+      const onRecording = (f: number): number => Math.round(sourceAt(c, f))
       const how = action === 'fadeOutOfTheWay' ? 'fade' : 'slide'
       editClip({ kind: 'moveOutOfTheWay', clipId: c.id, from: onRecording(from), to: onRecording(to), how, ...(pip.picture === MAIN_PICTURE ? {} : { picture: pip.picture }) })
       showToast({ kind: 'out-of-the-way', text: how === 'fade' ? 'The box fades out and back in.' : 'The box slides to a free corner and back.' })

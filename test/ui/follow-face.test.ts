@@ -66,7 +66,7 @@ afterAll(async () => {
 async function fresh(path: string): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), path)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -108,7 +108,7 @@ describe('Follow face', () => {
     expect(Math.abs(middle(last) - (TO_X + FACE_IN_PORTRAIT))).toBeLessThan(last.w / 6)
     await page.waitForSelector('[data-testid="zoom-group"][data-mode="keys"]', WAIT)
     // One undo takes it all back.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(async () => {
       const p = await window.api.currentProject()
       return (p.sequences[0]!.videoTracks.flatMap((t) => t.clips)[0]!.transform.keys ?? []).length === 0
@@ -146,7 +146,7 @@ describe('Centre on face', () => {
       expect(c.keys).toHaveLength(0)
     }
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(crops, WAIT).toEqual(before)
   }, 120_000)
 })

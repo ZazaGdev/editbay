@@ -5,8 +5,29 @@
 
 import type { JSX } from 'react'
 import { accent, meaning, pause as pauseColour } from '../../theme'
+import { usePlayheadRead, type PlayheadStore } from '../../state/playheadStore'
 import type { Drag } from './drag'
 import type { TimelineProps } from './props'
+
+/** The playhead's line across every track: the one thing here a tick of playback draws again. */
+function PlayheadLine({ playhead, pxPerFrame }: { playhead: PlayheadStore; pxPerFrame: number }): JSX.Element {
+  const left = usePlayheadRead(playhead, (frame) => frame * pxPerFrame)
+  return (
+    <div
+      data-testid="playhead-line"
+      style={{
+        position: 'absolute',
+        left,
+        top: 0,
+        bottom: 0,
+        width: 1,
+        background: meaning.playhead,
+        pointerEvents: 'none',
+        zIndex: 5
+      }}
+    />
+  )
+}
 
 export function TimelineOverlays({ props, snapped, pxPerFrame, binDrag, drag }: {
   props: TimelineProps
@@ -40,19 +61,7 @@ export function TimelineOverlays({ props, snapped, pxPerFrame, binDrag, drag }: 
         />
       )}
 
-      <div
-        data-testid="playhead-line"
-        style={{
-          position: 'absolute',
-          left: props.playhead * pxPerFrame,
-          top: 0,
-          bottom: 0,
-          width: 1,
-          background: meaning.playhead,
-          pointerEvents: 'none',
-          zIndex: 5
-        }}
-      />
+      <PlayheadLine playhead={props.playhead} pxPerFrame={pxPerFrame} />
 
       {/* The marked range, tinted across every track, so Delete acting on it is no surprise. */}
       {props.range && (

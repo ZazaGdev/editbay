@@ -32,7 +32,7 @@ beforeAll(async () => {
   await page.waitForSelector('main')
   await discardUnsavedWork(app)
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'landscape' }))
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.evaluate((p) => window.api.importFiles([p]), bands)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
   await page.locator('[data-testid="add-to-timeline"]').first().click()

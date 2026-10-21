@@ -240,12 +240,12 @@ export function playedByPicture(p: Timeline, s: SoundClip): Clip | null {
   const at = pictureIndex(p)
   if (at.faded.has(s.id)) return null
   // A ducked sound's level follows a curve, and a cleaned, enhanced or treated
-  // one plays another file: each needs a player of its own.
-  if (at.trackOf.get(s.id)?.duck === true || s.denoise === true || s.voice !== undefined) return null
+  // one plays another file, and one side on both is not the file's own: each needs a player of its own.
+  if (at.trackOf.get(s.id)?.duck === true || s.denoise === true || s.voice !== undefined || s.channel !== undefined) return null
   const m = at.media.get(s.mediaId)
   if (m && (careOf(m, s.track) !== undefined || playedCopy(m, s) !== null)) return null
   const c = at.pictures.get(s.link)?.find(
-    (x) => x.mediaId === s.mediaId && x.timelineStart === s.timelineStart && x.sourceIn === s.sourceIn && x.sourceOut === s.sourceOut
+    (x) => x.mediaId === s.mediaId && x.timelineStart === s.timelineStart && x.sourceIn === s.sourceIn && x.sourceOut === s.sourceOut && x.speed === s.speed
   )
   return c ?? null
 }

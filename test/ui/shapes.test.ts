@@ -85,7 +85,7 @@ async function dragOn(from: { x: number; y: number }, to: { x: number; y: number
 
 describe('a shape', () => {
   it('is picked from the Shape menu beside Add text, and drawn by a drag on the Output view', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     if ((await page.inputValue('[data-testid="export-preset"]')) !== 'vertical') await page.selectOption('[data-testid="export-preset"]', 'vertical')
     // One view at a time, so the Output view is large enough to read a line's pixels.
@@ -131,7 +131,7 @@ describe('a shape', () => {
     await expect.poll(async () => (await shapes())[0]!.shape.bend !== undefined, { timeout: 10_000 }).toBe(true)
     // One undo takes the bend back.
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await shapes())[0]!.shape.bend, { timeout: 10_000 }).toBeUndefined()
   })
 
@@ -280,7 +280,7 @@ describe('a shape', () => {
 
   it('is drawn by the first press though a clip off the playhead is selected, and the playhead stays (task 91)', async () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await expect.poll(async () => (await shapes()).length, { timeout: 10_000 }).toBe(0)
     const at = await frameMap()
     // One shape, selected, and the playhead moved off it.

@@ -163,7 +163,7 @@ describe('the small picture on the Output view', () => {
     await expect.poll(where, WAIT).toBe('Bottom right')
     // The drag and its snap are one step.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await small()).place.x, WAIT).toBeCloseTo(custom.x, 3)
     await expect.poll(where, WAIT).toBe('Custom')
   })

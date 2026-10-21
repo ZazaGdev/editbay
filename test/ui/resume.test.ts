@@ -159,13 +159,13 @@ describe('closing with unsaved changes', () => {
     await importAndAdd(page, [cleanPath])
 
     await answerUnsavedPrompt(app, CANCEL)
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await expect.poll(() => promptsAsked(app), { timeout: 10_000 }).toHaveLength(1)
     await page.waitForTimeout(500)
     expect(await page.locator('[data-testid="clip"]').count()).toBe(1)
 
     await answerUnsavedPrompt(app, DONT_SAVE)
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
     await closeAndWait(app)
   }, 240_000)
@@ -179,7 +179,7 @@ describe('the project name', () => {
     await importAndAdd(page, [cleanPath])
 
     await answerSaveDialog(app, join(files, 'holiday.editbay'))
-    await page.keyboard.press('Control+s')
+    await page.keyboard.press('ControlOrMeta+s')
     await waitForTitle(page, 'holiday - Editbay')
 
     await app.evaluate(async ({ dialog }, dir) => {
@@ -231,7 +231,7 @@ describe('reopening a project', () => {
     expect(await playhead(page)).toBe(total - 3)
 
     await answerSaveDialog(first.app, target)
-    await page.keyboard.press('Control+s')
+    await page.keyboard.press('ControlOrMeta+s')
     await waitForTitle(page, 'demo - Editbay')
 
     // Moving after the save is not an edit: no question on close, and still
@@ -297,7 +297,7 @@ describe.runIf(process.platform === 'win32')('after a crash', () => {
     const first = await launch(userData, [], FAST_AUTOSAVE)
     await importAndAdd(first.page, [cleanPath])
     await answerSaveDialog(first.app, target)
-    await first.page.keyboard.press('Control+s')
+    await first.page.keyboard.press('ControlOrMeta+s')
     await waitForTitle(first.page, 'demo - Editbay')
 
     // An edit that is never saved, then the app dies once a copy holds it.
@@ -319,7 +319,7 @@ describe.runIf(process.platform === 'win32')('after a crash', () => {
     await waitForTitle(page, 'demo • Editbay')
     expect(await page.locator('[data-testid="recovery-offer"]').count()).toBe(0)
 
-    await page.keyboard.press('Control+s')
+    await page.keyboard.press('ControlOrMeta+s')
     await waitForTitle(page, 'demo - Editbay')
     await expect.poll(() => recoveryCopies(userData), { timeout: 10_000 }).toHaveLength(0)
     await closeAndWait(second.app)
@@ -386,7 +386,7 @@ describe.runIf(process.platform === 'win32')('after a crash', () => {
 /** Save the open project to `target` through Ctrl+S, answering the save dialog. */
 async function saveAs(app: ElectronApplication, page: Page, target: string): Promise<void> {
   await answerSaveDialog(app, target)
-  await page.keyboard.press('Control+Shift+s')
+  await page.keyboard.press('ControlOrMeta+Shift+s')
   const name = target.split(/[\\/]/).pop()!.replace(/\.editbay$/, '')
   await waitForTitle(page, `${name} - Editbay`)
 }
@@ -399,7 +399,7 @@ describe('getting back to a project', () => {
     await importAndAdd(first.page, [cleanPath, silentPath])
     await saveAs(first.app, first.page, target)
     // Start a new project, so that reopening the last one would show nothing.
-    await first.page.keyboard.press('Control+n')
+    await first.page.keyboard.press('ControlOrMeta+n')
     await first.page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
     await closeAndWait(first.app)
 
@@ -414,7 +414,7 @@ describe('getting back to a project', () => {
     const first = await launch(userData)
     await importAndAdd(first.page, [cleanPath])
     await saveAs(first.app, first.page, join(files, 'old.editbay'))
-    await first.page.keyboard.press('Control+n')
+    await first.page.keyboard.press('ControlOrMeta+n')
     await waitForTitle(first.page, 'Untitled - Editbay')
     await closeAndWait(first.app)
 
@@ -446,10 +446,10 @@ describe('getting back to a project', () => {
     const { app, page } = await launch(userData)
     await importAndAdd(page, [cleanPath])
     await saveAs(app, page, join(files, 'one.editbay'))
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await importAndAdd(page, [cleanPath, silentPath])
     await saveAs(app, page, join(files, 'two.editbay'))
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await importAndAdd(page, [silentPath])
     await saveAs(app, page, join(files, 'three.editbay'))
     await unlink(join(files, 'three.editbay'))
@@ -478,13 +478,13 @@ describe('getting back to a project', () => {
     const { app, page } = await launch(userData)
     await importAndAdd(page, [cleanPath])
     await answerUnsavedPrompt(app, DONT_SAVE)
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await waitForTitle(page, 'Untitled - Editbay')
     expect(await promptsAsked(app)).toEqual(['Save changes to Untitled?'])
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
 
     // From Search every action, which opens the Recent menu at them.
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.keyboard.type('earlier versions')
     await page.keyboard.press('Enter')
     await page.waitForSelector('[data-testid="earlier-versions"]')
@@ -548,7 +548,7 @@ describe('getting back to a project', () => {
     const { app, page } = await launch(userData)
     await importAndAdd(page, [cleanPath, silentPath])
     await saveAs(app, page, other)
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await waitForTitle(page, 'Untitled - Editbay')
 
     // What double-clicking a project does while the app is open: Windows

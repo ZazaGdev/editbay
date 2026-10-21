@@ -51,7 +51,7 @@ beforeAll(async () => {
   await page.waitForSelector('[data-testid="clip"]', WAIT)
   await answerSaveDialog(app, saved)
   await page.locator('[data-testid="timecode"]').click()
-  await page.keyboard.press('Control+s')
+  await page.keyboard.press('ControlOrMeta+s')
   await page.waitForFunction(() => document.title.startsWith('talk '), undefined, WAIT)
 }, 240_000)
 
@@ -132,11 +132,11 @@ describe('recording a voice over', () => {
   it('takes one undo off the timeline, leaving the take in the bin', async () => {
     const [take] = await takesOnTimeline()
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await takesOnTimeline()).length).toBe(0)
     const inBin = await page.evaluate(async (id) => (await window.api.currentProject()).media.some((m) => m.id === id), take!.mediaId)
     expect(inBin).toBe(true)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(async () => (await takesOnTimeline()).length).toBe(1)
   })
 

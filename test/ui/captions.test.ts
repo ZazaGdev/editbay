@@ -107,10 +107,10 @@ describe('making captions', () => {
 
   it('takes every caption away with one undo, and puts them back with one redo', async () => {
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(captions, WAIT).toEqual([])
     expect(await page.locator('[data-testid="caption-track"]').count()).toBe(0)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(async () => (await captions()).length, WAIT).toBe(2)
   })
 
@@ -128,7 +128,7 @@ describe('making captions', () => {
       ['HELLO THERE', 5],
       ['EVERYONE.', 32]
     ])
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(captions, WAIT).toEqual([
       ['HELLO THERE', 15],
       ['EVERYONE.', 42]
@@ -175,12 +175,12 @@ describe('making captions', () => {
     ])
     // One undo puts it back as it was.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(captions, WAIT).toEqual([
       ['HELLO THERE', 15],
       ['EVERYONE.', 42]
     ])
-    await page.keyboard.press('Control+Shift+KeyX')
+    await page.keyboard.press('ControlOrMeta+Shift+KeyX')
   })
 
   it("offers Make captions for this clip on a clip's right click, with the selected clips chosen", async () => {
@@ -252,8 +252,8 @@ describe('making captions in the background', () => {
     }
     // Both undone, back to how it was.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(captions, WAIT).toEqual([
       ['HELLO THERE', 15],
       ['EVERYONE.', 42]
@@ -454,7 +454,7 @@ describe('editing captions', () => {
     await words.fill('Hello world')
     await words.press('Enter')
     await expect.poll(async () => (await captions())[0]).toEqual(['HELLO WORLD', 15])
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await captions())[0]).toEqual(['HELLO THERE', 15])
   })
 
@@ -472,9 +472,9 @@ describe('editing captions', () => {
     await expect.poll(async () => page.locator('[data-testid="clip"]').count(), WAIT).toBe(clipsBefore + 1)
     expect(await page.locator('[data-testid="caption-words"]').inputValue()).toBe('everyone.')
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => page.locator('[data-testid="clip"]').count(), WAIT).toBe(clipsBefore)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await captions())[0], WAIT).toEqual(['HELLO THERE', 15])
   })
 
@@ -489,7 +489,7 @@ describe('editing captions', () => {
       ['THERE', 27],
       ['EVERYONE.', 42]
     ])
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await captions()).length, WAIT).toBe(2)
   })
 
@@ -512,8 +512,8 @@ describe('editing captions', () => {
     await page.keyboard.press('Delete')
     await expect.poll(captions, WAIT).toEqual([['HELLO THERE', 15]])
     // One undo for the delete, one for the drag.
-    await page.keyboard.press('Control+z')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(captions, WAIT).toEqual([
       ['HELLO THERE', 15],
       ['EVERYONE.', 42]
@@ -545,7 +545,7 @@ describe('editing captions', () => {
     await page.waitForSelector('[data-testid="caption-panel"]', WAIT)
     expect(await page.locator('[data-testid="caption-words-per"]').inputValue()).toBe('1')
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await captions()).length, WAIT).toBe(2)
   })
 
@@ -563,7 +563,7 @@ describe('editing captions', () => {
     await expect.poll(async () => (await style()).wordColour, WAIT).toBe('#00FF00')
     for (let i = 0; i < 3; i++) {
       await page.locator('[data-testid="timecode"]').click()
-      await page.keyboard.press('Control+z')
+      await page.keyboard.press('ControlOrMeta+z')
     }
     await expect.poll(async () => (await style()).font, WAIT).toBe('montserrat')
     expect(await style()).toMatchObject({ outline: 0.08, wordColour: '#FFFFFF' })
@@ -636,7 +636,7 @@ describe('editing captions', () => {
     ]
     for (const [field, was] of undone) {
       await page.locator('[data-testid="timecode"]').click()
-      await page.keyboard.press('Control+z')
+      await page.keyboard.press('ControlOrMeta+z')
       await expect.poll(async () => (await style())[field], WAIT).toBe(was)
     }
     await expect.poll(() => outputPixels(blue), WAIT).toBe(0)
@@ -668,11 +668,11 @@ describe('editing captions', () => {
     await page.locator('[data-testid="caption-saved-remove"][data-name="Boxed glow"]').click()
     await expect.poll(async () => (await settings()).savedCaptionStyles, WAIT).toEqual([])
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await style()).glow, WAIT).toBe(0)
     expect((await style()).box).toBe(false)
     // The rest of this file starts from captions as they were.
-    for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z')
+    for (let i = 0; i < 4; i++) await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await style()).box, WAIT).toBe(false)
   })
 })
@@ -716,9 +716,9 @@ describe('moving captions on the Output view', () => {
     // One undo for the whole drag.
     await page.keyboard.press('Escape')
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await stored()).clips[0]!.at, WAIT).toBeUndefined()
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(async () => (await stored()).clips[0]!.at, WAIT).toBeDefined()
   })
 
@@ -820,7 +820,7 @@ describe('captions and the export', () => {
     await page.waitForSelector('[data-testid="export-captions-note"]', WAIT)
     await page.locator('[data-testid="export-panel-close"]').click()
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 })
 
@@ -857,7 +857,7 @@ describe('one caption style on every sequence', () => {
     expect(after[0]).toEqual(before[0])
 
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await styles())[1], WAIT).toEqual(before[1])
   })
 })

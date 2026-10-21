@@ -3,6 +3,7 @@ import { formatTimecode } from '../../shared/time'
 import { rulerFrames, type PxSpan } from '../../shared/timeline-layout'
 import { inOrder, type Marker } from '../../shared/markers'
 import { markColour } from '../../shared/marks'
+import { usePlayheadRead, type PlayheadStore } from '../state/playheadStore'
 import { surface, ink, accent, meaning, motion, radius, type, elevation } from '../theme'
 
 /** A marker's flag: wide enough to hit, narrow enough to leave the ruler scrubbable. */
@@ -30,7 +31,7 @@ export function Ruler(props: {
   durationFrames: number
   fps: number
   pxPerFrame: number
-  playhead: number
+  playhead: PlayheadStore
   /**
    * The stretch of the ruler near the part in view, in pixels: its labels are
    * drawn there and nowhere else. All of it when not given.
@@ -166,7 +167,6 @@ export function Ruler(props: {
     if (box) setHoverX(e.clientX - box.left)
   }
 
-  const headX = props.playhead * props.pxPerFrame
   const hoverFrame = hoverX === null ? null : Math.max(0, Math.min(props.durationFrames, Math.round(hoverX / props.pxPerFrame)))
 
   return (
@@ -419,6 +419,16 @@ export function Ruler(props: {
         </>
       )}
 
+      <PlayheadHead playhead={props.playhead} pxPerFrame={props.pxPerFrame} />
+    </div>
+  )
+}
+
+/** The playhead on the ruler, drawn again on its own as it moves rather than with the whole ruler. */
+function PlayheadHead({ playhead, pxPerFrame }: { playhead: PlayheadStore; pxPerFrame: number }): JSX.Element {
+  const headX = usePlayheadRead(playhead, (frame) => frame * pxPerFrame)
+  return (
+    <>
       {/* The playhead's handle: the part that looks like something to grab. */}
       <div
         data-testid="playhead-head"
@@ -447,6 +457,6 @@ export function Ruler(props: {
           pointerEvents: 'none'
         }}
       />
-    </div>
+    </>
   )
 }

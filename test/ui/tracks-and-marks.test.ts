@@ -126,9 +126,9 @@ describe('a track you have called something', () => {
   })
 
   it('goes back to what it was on an undo', async () => {
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(v1Name, WAIT).toBe('V1')
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(v1Name, WAIT).toBe('Facecam')
   })
 
@@ -166,7 +166,7 @@ describe('a picture track that is not drawn', () => {
   })
 
   it('comes back on an undo, and on a second press', async () => {
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(hidden, WAIT).toBe(false)
     await page.click(`${header('v1')} [data-testid="track-hide"]`)
     await expect.poll(hidden, WAIT).toBe(true)
@@ -190,7 +190,7 @@ describe('a sound track that ducks', () => {
     await d.click()
     await expect.poll(ducks, WAIT).toBe(true)
     expect(await d.getAttribute('aria-pressed')).toBe('true')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(ducks, WAIT).toBe(false)
   })
 
@@ -277,7 +277,7 @@ describe('a colour on a clip', () => {
 
   it('undoes as any other edit does', async () => {
     const { picture } = await clipIds()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => markOf(picture), WAIT).toBe('amber')
   })
 })

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { discardUnsavedWork } from './dialogs'
+import { answerSaveDialog, discardUnsavedWork } from './dialogs'
 
 /**
  * Plan 44: text over the video. Added with T at the playhead, above V1, typed
@@ -43,13 +43,13 @@ async function rgbAt(x: number, y: number): Promise<[number, number, number]> {
   return [stdout[0] ?? 0, stdout[1] ?? 0, stdout[2] ?? 0]
 }
 
-type Media = { id: string; width: number; height: number; playablePath: string; text?: { text: string; size: number } }
+type Media = { id: string; width: number; height: number; playablePath: string; text?: { text: string; size: number; font?: string } }
 const texts = (): Promise<Media[]> =>
   page.evaluate(async () => (await window.api.currentProject()).media.filter((m) => m.text !== undefined) as unknown as Media[])
 
 describe('text', () => {
   it('goes on above V1 at the playhead with T, selected, with its Text section open', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     await page.keyboard.press('t')
     await page.waitForSelector('[data-testid="clip"]', { timeout: 10_000 })
@@ -99,7 +99,7 @@ describe('text', () => {
     const place = await page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.videoTracks[1]!.clips[0]!.transform.place)
     expect(place.w * 1080).toBeCloseTo(after.width, 0)
     await page.locator('[data-testid="text-words"]').blur()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await texts())[0]!.text!.text, { timeout: 5000 }).toBe('Your text')
   })
 
@@ -122,14 +122,14 @@ describe('text', () => {
       page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.videoTracks[1]!.clips[0]!.transform.place.w)
     const grownWidth = await boxWidth()
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     // Back to its size before the drag: the redraw was part of the drag, not a step of its own.
     await expect.poll(async () => (await texts())[0]!.text!.size, { timeout: 5000 }).toBe(96)
     await expect.poll(boxWidth, { timeout: 5000 }).toBeLessThan(grownWidth)
     // Given time to draw itself again, which it must not.
     await page.waitForTimeout(800)
     expect((await texts())[0]!.text!.size).toBe(96)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(boxWidth, { timeout: 5000 }).toBeCloseTo(grownWidth, 2)
   })
 })
@@ -160,7 +160,7 @@ describe('typing into a text on the Output view', () => {
     // Enter is a new line; Ctrl+Enter finishes.
     await page.keyboard.press('Enter')
     await page.keyboard.type('two')
-    await page.keyboard.press('Control+Enter')
+    await page.keyboard.press('ControlOrMeta+Enter')
     await page.waitForSelector('[data-testid="text-edit-box"]', { state: 'detached' })
     await expect.poll(words, { timeout: 5000 }).toBe('Hi there t' + String.fromCharCode(10) + 'two')
     // The double click moved nothing.
@@ -187,7 +187,7 @@ describe('typing into a text on the Output view', () => {
 
   it('takes the whole of the typing back in one undo', async () => {
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(words, { timeout: 5000 }).not.toBe('Hi there t' + String.fromCharCode(10) + 'two')
     expect(await words()).not.toContain('Hi there')
   })
@@ -220,7 +220,7 @@ describe('a field left for the ruler or the picture', () => {
   it('lets go of the words box when the Output view is pressed, applying them', async () => {
     await page.locator('[data-testid="clip"]').first().click()
     await page.click('[data-testid="text-words"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('From the picture')
     const box = (await page.locator('[data-testid="place-rect"]').boundingBox())!
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
@@ -230,7 +230,7 @@ describe('a field left for the ruler or the picture', () => {
 
   it('lets go of it when the ruler is pressed, so Delete takes the clip rather than a letter', async () => {
     await page.click('[data-testid="text-words"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('From the ruler')
     const ruler = (await page.locator('[data-testid="ruler"]').boundingBox())!
     const clip = (await page.locator('[data-testid="clip"]').first().boundingBox())!
@@ -247,7 +247,7 @@ describe('lining a text up', () => {
     page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.videoTracks[1]!.clips[0]!.transform.place)
 
   it('puts it against a side of the frame, a little in, or in the middle, from the Frame section', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     await page.keyboard.press('t')
     await page.waitForSelector('[data-testid="text-panel"]', { timeout: 10_000 })
@@ -281,12 +281,12 @@ describe('typing in the words box, with pauses', () => {
     page.evaluate(() => (document.querySelector('[data-testid="text-words"]') as HTMLTextAreaElement).selectionStart)
 
   it('keeps every letter typed while the words sent before are drawn, and the caret where it is', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     await page.keyboard.press('t')
     await page.waitForSelector('[data-testid="text-words"]', { timeout: 10_000 })
     await page.click('[data-testid="text-words"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     // Each pause longer than the moment before the words are sent, so each word
     // is being drawn while the next one is typed.
     const sentence = ['Every ', 'letter ', 'typed ', 'stays ', 'put']
@@ -342,7 +342,7 @@ describe('a number in the Text group (bugs and notes 2, note 28)', () => {
     await page.locator('[data-testid="clip"][data-selected="yes"]').first().waitFor()
     const was = (await newest()).text.size
     await page.click('[data-testid="text-size"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('61')
     // No Enter: it is drawn a moment after the typing rests.
     await expect.poll(async () => (await newest()).text.size, WAIT).toBe(61)
@@ -358,23 +358,23 @@ describe('a number in the Text group (bugs and notes 2, note 28)', () => {
   it('takes a whole visit to the box back in one undo', async () => {
     const was = (await newest()).text.size
     await page.click('[data-testid="text-size"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('70')
     await expect.poll(async () => (await newest()).text.size, WAIT).toBe(70)
     await page.keyboard.press('ArrowDown')
     await expect.poll(async () => (await newest()).text.size, WAIT).toBe(69)
     await page.keyboard.press('Enter')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await newest()).text.size, WAIT).toBe(was)
   })
 
   it('does the same for the outline width', async () => {
     await page.click('[data-testid="text-outline"]')
-    await page.keyboard.press('Control+a')
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.type('5')
     await expect.poll(async () => (await newest()).text.outlineWidth, WAIT).toBe(5)
     await page.keyboard.press('Enter')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await newest()).text.outlineWidth, WAIT).not.toBe(5)
   })
 })
@@ -425,19 +425,56 @@ describe('a glow and saved text styles (plan 99)', () => {
     await page.click('[data-testid="text-saved-remove"][data-name="Neon"]')
     await expect.poll(async () => (await page.evaluate(() => window.api.appSettings())).savedTextStyles, WAIT).toEqual([])
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await newest()).text.glow, WAIT).toBe(false)
   })
 })
 
 describe('the font list', () => {
-  it('offers the fonts installed on this PC, not only the stand-ins', async () => {
-    const count = await page.evaluate(async () => {
-      const q = (window as unknown as { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts
-      return q ? new Set((await q()).map((f) => f.family)).size : 0
-    })
-    // A Windows machine has far more than the thirteen fallbacks.
-    expect(count).toBeGreaterThan(20)
+  const WAIT = { timeout: 10_000 }
+  const fontChoices = (): Promise<string[]> =>
+    page.locator('[data-testid="text-font"] option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value))
+
+  it('offers the fonts the app brings and the popular ones on this PC, not every one (task 1087)', async () => {
+    await page.keyboard.press('ControlOrMeta+n')
+    // The new project here before anything is pressed, as in the tests below.
+    await page.waitForFunction(() => document.title === 'Untitled - Editbay' && document.querySelectorAll('[data-testid="clip"]').length === 0, undefined, WAIT)
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+    await page.keyboard.press('t')
+    await page.waitForSelector('[data-testid="text-panel"]', WAIT)
+    await expect.poll(async () => {
+      const c = await fontChoices()
+      return c.includes('Arial') && c.includes('Montserrat ExtraBold')
+    }, WAIT).toBe(true)
+    const choices = await fontChoices()
+    // Thirty the app brings and the fourteen Windows has.
+    expect(choices.length).toBeLessThanOrEqual(50)
+    for (const f of ['Montserrat ExtraBold', 'Inter', 'Roboto', 'Playfair Display', 'Segoe UI', 'Arial']) expect(choices).toContain(f)
+    expect(choices.filter((f) => f.startsWith('BPG') || f === 'Sylfaen' || f === 'Wingdings')).toEqual([])
+  })
+
+  it('draws a text in a font the app brings, on a PC without it', async () => {
+    await page.selectOption('[data-testid="text-font"]', 'Pacifico')
+    await expect.poll(() => page.evaluate(() => document.fonts.check('40px "Pacifico"') && [...document.fonts].some((f) => f.family.replace(/"/g, '') === 'Pacifico' && f.status === 'loaded')), WAIT).toBe(true)
+  })
+
+  it('still shows a font a project uses that is not on the list, and draws with it', async () => {
+    const file = join(root, 'sylfaen.editbay')
+    await answerSaveDialog(app, file)
+    await page.evaluate(() => window.api.saveProject(true))
+    for (let i = 0; i < 100 && !(await stat(file).catch(() => null)); i++) await new Promise((r) => setTimeout(r, 100))
+    // Its text in Sylfaen, as a project from before the short list could be.
+    const saved = JSON.parse(await readFile(file, 'utf8')) as { media: { text?: { font: string } }[] }
+    for (const m of saved.media) if (m.text) m.text.font = 'Sylfaen'
+    await writeFile(file, JSON.stringify(saved))
+    await page.evaluate(() => window.api.newProject())
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0, undefined, WAIT)
+    await page.evaluate((path) => window.api.openProject(path), file)
+    await expect.poll(async () => (await texts()).map((m) => m.text?.font), WAIT).toContain('Sylfaen')
+    await page.locator('[data-testid="clip"]').first().click({ timeout: 10_000 })
+    await page.waitForSelector('[data-testid="text-panel"]', WAIT)
+    await expect.poll(() => page.inputValue('[data-testid="text-font"]'), WAIT).toBe('Sylfaen')
+    expect(await fontChoices()).toContain('Sylfaen')
   })
 })
 
@@ -447,7 +484,7 @@ describe('deleting a text', () => {
     const count = (n: number): Promise<unknown> =>
       page.waitForFunction((k) => document.querySelectorAll('[data-testid="clip"]').length === k, n, { timeout: 10_000 })
     const blur = (): Promise<void> => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     // The new project here before anything is pressed: New keeps the work it
     // replaces as an earlier version first (plan 84), which takes a moment.
     await page.waitForFunction(() => document.title === 'Untitled - Editbay' && document.querySelectorAll('[data-testid="clip"]').length === 0)

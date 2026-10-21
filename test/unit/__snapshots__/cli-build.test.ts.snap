@@ -2,7 +2,7 @@
 
 exports[`a half of a side-by-side recording > writes the same file every time 1`] = `
 "{
-  "schemaVersion": 10,
+  "schemaVersion": 11,
   "name": "obs cut",
   "fps": 30,
   "media": [
@@ -286,7 +286,7 @@ exports[`a half of a side-by-side recording > writes the same file every time 1`
 
 exports[`a project made from an edit list > writes the same file every time 1`] = `
 "{
-  "schemaVersion": 10,
+  "schemaVersion": 11,
   "name": "rough cut",
   "fps": 30,
   "media": [

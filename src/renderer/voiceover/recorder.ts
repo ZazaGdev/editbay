@@ -93,6 +93,11 @@ function refusal(err: unknown): MicrophoneRefused {
     )
   }
   if (name === 'NotFoundError') return new MicrophoneRefused('No microphone was found. Plug one in and try again.')
+  if (name === 'NotReadableError' && RUNNING_SYSTEM === 'mac') {
+    return new MicrophoneRefused(
+      'The microphone could not be opened. Close anything else using it, or allow it in System Settings, Privacy & Security, Microphone.'
+    )
+  }
   // Windows reports a microphone its privacy setting blocks this way too, not only one another app holds.
   if (name === 'NotReadableError') {
     return new MicrophoneRefused(

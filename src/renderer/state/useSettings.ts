@@ -40,6 +40,11 @@ export interface WindowSettings {
    * it was (task 61).
    */
   dockFolds: Record<string, boolean>
+  /**
+   * The sections right of the timeline folded down to a bar under the
+   * Inspector, which takes their height (task 1137).
+   */
+  rightTucked: boolean
   /** The window's theme (task 66), applied as it loads. */
   theme: ThemeId
   /**
@@ -148,6 +153,7 @@ export const DEFAULT_WINDOW_SETTINGS: WindowSettings = {
   inspectorFolded: false,
   inspectorFolds: {},
   dockFolds: {},
+  rightTucked: false,
   theme: 'current',
   overview: true,
   guides: false,
@@ -219,6 +225,7 @@ export function cleanWindowSettings(raw: unknown): WindowSettings {
     inspectorFolded: typeof r.inspectorFolded === 'boolean' ? r.inspectorFolded : d.inspectorFolded,
     inspectorFolds: cleanFolds(r.inspectorFolds),
     dockFolds: cleanFolds(r.dockFolds),
+    rightTucked: typeof r.rightTucked === 'boolean' ? r.rightTucked : d.rightTucked,
     theme: cleanTheme(r.theme),
     overview: typeof r.overview === 'boolean' ? r.overview : d.overview,
     guides: typeof r.guides === 'boolean' ? r.guides : d.guides,

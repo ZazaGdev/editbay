@@ -299,7 +299,7 @@ describe('several sequences in one project', () => {
     await expect.poll(() => sequenceNames(page), WAIT).toEqual(['Vertical'])
 
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForTabs(page, ['Vertical', 'YouTube'])
     expect(await activeName(page)).toBe('Vertical')
   })
@@ -335,7 +335,7 @@ describe('sequences across a restart', () => {
     await waitForPlayhead(first.page, 5)
 
     await answerSaveDialog(first.app, join(files, 'two cuts.editbay'))
-    await first.page.keyboard.press('Control+s')
+    await first.page.keyboard.press('ControlOrMeta+s')
     await waitForTitle(first.page, 'two cuts - Editbay')
     await closeAndWait(first.app)
 

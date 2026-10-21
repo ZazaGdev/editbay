@@ -324,6 +324,19 @@ describe('refusing what cannot be honoured', () => {
     expect(refusal((l) => (l.shape = 'handoff'))).toMatch(/^corner: /)
   })
 
+  it('eases a smooth zoom over its easeSec, so a punch-in pushes in fast (task 1188)', () => {
+    const l = list()
+    l.zooms[1]!.easeSec = 0.2
+    const keys = firstTimeline(build(l)).videoTracks[0]!.clips[2]!.transform.keys!
+    expect(keys.slice(3).map((k) => k.at)).toEqual([1200, 1206, 1314, 1320])
+  })
+
+  it('refuses an easeSec longer than half the zoom, or on a cut zoom', () => {
+    expect(refusal((l) => (l.zooms[1]!.easeSec = 2.5))).toMatch(/^zooms\[1\]\.easeSec: .*at most half/)
+    expect(refusal((l) => (l.zooms[1]!.easeSec = 0.01))).toMatch(/^zooms\[1\]\.easeSec: .*one frame/)
+    expect(refusal((l) => (l.zooms[0]!.easeSec = 0.2))).toMatch(/^zooms\[0\]\.easeSec: .*only for a smooth zoom/)
+  })
+
   it('refuses a smooth zoom too short to ease in and out of, rather than dropping it', () => {
     expect(refusal((l) => (l.zooms[1] = { fromSec: 40, toSec: 40.04, rect: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, how: 'smooth' }))).toMatch(/^zooms\[1\]: .*too short/)
   })
@@ -380,6 +393,60 @@ describe('a half of a side-by-side recording', () => {
     l.view = 'right'
     l.zooms[0]!.rect = { x: 0, y: 0, w: 1, h: 1 }
     expect(() => build2(l)).toThrow(/^zooms\[0\]\.rect: .*not a punch-in/)
+  })
+})
+
+describe('both halves stacked, the screen over the face (task 1188)', () => {
+  /** A Short: the OBS canvas in a vertical frame, both halves, a full-camera shot for the hook. */
+  const short = (): EditListV2 => {
+    const { version: _v, shape: _s, corner: _c, ...reel } = obsList()
+    return { version: 2, shape: 'vertical', reels: [{ ...reel, view: 'split', shots: [{ fromSec: 0, toSec: 5, view: 'right', why: 'the hook' }] }] }
+  }
+  const build2 = (l: EditListV2): Project => projectFromEditList(readEditList(l), obsFacts, 'short')
+
+  it('lays the left half above the right, each filling half of the frame', () => {
+    const v1 = firstTimeline(build2(short())).videoTracks[0]!.clips
+    const piece = v1[1]!
+    expect(piece.layout).toBe('split')
+    expect(piece.transform.place).toEqual({ x: 0, y: 0, w: 1, h: 0.5 })
+    expect(piece.transform.crop.x + piece.transform.crop.w).toBeLessThanOrEqual(1920)
+    expect(piece.layers).toHaveLength(1)
+    expect(piece.layers[0]!.place).toEqual({ x: 0, y: 0.5, w: 1, h: 0.5 })
+    expect(piece.layers[0]!.crop.x).toBeGreaterThanOrEqual(1920)
+  })
+
+  it('shows one half alone in a shot with a view, and both again after it', () => {
+    const v1 = firstTimeline(build2(short())).videoTracks[0]!.clips
+    expect(v1[0]!.layers).toEqual([])
+    expect(v1[0]!.transform.place).toEqual({ x: 0, y: 0, w: 1, h: 1 })
+    expect(v1[0]!.transform.crop.x).toBeGreaterThanOrEqual(1920)
+    expect(v1[1]!.layout).toBe('split')
+  })
+
+  it('takes split as a shot of a reel showing one half', () => {
+    const l = short()
+    l.reels[0]!.view = 'left'
+    l.reels[0]!.zooms = []
+    l.reels[0]!.shots = [{ fromSec: 30, toSec: 40, view: 'split', why: 'both' }]
+    const v1 = firstTimeline(build2(l)).videoTracks[0]!.clips
+    expect(v1.map((c) => c.layout)).toEqual(['single', 'single', 'split', 'single'])
+  })
+
+  it("moves the top picture for a zoom, reading its rectangle in the left half", () => {
+    const piece = firstTimeline(build2(short())).videoTracks[0]!.clips[2]!
+    const key = piece.transform.keys!.find((k) => k.at === 600)!
+    expect(key.crop.x).toBeGreaterThanOrEqual(960)
+    expect(key.crop.x + key.crop.w).toBeLessThanOrEqual(1920)
+    expect(piece.layers[0]!.keys).toBeUndefined()
+  })
+
+  it('refuses split on a recording that is not side by side, or a shape with no frame', () => {
+    const l = list()
+    l.view = 'split'
+    expect(() => build(l)).toThrow(/^view: .*not a side-by-side/)
+    const h = short()
+    h.shape = 'handoff'
+    expect(() => build2(h)).toThrow(/^reels\[0\]\.view: .*no frame/)
   })
 })
 

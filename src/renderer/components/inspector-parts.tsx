@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useRef, type JSX } from 'react'
 import type { ReactNode } from 'react'
 import type { ClipEdit } from '../../shared/types'
-import { ink, space, type } from '../theme'
+import { ink, radius, space, surface, type } from '../theme'
 import { SectionLabel } from '../ui/SectionLabel'
 import { Icon } from '../ui/Icon'
 import { Sections, useSectionDrag, useSectionMenu, useSectionShown } from './section-host'
@@ -76,11 +76,14 @@ export function Group(props: {
       data-inspector-group=""
       data-group={props.name}
       data-folded={folded ? 'yes' : 'no'}
+      // A card of its own, its heading on a darker band, so where one section ends and the next begins is plain (task 1093).
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 2,
-        marginTop: alone ? 0 : space.lg,
+        marginTop: alone ? 0 : space.sm,
+        background: surface.raised,
+        border: `1px solid ${surface.lineStrong}`,
+        borderRadius: radius.panel,
         ...(alone ? { flex: '1 1 auto', minHeight: 0 } : {})
       }}
     >
@@ -89,7 +92,17 @@ export function Group(props: {
         {...(drag ?? {})}
         {...(sectionMenu.heading ?? {})}
         title={drag ? 'Drag to put it beside the timeline, or right-click for more' : undefined}
-        style={{ display: 'flex', alignItems: 'center', gap: space.xs, cursor: drag ? 'grab' : undefined, flexShrink: 0 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: space.xs,
+          cursor: drag ? 'grab' : undefined,
+          flexShrink: 0,
+          padding: `6px ${space.sm}px`,
+          background: surface.control,
+          borderRadius: folded ? radius.panel - 1 : `${radius.panel - 1}px ${radius.panel - 1}px 0 0`,
+          borderBottom: folded ? 'none' : `1px solid ${surface.lineStrong}`
+        }}
       >
         <button
           type="button"
@@ -117,14 +130,19 @@ export function Group(props: {
         </button>
         {sectionMenu.menu}
       </div>
-      {/* The room a line under the heading took, kept without the line. */}
-      <div style={{ height: 1, margin: `2px 0 ${folded ? 0 : space.xs}px`, flexShrink: 0 }} />
-      {!folded &&
-        (alone ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>{props.children}</div>
-        ) : (
-          props.children
-        ))}
+      {!folded && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            padding: space.sm,
+            ...(alone ? { flex: 1, minHeight: 0, overflowY: 'auto' } : {})
+          }}
+        >
+          {props.children}
+        </div>
+      )}
     </section>
   )
 }

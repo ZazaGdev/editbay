@@ -27,6 +27,7 @@ import { EFFECT_TYPE } from './Timeline'
 import { BACKGROUND_COLOURS, type BackgroundColour } from '../../shared/looks'
 import { OPEN_FREE_PACKS } from '../app/palette-recent'
 import { HelpTip } from '../ui/HelpTip'
+import { RUNNING_SYSTEM } from '../../shared/system'
 import { useCopyDrop } from './folder-copy-drop'
 
 /** What a file in the effects folder can do besides being brought in (plan 90). */
@@ -468,7 +469,7 @@ function FolderEntry(props: {
           />
           <MenuItem
             testid="folder-menu-show"
-            label="Show in Explorer"
+            label={RUNNING_SYSTEM === 'mac' ? 'Show in Finder' : 'Show in Explorer'}
             disabled={recordings ? !listing?.folder : !entry.folder}
             onClick={() => {
               setMenu(null)

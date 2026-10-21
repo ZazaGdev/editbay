@@ -47,7 +47,8 @@ jobs:
         include: ${{ fromJSON(needs.chips.outputs.list) }}
     name: ${{ matrix.chip }}
     runs-on: macos-15
-    timeout-minutes: 60
+    # The whole UI suite runs here too (task 1388), which takes most of this.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -108,7 +109,14 @@ jobs:
         env:
           EDITBAY_SCREENSHOT: ${{ github.workspace }}/screenshot-${{ matrix.chip }}.png
 
+      # Every app test against the development build, as run on Windows before
+      # each release (task 1388). Its report is kept whether it passes or not.
+      - name: The UI suite
+        if: always()
+        run: npx electron-vite build && npx vitest run --dir test/ui --no-file-parallelism --reporter=default --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml
+
       - name: SHA-256
+        if: always()
         run: |
           cd release
           shasum -a 256 ${{ matrix.name }}.dmg | tee ${{ matrix.name }}.dmg.sha256
@@ -122,3 +130,4 @@ jobs:
             release/${{ matrix.name }}.dmg
             release/${{ matrix.name }}.dmg.sha256
             screenshot-${{ matrix.chip }}.png
+            ui-${{ matrix.chip }}.xml

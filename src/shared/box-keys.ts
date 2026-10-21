@@ -14,6 +14,7 @@ import { isFullFrame, type Place } from './layout'
 import { clamp, EASES, MAIN_PICTURE } from './project-core'
 import type { BoxKey, Clip, Ease, Timeline } from './project'
 import { findVideoClip, updateVideoClip } from './timeline-query'
+import { sourceAt } from './tracks'
 
 /** Where a box is and how much of it is drawn, 0 to 1. */
 export interface BoxAt {
@@ -283,7 +284,7 @@ export function pinBoxWith(p: Timeline, clipId: string, at: number, picture?: st
 export function boxAtPlayhead(c: Clip, playhead: number, picture: string = MAIN_PICTURE): Place | null {
   const keys = boxKeysOf(c, picture)
   if (!keys || keys.length === 0) return null
-  return boxAtKeys(staticPlaceOf(c, picture), keys, c.sourceIn + playhead - c.timelineStart).place
+  return boxAtKeys(staticPlaceOf(c, picture), keys, sourceAt(c, playhead)).place
 }
 
 /** How long "Move out of the way" keeps the box away when no range is marked, in seconds from the playhead. */

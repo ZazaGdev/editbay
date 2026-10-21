@@ -9,7 +9,7 @@ Make the common zooms in one click, aimed at whatever you click on.
 ## Steps
 
 1. Select a clip and put the playhead where the zoom should happen, or mark In and Out. {show: clip on:video}
-2. In [Zoom], with [Keyframes] chosen, press [Punch in], [Zoom in] or [Zoom in and out]. {show: zoom-punch or:zoom-mode on:video "Choose Keyframes here, then press Punch in"}
+2. In [Zoom], with [Keyframes] chosen, find the One-click zooms part and press [Punch in], [Zoom in] or [Zoom in and out]. {show: zoom-punch or:zoom-mode on:video "Choose Keyframes here, then press Punch in"}
 3. Click the face or line you want on the Source or Output view. {show: monitor-view on:video "Click where it should close in"}
 4. Press `Enter`, or the button again, when it is right.
 

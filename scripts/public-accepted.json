@@ -19,6 +19,16 @@
       "why": "third-party licence text with its author's email"
     },
     {
+      "file": "resources/licences/Lato-OFL.txt",
+      "match": "team@latofonts.com",
+      "why": "the Lato font's licence text, with its authors' public address"
+    },
+    {
+      "file": "resources/licences/Raleway-OFL.txt",
+      "match": "impallari@gmail.com",
+      "why": "the Raleway font's licence text, with its author's public address"
+    },
+    {
       "file": "package-lock.json",
       "why": "package authors' emails"
     },

@@ -159,7 +159,7 @@ describe('Delete moving on', () => {
       [90, 30],
       [120, 90]
     ])
-    for (let i = 0; i < 3; i++) await press('Control+z')
+    for (let i = 0; i < 3; i++) await press('ControlOrMeta+z')
     await expect.poll(async () => (await v1()).length, WAIT).toBe(5)
   })
 
@@ -176,7 +176,7 @@ describe('Delete moving on', () => {
     }
     await page.waitForTimeout(300)
     expect((await v1()).length).toBe(before - 1)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await v1()).length, WAIT).toBe(before)
   })
 
@@ -188,7 +188,7 @@ describe('Delete moving on', () => {
     // The document changes before the window draws it, so wait for what is drawn.
     await expect.poll(() => page.getAttribute(`${V1}[data-selected="yes"]`, 'data-start'), WAIT).toBe('90')
     expect(await page.getAttribute(`${V1}[data-selected="yes"]`, 'data-clip-id')).not.toBe(last)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await v1()).length, WAIT).toBe(5)
   })
 })
@@ -244,7 +244,7 @@ describe('several clips at once', () => {
       [0, 30],
       [120, 90]
     ])
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await v1()).length, WAIT).toBe(5)
   })
 
@@ -283,16 +283,16 @@ describe('several clips at once', () => {
     await press('Alt+ArrowLeft')
     await expect.poll(async () => (await cropXs())[0], WAIT).not.toBe(first)
     const framed = (await cropXs())[0]!
-    await press('Control+Alt+KeyC')
+    await press('ControlOrMeta+Alt+KeyC')
 
     await clickClip(1)
     await shiftClick(2)
     await expect.poll(selectedOnV1, WAIT).toBe(2)
-    await press('Control+Alt+KeyV')
+    await press('ControlOrMeta+Alt+KeyV')
     await expect.poll(async () => (await cropXs()).slice(1, 3), WAIT).toEqual([framed, framed])
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await cropXs()).slice(1, 3), WAIT).toEqual([first, first])
-    await press('Control+z')
+    await press('ControlOrMeta+z')
   })
 
   it('paints the framing onto the next clip pressed, or onto every one until Esc', async () => {
@@ -330,12 +330,12 @@ describe('several clips at once', () => {
     expect(await page.getAttribute(`${V1}[data-clip-id="${from}"]`, 'data-selected')).toBe('yes')
 
     // Each clip painted is its own undo step.
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await cropXs())[3], WAIT).toBe(first)
-    await press('Control+z')
-    await press('Control+z')
+    await press('ControlOrMeta+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await cropXs()).slice(1, 3), WAIT).toEqual([first, first])
-    await press('Control+z')
+    await press('ControlOrMeta+z')
   })
 
   it('closes up for clips that follow one another, and says why when they do not', async () => {
@@ -348,7 +348,7 @@ describe('several clips at once', () => {
       [30, 30],
       [60, 90]
     ])
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await v1()).length, WAIT).toBe(5)
 
     const before = await v1()
@@ -365,7 +365,7 @@ describe('several clips at once', () => {
     const all = await page.locator(ANY).count()
     expect(await page.locator('[data-testid="track"] [data-testid="sound-clip"]').count()).toBeGreaterThan(0)
     expect(await page.locator(`${ANY}[data-selected="yes"]`).count()).toBeLessThan(all)
-    await press('Control+a')
+    await press('ControlOrMeta+a')
     await expect.poll(() => page.locator(`${ANY}[data-selected="yes"]`).count(), WAIT).toBe(all)
     await press('Escape')
     await expect.poll(() => page.locator(`${ANY}[data-selected="yes"]`).count(), WAIT).toBe(0)

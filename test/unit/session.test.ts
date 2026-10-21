@@ -200,6 +200,7 @@ describe('applyEditTo', () => {
       applyLayout: { kind: 'applyLayout', clipId: 'x', layout: 'pip' },
       swapPictures: { kind: 'swapPictures', clipId: 'y' },
       applyLayoutToSource: { kind: 'applyLayoutToSource', clipId: 'x' },
+      setSpeed: { kind: 'setSpeed', clipId: 'x', speed: 2 },
       setClipAudio: { kind: 'setClipAudio', clipId: 'x.1', gain: 0.5, muted: true },
       applySoundToSource: { kind: 'applySoundToSource', clipId: 'x' },
       setShape: { kind: 'setShape', presetId: 'square' },

@@ -4,6 +4,7 @@ import { boxLines, fitInBox, joinLines, linesUnder, nearestLine, safeLines, side
 import { moveFreeBox, placeFromPixels, scaleFreeBox, stretchFreeBox, stretchPlace, tidyAngle, type Edge, type Place } from '../../shared/layout'
 import { PIP_CORNERS, placeAtCorner, snapToCorner, type PipCorner } from '../../shared/pip'
 import { accent, ink, meaning, radius, surface, type } from '../theme'
+import { ALT_KEY_NAME } from '../../shared/system'
 
 const HANDLE_SIZE = 12
 /** How near, in screen pixels, a moved place must come to a line to snap to it. */
@@ -337,7 +338,7 @@ export function PlaceOverlay(props: {
           pointerEvents: 'none'
         }}
       >
-        {snapping ? 'Alt: place freely' : 'Alt: snap'}
+        {snapping ? `${ALT_KEY_NAME}: place freely` : `${ALT_KEY_NAME}: snap`}
       </span>
     )}
     {cornerBoxes.map(({ corner, box: b }) => (
@@ -366,7 +367,7 @@ export function PlaceOverlay(props: {
       data-testid="place-rect"
       data-place={[p.x, p.y, p.w, p.h].map((n) => n.toFixed(4)).join(',')}
       data-snap={snapping ? 'yes' : 'no'}
-      title={snapping ? 'Drag to move. It snaps to the edges and middles: hold Alt to place it freely' : 'Drag to move. Hold Alt to snap it to the edges and middles'}
+      title={snapping ? `Drag to move. It snaps to the edges and middles: hold ${ALT_KEY_NAME} to place it freely` : `Drag to move. Hold ${ALT_KEY_NAME} to snap it to the edges and middles`}
       data-rotation={turn}
       onPointerDown={begin((e) => ({ kind: 'move', fromX: e.clientX, fromY: e.clientY, start }))}
       style={{

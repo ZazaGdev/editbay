@@ -104,7 +104,7 @@ export function TrackHeaders({ props, t, heightOf, cornerPin, captioned, lanesSh
             variant="ghost"
             title="How captions look: selects the caption at the playhead"
             onClick={() => {
-              const c = captionAt(t.captions.clips, props.playhead) ?? t.captions.clips[0]
+              const c = captionAt(t.captions.clips, props.playhead.get()) ?? t.captions.clips[0]
               if (c) props.onSelectCaption(c.id)
             }}
             style={{ height: 18, padding: '0 5px' }}

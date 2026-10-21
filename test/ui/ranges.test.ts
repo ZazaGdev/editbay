@@ -88,7 +88,7 @@ describe('splitting every track', () => {
         [60, 60]
       ]
     })
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await tracks()).v1.length, WAIT).toBe(2)
   })
 
@@ -103,7 +103,7 @@ describe('splitting every track', () => {
     await page.waitForTimeout(300)
     expect((await tracks()).v1.length).toBe(3)
     // One undo puts it back: the repeats pushed no steps of their own.
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await tracks()).v1.length, WAIT).toBe(2)
   })
 })
@@ -142,7 +142,7 @@ describe('a marked range', () => {
     // Read off the window once it has the document main already has.
     await expect.poll(() => page.locator('[data-testid="marked-range"]').count(), WAIT).toBe(0)
     await expect.poll(playhead, WAIT).toBe(30)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await tracks()).v1.length, WAIT).toBe(2)
   })
 
@@ -164,7 +164,7 @@ describe('a marked range', () => {
       ]
     })
     await expect.poll(playhead, WAIT).toBe(30)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await tracks()).v1.length, WAIT).toBe(2)
   })
 
@@ -174,7 +174,7 @@ describe('a marked range', () => {
     await goTo(89)
     await press('Shift+KeyO')
     await page.waitForSelector('[data-testid="marked-range"]', WAIT)
-    await press('Control+Shift+KeyX')
+    await press('ControlOrMeta+Shift+KeyX')
     await expect.poll(() => page.locator('[data-testid="marked-range"]').count(), WAIT).toBe(0)
 
     // Nothing selected and no range: Delete does nothing at all.
@@ -194,7 +194,7 @@ describe('a marked range', () => {
     await goTo(60)
     await press('Shift+KeyI')
     await page.waitForSelector('[data-testid="marked-range"][data-from="60"]', WAIT)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await page.waitForSelector('[data-testid="marked-range"][data-from="30"][data-to="90"]', WAIT)
     // Undoing the marks never touched the playhead: where you are is still not an edit.
     expect(await playhead()).toBe(60)
@@ -203,17 +203,17 @@ describe('a marked range', () => {
   it('undoes only the last of edits pressed faster than the window hears back', async () => {
     const marks = (): Promise<unknown> => page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.marks ?? null)
     // From no marks at all, whatever the test before left.
-    await press('Control+Shift+KeyX')
+    await press('ControlOrMeta+Shift+KeyX')
     await expect.poll(marks, WAIT).toBeNull()
     // Out and undo in the same breath as In, with nothing waited for between.
     await goTo(30)
     await page.keyboard.press('Shift+KeyI')
     await page.keyboard.press('Shift+ArrowRight')
     await page.keyboard.press('Shift+KeyO')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(marks, WAIT).toEqual({ in: 30 })
     await page.waitForSelector('[data-testid="marked-range"][data-from="30"]', WAIT)
-    await press('Control+Shift+KeyX')
+    await press('ControlOrMeta+Shift+KeyX')
     await expect.poll(marks, WAIT).toBeNull()
   })
 
@@ -225,7 +225,7 @@ describe('a marked range', () => {
     await page.waitForSelector('[data-testid="marked-range"]', WAIT)
     const file = join(root, 'marked.editbay')
     await answerSaveDialog(app, file)
-    await press('Control+Shift+KeyS')
+    await press('ControlOrMeta+Shift+KeyS')
     for (let i = 0; i < 100 && !(await stat(file).catch(() => null)); i++) await new Promise((r) => setTimeout(r, 100))
     await page.evaluate(() => window.api.newProject())
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0, undefined, WAIT)

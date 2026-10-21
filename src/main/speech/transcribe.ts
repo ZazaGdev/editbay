@@ -2,7 +2,9 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { join } from 'node:path'
 import { trackFile, trackName, type Timeline } from '../../shared/project'
-import { spanLength } from '../../shared/tracks'
+import { spanLength, speedOf } from '../../shared/tracks'
+import { soundHeard } from '../../shared/speed'
+import { tempoFilters } from '../../shared/render-sound'
 import { framesToSeconds } from '../../shared/time'
 import { readWhisperJson, wordsToFrames, type TimedWord } from '../../shared/captions'
 import { clipNameFromPath } from '../../shared/filename'
@@ -31,9 +33,18 @@ export interface Listened {
   label: string
   /** Its file is a copy of one of the recording's streams, made in the cache, rather than the recording itself. */
   copy: boolean
+  /** The speed it plays at, so `lengthSec` of it is that many times as much of its file. Absent for 1. */
+  speed?: number
 }
 
-/** Every heard clip on the tracks listened to, in track order. Muted and silent clips are left out. */
+/**
+ * Every heard clip on the tracks listened to, in track order. Muted and
+ * silent clips are left out, and so is one sped up or slowed down past where
+ * its sound is heard. A clip at a speed is heard as the export plays it: all
+ * of its recording, stretched to its time on the timeline (audit 2026-10-19:
+ * read for its timeline length at 1x, its captions ran late and stopped part
+ * way through it).
+ */
 export function listened(t: Timeline, trackIds: readonly string[]): Listened[] {
   const wanted = new Set(trackIds)
   return t.audioTracks
@@ -42,7 +53,8 @@ export function listened(t: Timeline, trackIds: readonly string[]): Listened[] {
       r.clips.flatMap((c) => {
         const m = t.media.find((x) => x.id === c.mediaId)
         const file = m ? trackFile(m, c.track) : null
-        if (!m || !file || c.muted || c.gain <= 0) return []
+        if (!m || !file || c.muted || c.gain <= 0 || !soundHeard(c)) return []
+        const speed = speedOf(c)
         return [
           {
             path: file.path,
@@ -51,7 +63,8 @@ export function listened(t: Timeline, trackIds: readonly string[]): Listened[] {
             atSec: framesToSeconds(c.timelineStart, t.fps),
             gain: c.gain,
             label: c.track > 0 ? `${trackName(m, c.track)} of ${clipNameFromPath(m.originalPath)}` : clipNameFromPath(m.originalPath),
-            copy: c.track > 0
+            copy: c.track > 0,
+            ...(speed !== 1 ? { speed } : {})
           }
         ]
       })
@@ -91,10 +104,11 @@ export function mixGraph(clips: Listened[]): { inputs: string[]; graph: string }
     const j = branch.get(c.path) ?? 0
     branch.set(c.path, j + 1)
     const from = Math.round(c.fromSec * SPEECH_RATE)
-    const to = from + Math.max(1, Math.round(c.lengthSec * SPEECH_RATE))
+    const speed = c.speed ?? 1
+    const to = from + Math.max(1, Math.round(c.lengthSec * speed * SPEECH_RATE))
     const delay = Math.round(c.atSec * SPEECH_RATE)
     parts.push(
-      `[i${k}_${j}]atrim=start_sample=${from}:end_sample=${to},asetpts=PTS-STARTPTS,volume=${level(c.gain)}` +
+      `[i${k}_${j}]atrim=start_sample=${from}:end_sample=${to},asetpts=PTS-STARTPTS,${speed !== 1 ? `${tempoFilters(speed)},` : ''}volume=${level(c.gain)}` +
         `${delay > 0 ? `,adelay=${delay}S:all=1` : ''}[m${i}]`
     )
     return `[m${i}]`
