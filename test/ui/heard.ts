@@ -93,7 +93,10 @@ export interface Played {
 export async function recordPlaying(page: Page, seconds: number): Promise<Played> {
   await page.evaluate(async () => {
     type Rec = { rate: number; chunks: Float32Array[]; at: number[]; on: boolean }
-    const w = window as unknown as { __heard: { players: Rec; engine: Rec; flashes: number[]; pressedAt: number } }
+    const w = window as unknown as {
+      __heard: { players: Rec; engine: Rec; flashes: number[]; pressedAt: number }
+      __heardTap?: { ctx: AudioContext; sum: GainNode; tapped: WeakSet<HTMLMediaElement>; connect: (this: AudioNode, ...a: unknown[]) => unknown }
+    }
     const recorder = (c: AudioContext, rec: Rec): ScriptProcessorNode => {
       const tap = c.createScriptProcessor(2048, 1, 1)
       tap.channelCount = 1
@@ -111,17 +114,27 @@ export async function recordPlaying(page: Page, seconds: number): Promise<Played
       quiet.connect(c.destination)
       return tap
     }
-    const ctx = new AudioContext()
+    // One context for the page, kept: a player can be tapped only once, and a
+    // test tried again records on the same page (task 1388).
+    if (!w.__heardTap) {
+      const c = new AudioContext()
+      w.__heardTap = { ctx: c, sum: c.createGain(), tapped: new WeakSet(), connect: AudioNode.prototype.connect as (this: AudioNode, ...a: unknown[]) => unknown }
+    }
+    const kept = w.__heardTap
+    const ctx = kept.ctx
     await ctx.resume()
     const players: Rec = { rate: ctx.sampleRate, chunks: [], at: [], on: false }
-    const sum = ctx.createGain()
-    for (const el of document.querySelectorAll('video[data-testid="track-video"], audio[data-testid="track-player"]')) {
-      ctx.createMediaElementSource(el as HTMLMediaElement).connect(sum)
+    const sum = kept.sum
+    for (const el of document.querySelectorAll<HTMLMediaElement>('video[data-testid="track-video"], audio[data-testid="track-player"]')) {
+      if (kept.tapped.has(el)) continue
+      kept.tapped.add(el)
+      ctx.createMediaElementSource(el).connect(sum)
     }
+    sum.disconnect()
     sum.connect(recorder(ctx, players))
     const engine: Rec = { rate: 0, chunks: [], at: [], on: false }
     const tapped = new WeakSet<AudioNode>()
-    const connect = AudioNode.prototype.connect as (this: AudioNode, ...a: unknown[]) => unknown
+    const connect = kept.connect
     AudioNode.prototype.connect = function (this: AudioNode, ...args: unknown[]) {
       const target = args[0]
       if (this instanceof GainNode && target instanceof GainNode && !tapped.has(target) && target.context !== ctx) {
