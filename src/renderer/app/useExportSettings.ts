@@ -3,7 +3,7 @@
  * workspace, and how you like exports to go, from Settings.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { DEFAULT_FILENAME_PATTERN, type ExportMode } from '../../shared/workspace'
 import { exportPrefsOf, type ExportPrefs } from '../components/SettingsDialog'
 import type { AppLocals } from './app-state'
@@ -35,13 +35,14 @@ export function useExportSettings({ exportOpen }: Pick<AppLocals, 'exportOpen'>)
   // A project that has never been exported starts from how you like exports
   // to go. One that has keeps what it used: its folder is set by its first
   // export, and its mode and names are its own from then on. Only as the
-  // window opens, so a change made in it is never undone.
+  // window opens, so a change made in it is never undone. Before the window is
+  // first drawn, so it never shows the project's own mode for a moment first.
   const exportUntouched = exportFolder === null && exportMode === 'join' && exportPattern === DEFAULT_FILENAME_PATTERN
   const exportUntouchedNow = useRef(exportUntouched)
   exportUntouchedNow.current = exportUntouched
   const exportPrefsNow = useRef(exportPrefs)
   exportPrefsNow.current = exportPrefs
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!exportOpen || !exportUntouchedNow.current) return
     setExportMode(exportPrefsNow.current.exportMode)
     setExportPattern(exportPrefsNow.current.exportPattern)

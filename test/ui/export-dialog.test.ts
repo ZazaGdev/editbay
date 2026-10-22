@@ -387,23 +387,26 @@ describe('the Export dialog', () => {
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="settings"]', { state: 'detached' })
 
-    await openExport(page)
-    expect(await page.inputValue('[data-testid="export-mode"]')).toBe('batch')
-    expect(await page.inputValue('[data-testid="export-pattern"]')).toBe('{clip}_{index}')
-    // Changed in the window, and it stays changed: Settings is only where it starts.
-    await page.selectOption('[data-testid="export-mode"]', 'join')
-    await closeExport(page)
-    await openExport(page)
-    expect(await page.inputValue('[data-testid="export-mode"]')).toBe('join')
-    await closeExport(page)
-
-    await page.click('[data-testid="open-settings"]')
-    await page.click('[data-testid="settings-tab"][data-tab="Export"]')
-    await page.selectOption('[data-testid="setting-export-mode"]', 'join')
-    await page.fill('[data-testid="setting-export-pattern"]', '')
-    await page.press('[data-testid="setting-export-pattern"]', 'Enter')
-    await page.keyboard.press('Escape')
-    await page.waitForSelector('[data-testid="settings"]', { state: 'detached' })
+    try {
+      await openExport(page)
+      expect(await page.inputValue('[data-testid="export-mode"]')).toBe('batch')
+      expect(await page.inputValue('[data-testid="export-pattern"]')).toBe('{clip}_{index}')
+      // Changed in the window, and it stays changed: Settings is only where it starts.
+      await page.selectOption('[data-testid="export-mode"]', 'join')
+      await closeExport(page)
+      await openExport(page)
+      expect(await page.inputValue('[data-testid="export-mode"]')).toBe('join')
+    } finally {
+      // Settings put back even on a miss, or every export after it writes one file a clip.
+      await closeExport(page)
+      await page.click('[data-testid="open-settings"]')
+      await page.click('[data-testid="settings-tab"][data-tab="Export"]')
+      await page.selectOption('[data-testid="setting-export-mode"]', 'join')
+      await page.fill('[data-testid="setting-export-pattern"]', '')
+      await page.press('[data-testid="setting-export-pattern"]', 'Enter')
+      await page.keyboard.press('Escape')
+      await page.waitForSelector('[data-testid="settings"]', { state: 'detached' })
+    }
   }, 240_000)
 
   it('drops its question when the folder changes, so it never answers for files it did not check', async () => {
