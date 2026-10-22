@@ -294,7 +294,12 @@ describe('a background taken out (plan 90)', () => {
   // levels apart already, and a key beside bright bands makes that many more.
   beforeAll(async () => {
     await page.locator('[data-testid="blur-whole"]').fill('0')
-    while ((await page.locator('[data-testid="blur-box-remove"]').count()) > 0) await page.locator('[data-testid="blur-box-remove"]').first().click()
+    // Pressed from the page: the button is drawn again as the blur above lands, and a click waiting for it to hold still can wait for good.
+    while ((await page.locator('[data-testid="blur-box-remove"]').count()) > 0) {
+      const was = await page.locator('[data-testid="blur-box-remove"]').count()
+      await page.evaluate(() => document.querySelector<HTMLButtonElement>('[data-testid="blur-box-remove"]')?.click())
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="blur-box-remove"]').length < n, was)
+    }
     await page.waitForFunction(async () => {
       const c = (await window.api.currentProject()).sequences[0]!.videoTracks[0]!.clips[0]!
       return c.blur === undefined && c.blurBoxes === undefined
