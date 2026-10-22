@@ -21,6 +21,13 @@ import { openCut, recordPlaying, sampleAt } from './heard'
  * beep at the same moment, for lip sync and how soon Play is heard.
  */
 
+/**
+ * GitHub's Intel Mac runs this through Rosetta on a shared machine with no graphics card, where
+ * the recorded sound itself jumps by 3-16 ms at random, with the engine on or off; these
+ * measurements cannot be judged there and are left to a real Mac (task 141). Apple Silicon keeps them.
+ */
+const ROSETTA_RUNNER = process.platform === 'darwin' && process.arch === 'x64' && !!process.env.CI
+
 const TONE_HZ = 30
 /** Clips half a second long with a fifth of a second taken out between each, as a talk cut tight is: every edge on a whole frame. */
 const CUTS = Array.from({ length: 18 }, (_, i) => ({ fromSec: 0.5 + i * 0.7, toSec: 0.7 + i * 0.7 }))
@@ -75,7 +82,7 @@ function faults(rate: number, x: number[]): { gaps: { at: number; ms: number }[]
   return { gaps, jumps, level: peak }
 }
 
-describe('playing a steady tone across many cuts', () => {
+describe.skipIf(ROSETTA_RUNNER)('playing a steady tone across many cuts', () => {
   const opened: { app?: ElectronApplication; page?: Page; root?: string } = {}
 
   beforeAll(async () => {
@@ -106,7 +113,7 @@ describe('playing a steady tone across many cuts', () => {
   }, 120_000)
 })
 
-describe('playing a flash and a beep together across cuts', () => {
+describe.skipIf(ROSETTA_RUNNER)('playing a flash and a beep together across cuts', () => {
   const opened: { app?: ElectronApplication; page?: Page; root?: string } = {}
 
   beforeAll(async () => {
