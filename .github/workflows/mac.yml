@@ -114,7 +114,8 @@ jobs:
       - name: The UI suite
         if: always()
         run: |
-          system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
+          system_profiler SPDisplaysDataType || true
+          osascript -e 'tell application "Finder" to get bounds of window of desktop' || true
           mkdir -p "$EDITBAY_SHOTS"
           npx electron-vite build && npx vitest run --dir test/ui --no-file-parallelism --reporter=default --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml
         env:

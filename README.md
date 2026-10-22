@@ -4,6 +4,8 @@
 
 A free, local video editor.
 
+Website: [zazagdev.github.io/editbay](https://zazagdev.github.io/editbay/)
+
 ## How to install
 
 **Windows 11, 64-bit.**

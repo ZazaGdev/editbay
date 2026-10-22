@@ -169,7 +169,12 @@ function createWindow(): void {
   // clicks go into the page through the debugger and are not affected.
   if (OUT_OF_THE_WAY) {
     win.setIgnoreMouseEvents(true)
-    win.once('ready-to-show', () => win.showInactive())
+    win.once('ready-to-show', () => {
+      win.showInactive()
+      // macOS fits a window to the screen as it is shown, and a CI Mac's screen
+      // is smaller than the window: sized again after, beyond it (task 1388).
+      if (process.platform === 'darwin') win.setSize(1440, 900)
+    })
   }
   // Nothing heard either (task 1097): the page plays and its sound is worked
   // out as ever, so a test can still record it, but none reaches the speakers.
