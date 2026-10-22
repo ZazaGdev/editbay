@@ -142,11 +142,15 @@ describe('resizing the crop box in a zoomed Source view', () => {
   it('does the same on a clip whose zoom has keyframes, the playhead between them', async () => {
     // Keyframes at the clip's start and two thirds in, and the playhead between them.
     const clip = (await page.locator('[data-testid="track"][data-track-id="v1"] [data-testid="clip"]').first().boundingBox())!
-    const ruler = (await page.locator('[data-testid="timeline-scroll"]').boundingBox())!
     const playhead = async (): Promise<number> => Number(await page.getAttribute('[data-testid="timecode"]', 'data-playhead'))
     const at = async (share: number): Promise<void> => {
       const was = await playhead()
-      await page.mouse.click(clip.x + clip.width * share, ruler.y + 8)
+      // The ruler measured now, in the middle of its height, rather than guessed from the top of the timeline.
+      const ruler = (await page.locator('[data-testid="ruler"]').boundingBox())!
+      const x = clip.x + clip.width * share
+      const y = ruler.y + ruler.height / 2
+      console.log('DBG ruler', JSON.stringify({ ruler, x, y, was, under: await page.evaluate(([px, py]) => document.elementFromPoint(px!, py!)?.outerHTML.slice(0, 160), [x, y]) }))
+      await page.mouse.click(x, y)
       await expect.poll(playhead, WAIT).not.toBe(was)
       await page.waitForTimeout(200)
     }

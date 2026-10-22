@@ -94,6 +94,14 @@ async function playhead(): Promise<number> {
 async function goTo(frame: number): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.keyboard.press('Home')
+  // At the start before stepping on, so a step never counts from where it was.
+  await expect
+    .poll(async () => {
+      const at = await playhead()
+      if (at !== 0) console.log('DBG home', at, await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 160)))
+      return at
+    }, WAIT)
+    .toBe(0)
   for (let i = 0; i < Math.floor(frame / 30); i++) await page.keyboard.press('Shift+ArrowRight')
   for (let i = 0; i < frame % 30; i++) await page.keyboard.press('ArrowRight')
   await expect.poll(playhead, WAIT).toBe(frame)

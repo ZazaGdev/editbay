@@ -500,7 +500,8 @@ describe('noise cleaned out of a sound clip', () => {
     const c = await centre(song())
     await page.mouse.click(c.x, c.y)
     await page.waitForSelector('[data-testid="sound-clip-panel"]', WAIT)
-    await page.locator('[data-testid="sound-clip-denoise"]').check()
+    // Ticked once the edit comes back from the project, a moment after the click on a slow machine.
+    await page.locator('[data-testid="sound-clip-denoise"]').click()
     await expect.poll(async () => (await state()).on, WAIT).toBe(true)
     // Made in the background, a few seconds for a six second song.
     await expect.poll(async () => (await state()).cleaned, { timeout: 60_000 }).toBe(true)
@@ -523,7 +524,7 @@ describe('a voice enhanced on a sound clip', () => {
     const c = await centre(song())
     await page.mouse.click(c.x, c.y)
     await page.waitForSelector('[data-testid="sound-clip-panel"]', WAIT)
-    await page.locator('[data-testid="sound-clip-voice"]').check()
+    await page.locator('[data-testid="sound-clip-voice"]').click()
     await expect.poll(async () => (await state()).voice, WAIT).toBe('normal')
     await expect.poll(async () => (await state()).recipes, { timeout: 60_000 }).toContain('v1-normal')
     await expect.poll(() => page.locator('[data-testid="sound-clip-enhancing"]').count(), WAIT).toBe(0)
