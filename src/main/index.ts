@@ -53,6 +53,12 @@ const UNDER_TEST = isUnderTest(process.env, app.isPackaged)
 // folder and the switch. Nobody starting the installed app passes either.
 const OUT_OF_THE_WAY =
   (DEVELOPING || testLaunch) && (process.env.EDITBAY_TEST_WINDOW === 'hidden' || UNDER_TEST)
+// macOS counts a window at no opacity as covered, and Chromium then stops drawing
+// it: sizes go stale and playback is timed by frames that never come (task 1388).
+if (OUT_OF_THE_WAY && process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+  app.commandLine.appendSwitch('disable-renderer-backgrounding')
+}
 /** The development server the window loads from, in development only. */
 const RENDERER_URL = DEVELOPING ? process.env.ELECTRON_RENDERER_URL : undefined
 

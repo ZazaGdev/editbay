@@ -404,6 +404,7 @@ describe('sequences across a restart', () => {
     expect(await page.getAttribute('[data-testid="monitor-stage"]', 'data-view')).toBe('program')
     expect(await selectedIndex(page)).toBe(0)
     // Opening an older file is not a change of its own.
+    console.log('DBG older', cleanPath, userData, JSON.stringify(await page.evaluate(async () => (await window.api.currentProject()).media)))
     await waitForTitle(page, 'older - Editbay')
     await closeAndWait(app)
   }, 240_000)
