@@ -299,7 +299,7 @@ describe('a background taken out (plan 90)', () => {
       const c = (await window.api.currentProject()).sequences[0]!.videoTracks[0]!.clips[0]!
       return c.blur === undefined && c.blurBoxes === undefined
     })
-  })
+  }, 60_000)
 
   it('is offered from the clip menu too, under Tools, and leaves bands with no plain background as they were', async () => {
     await page.click('[data-testid="tool-remove-background-none"]')

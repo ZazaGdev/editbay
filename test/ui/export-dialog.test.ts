@@ -388,7 +388,6 @@ describe('the Export dialog', () => {
     await page.waitForSelector('[data-testid="settings"]', { state: 'detached' })
 
     await openExport(page)
-    console.log('DBG export', JSON.stringify(await page.evaluate(async () => [document.querySelector('[data-testid="export-folder"]')?.textContent, document.title, [...document.querySelectorAll('[role="dialog"] input, [role="dialog"] select')].map((e) => (e as HTMLInputElement).value), await window.api.appSettings()])))
     expect(await page.inputValue('[data-testid="export-mode"]')).toBe('batch')
     expect(await page.inputValue('[data-testid="export-pattern"]')).toBe('{clip}_{index}')
     // Changed in the window, and it stays changed: Settings is only where it starts.

@@ -149,7 +149,6 @@ describe('resizing the crop box in a zoomed Source view', () => {
       const ruler = (await page.locator('[data-testid="ruler"]').boundingBox())!
       const x = clip.x + clip.width * share
       const y = ruler.y + ruler.height / 2
-      console.log('DBG ruler', JSON.stringify({ ruler, x, y, was, under: await page.evaluate(([px, py]) => document.elementFromPoint(px!, py!)?.outerHTML.slice(0, 160), [x, y]) }))
       await page.mouse.click(x, y)
       await expect.poll(playhead, WAIT).not.toBe(was)
       await page.waitForTimeout(200)

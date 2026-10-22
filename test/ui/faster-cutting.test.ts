@@ -32,7 +32,6 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
-  console.log('DBG size', JSON.stringify(await app.evaluate(({ BrowserWindow, screen }) => { const w = BrowserWindow.getAllWindows()[0]!; return [w.getSize(), w.getContentSize(), screen.getPrimaryDisplay().workArea] })))
   await discardUnsavedWork(app)
   const assets = await page.evaluate((p) => window.api.importFiles(p), [red, green])
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"][data-status="ready"]').length === 2, undefined, {
@@ -99,7 +98,6 @@ describe('the Source and Output side by side', () => {
     // The Output side is the frame's shape at the monitor's height, inside the room kept round the
     // pictures (26 pixels above for the caption, 14 elsewhere), unless that would be more than half of it.
     const stage = await boxOf('[data-testid="monitor-stage"]')
-    console.log('DBG boxes', JSON.stringify({ inner: await page.evaluate(() => [innerWidth, innerHeight]), stage, program, source, crop: await boxOf('[data-testid="crop-rect"]'), tc: await boxOf('[data-testid="timecode"]') }))
     expect(Math.abs(program.height - (stage.height - 40))).toBeLessThanOrEqual(1)
     expect(Math.abs(stage.x + stage.width - (program.x + program.width) - 14)).toBeLessThanOrEqual(1)
     expect(program.width).toBeLessThanOrEqual(stage.width / 2 + 1)
