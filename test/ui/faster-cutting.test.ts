@@ -206,6 +206,8 @@ describe('the Source and Output side by side', () => {
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="monitor-stage"][data-fullscreen="no"]', WAIT)
     await page.waitForSelector('[data-testid="monitor-stage"][data-both="yes"]', WAIT)
+    // Back to its size: a Mac brings the window back from the whole screen fitted to a small CI screen first (task 1388).
+    await page.waitForFunction(() => window.innerWidth > 1300, undefined, WAIT)
   })
 
   it('shows one view at a time for a frame that is not taller than wide', async () => {

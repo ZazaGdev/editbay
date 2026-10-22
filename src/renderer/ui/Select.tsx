@@ -118,9 +118,13 @@ function List(props: {
       if (box.current?.contains(target) || anchor.contains(target)) return
       onClose()
     }
-    // Scrolled or resized from under it, it would float away from its box.
+    // Scrolled or resized from under it, it would float away from its box. A
+    // scroll made just before it opened is told only on the next frame or two,
+    // and that one is not a scroll away from it (task 1388).
+    let opening = true
+    let frame = requestAnimationFrame(() => (frame = requestAnimationFrame(() => (opening = false))))
     const scrolled = (e: Event): void => {
-      if (box.current?.contains(e.target as Node)) return
+      if (opening || box.current?.contains(e.target as Node)) return
       onClose()
     }
     window.addEventListener('keydown', keys, true)
@@ -129,6 +133,7 @@ function List(props: {
     window.addEventListener('resize', onClose)
     window.addEventListener('blur', onClose)
     return () => {
+      cancelAnimationFrame(frame)
       window.removeEventListener('keydown', keys, true)
       window.removeEventListener('pointerdown', outside, true)
       window.removeEventListener('scroll', scrolled, true)

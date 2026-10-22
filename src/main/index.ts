@@ -193,6 +193,12 @@ function createWindow(): void {
         }
         win.on('resize', fitToScreen)
         setTimeout(() => win.isDestroyed() || win.off('resize', fitToScreen), 5000)
+        // Leaving the whole screen, it comes back fitted to the screen too.
+        const backToSize = (): void => {
+          for (const ms of [300, 1500]) setTimeout(() => win.isDestroyed() || win.setSize(1440, 900), ms)
+        }
+        win.on('leave-full-screen', backToSize)
+        win.on('leave-html-full-screen', backToSize)
       }
     })
   }
