@@ -28,6 +28,7 @@ export function ContextMenu(props: {
 }): JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   const [shift, setShift] = useState({ x: 0, y: 0 })
+  const [tall, setTall] = useState(false)
   const { onClose } = props
   // Read inside the handler rather than depended on, so the listeners are not
   // torn down and rebuilt every time the anchor is handed over again.
@@ -48,9 +49,12 @@ export function ContextMenu(props: {
     const el = box.current
     if (!el) return
     const r = el.getBoundingClientRect()
+    // Taller than the window: from its top edge, scrolling, rather than off the top (task 1388).
+    const tooTall = r.height > window.innerHeight - 16
+    setTall(tooTall)
     setShift({
       x: Math.min(0, window.innerWidth - 8 - (props.at.x + r.width)),
-      y: Math.min(0, window.innerHeight - 8 - (props.at.y + r.height))
+      y: tooTall ? 8 - props.at.y : Math.min(0, window.innerHeight - 8 - (props.at.y + r.height))
     })
   }, [props.at])
 
@@ -119,7 +123,8 @@ export function ContextMenu(props: {
         minWidth: 200,
         display: 'flex',
         flexDirection: 'column',
-        gap: 2
+        gap: 2,
+        ...(tall ? { maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' as const } : {})
       }}
     >
       {props.children}

@@ -1,4 +1,4 @@
-import { constants, copyFile, readdir, stat } from 'node:fs/promises'
+import { constants, copyFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { FolderFile, FolderListing, FolderSearch } from '../shared/types'
 
@@ -48,10 +48,14 @@ function underOf(root: string, dir: string): string {
 }
 
 async function fileAt(dir: string, name: string, under?: string): Promise<FolderFile | null> {
-  const path = join(dir, name)
+  const listed = join(dir, name)
   try {
-    const s = await stat(path)
-    return s.isFile() ? { path, name, size: s.size, modifiedAt: s.mtimeMs, ...(under !== undefined ? { under } : {}) } : null
+    const s = await stat(listed)
+    if (!s.isFile()) return null
+    // The real path, as an import keeps it, so a folder reached through a link
+    // (a Mac's temp folder is one) still shows what is imported (task 1388).
+    const path = await realpath(listed).catch(() => listed)
+    return { path, name, size: s.size, modifiedAt: s.mtimeMs, ...(under !== undefined ? { under } : {}) }
   } catch {
     return null
   }

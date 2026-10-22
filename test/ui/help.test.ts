@@ -85,7 +85,7 @@ describe('an empty window', () => {
     expect(keys).toContain('S')
     expect(keys).toContain('I')
     expect(keys).toContain('O')
-    expect(keys).toContain('Ctrl+E')
+    expect(keys).toContain(process.platform === 'darwin' ? '⌘E' : 'Ctrl+E')
   })
 
   it('offers the tutorials, and opens them, which is the line a first-time user sees', async () => {

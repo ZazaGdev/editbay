@@ -16,6 +16,8 @@ import { closeExport, discardUnsavedWork } from './dialogs'
  */
 
 const fx = fixtureSet('ui-reframing')
+/** A GitHub Mac, where the hidden test window cannot go full screen. */
+const HIDDEN_MAC = process.platform === 'darwin' && !!process.env.CI
 const root = await mkdtemp(join(tmpdir(), 'editbay-reframing-'))
 let app: ElectronApplication
 let page: Page
@@ -325,7 +327,8 @@ async function cropXIs(x: number): Promise<void> {
 describe('keys', () => {
   beforeEach(() => fresh())
 
-  it('G shows and hides the guides, and F puts the monitor on the whole screen and back', async () => {
+  // A window kept hidden never finishes going full screen on a Mac, so GitHub's Macs skip it (task 1388).
+  it.skipIf(HIDDEN_MAC)('G shows and hides the guides, and F puts the monitor on the whole screen and back', async () => {
     await page.click('[data-testid="view-program"]')
     const shown = (await page.locator('[data-testid="guides"]').count()) > 0
     await page.keyboard.press('g')
@@ -745,7 +748,7 @@ describe('the halves of a wide recording', () => {
   })
 })
 
-describe('full screen', () => {
+describe.skipIf(HIDDEN_MAC)('full screen', () => {
   beforeEach(() => fresh())
 
   it('puts the monitor on the whole screen, and Escape brings it back', async () => {

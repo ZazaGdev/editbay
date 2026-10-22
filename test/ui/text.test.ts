@@ -447,9 +447,10 @@ describe('the font list', () => {
       return c.includes('Arial') && c.includes('Montserrat ExtraBold')
     }, WAIT).toBe(true)
     const choices = await fontChoices()
-    // Thirty the app brings and the fourteen Windows has.
+    // Thirty the app brings and the few the system has: Segoe UI on Windows, Helvetica on a Mac.
     expect(choices.length).toBeLessThanOrEqual(50)
-    for (const f of ['Montserrat ExtraBold', 'Inter', 'Roboto', 'Playfair Display', 'Segoe UI', 'Arial']) expect(choices).toContain(f)
+    const systemFont = process.platform === 'darwin' ? 'Helvetica' : 'Segoe UI'
+    for (const f of ['Montserrat ExtraBold', 'Inter', 'Roboto', 'Playfair Display', systemFont, 'Arial']) expect(choices).toContain(f)
     expect(choices.filter((f) => f.startsWith('BPG') || f === 'Sylfaen' || f === 'Wingdings')).toEqual([])
   })
 

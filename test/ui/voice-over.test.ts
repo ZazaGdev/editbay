@@ -97,7 +97,8 @@ async function wavsSaved(): Promise<string[]> {
   }
 }
 
-describe('recording a voice over', () => {
+// GitHub's Macs give no app the microphone, fake or not: macOS asks, and nobody is there to answer (task 1388).
+describe.skipIf(process.platform === 'darwin' && !!process.env.CI)('recording a voice over', () => {
   it('lands on the first free audio track at the frame where recording began, selected, saved beside the project', async () => {
     await playheadTo(30)
     await page.keyboard.press('KeyR')

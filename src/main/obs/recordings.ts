@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises'
+import { readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import type { Recording, RecordingsListing } from '../../shared/types'
 
@@ -28,11 +28,14 @@ export async function newestVideos(folder: string): Promise<Entry[] | null> {
   } catch {
     return null
   }
+  // The folder's real path, as an import keeps each file's, so one reached
+  // through a link still shows what is imported (task 1388).
+  const real = await realpath(folder).catch(() => folder)
   const entries = await Promise.all(
     names
       .filter((n) => VIDEO.has(extname(n).toLowerCase()))
       .map(async (n): Promise<Entry | null> => {
-        const path = join(folder, n)
+        const path = join(real, n)
         try {
           const s = await stat(path)
           return s.isFile() ? { path, size: s.size, mtimeMs: s.mtimeMs } : null

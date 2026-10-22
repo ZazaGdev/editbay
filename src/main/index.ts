@@ -147,7 +147,9 @@ function createWindow(): void {
     // Never able to take the focus either (task 78): whatever a test does to
     // the window, the keyboard stays with whoever is at the machine. Playwright
     // types into the page through the debugger, which needs no focus.
-    ...(OUT_OF_THE_WAY ? { show: false, skipTaskbar: true, opacity: 0, focusable: false } : {}),
+    // On a Mac it may also be larger than the screen: a CI Mac's screen is smaller than
+    // 1440x900, and macOS would squeeze the window to fit it (task 1388).
+    ...(OUT_OF_THE_WAY ? { show: false, skipTaskbar: true, opacity: 0, focusable: false, enableLargerThanScreen: true } : {}),
     webPreferences: {
       preload: join(here, '../preload/index.cjs'),
       contextIsolation: true,

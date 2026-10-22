@@ -113,7 +113,13 @@ jobs:
       # each release (task 1388). Its report is kept whether it passes or not.
       - name: The UI suite
         if: always()
-        run: npx electron-vite build && npx vitest run --dir test/ui --no-file-parallelism --reporter=default --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml
+        run: |
+          system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
+          mkdir -p "$EDITBAY_SHOTS"
+          npx electron-vite build && npx vitest run --dir test/ui --no-file-parallelism --reporter=default --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml
+        env:
+          # Tests that take pictures of the app keep them here, kept with the run.
+          EDITBAY_SHOTS: ${{ github.workspace }}/shots-${{ matrix.chip }}
 
       - name: SHA-256
         if: always()
@@ -131,3 +137,4 @@ jobs:
             release/${{ matrix.name }}.dmg.sha256
             screenshot-${{ matrix.chip }}.png
             ui-${{ matrix.chip }}.xml
+            shots-${{ matrix.chip }}/

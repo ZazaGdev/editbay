@@ -204,7 +204,8 @@ describe('the Export dialog', () => {
     await closeExport(page)
   })
 
-  it('offers a Fast export on the graphics card, Best quality at first, and keeps the choice', async () => {
+  // Fast is NVIDIA's encoder, which no Mac has (task 1388); the test below covers it switched off.
+  it.skipIf(process.platform === 'darwin')('offers a Fast export on the graphics card, Best quality at first, and keeps the choice', async () => {
     await freshProject()
     await page.keyboard.press('ControlOrMeta+e')
     await page.waitForSelector('[data-testid="export-panel"]')

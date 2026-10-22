@@ -108,9 +108,11 @@ describe('the window', () => {
   })
 
   it('names each key in the top bar tooltips', async () => {
-    expect(await page.getAttribute('[data-testid="save"]', 'title')).toBe('Save (Ctrl+S)')
-    expect(await page.getAttribute('[data-testid="undo"]', 'title')).toBe('Undo (Ctrl+Z)')
-    expect(await page.getAttribute('[data-testid="new-project"]', 'title')).toBe('New project (Ctrl+N)')
+    // A Mac shows Cmd as its sign, with no plus.
+    const k = process.platform === 'darwin' ? '⌘' : 'Ctrl+'
+    expect(await page.getAttribute('[data-testid="save"]', 'title')).toBe(`Save (${k}S)`)
+    expect(await page.getAttribute('[data-testid="undo"]', 'title')).toBe(`Undo (${k}Z)`)
+    expect(await page.getAttribute('[data-testid="new-project"]', 'title')).toBe(`New project (${k}N)`)
   })
 
   it('opens Export as a dialog, which Escape closes', async () => {

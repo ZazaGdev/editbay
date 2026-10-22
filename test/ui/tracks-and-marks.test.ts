@@ -189,7 +189,7 @@ describe('a sound track that ducks', () => {
     expect(await d.getAttribute('aria-pressed')).toBe('false')
     await d.click()
     await expect.poll(ducks, WAIT).toBe(true)
-    expect(await d.getAttribute('aria-pressed')).toBe('true')
+    await expect.poll(() => d.getAttribute('aria-pressed'), WAIT).toBe('true')
     await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(ducks, WAIT).toBe(false)
   })
