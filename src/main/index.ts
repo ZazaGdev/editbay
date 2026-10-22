@@ -155,7 +155,9 @@ function createWindow(): void {
     // types into the page through the debugger, which needs no focus.
     // On a Mac it may also be larger than the screen: a CI Mac's screen is smaller than
     // 1440x900, and macOS would squeeze the window to fit it (task 1388).
-    ...(OUT_OF_THE_WAY ? { show: false, skipTaskbar: true, opacity: 0, focusable: false, enableLargerThanScreen: true } : {}),
+    // Seen on a Mac: macOS stops drawing a window at no opacity, and only GitHub's
+    // Macs run the tests, with nobody at the screen.
+    ...(OUT_OF_THE_WAY ? { show: false, skipTaskbar: true, opacity: process.platform === 'darwin' ? 1 : 0, focusable: false, enableLargerThanScreen: true } : {}),
     webPreferences: {
       preload: join(here, '../preload/index.cjs'),
       contextIsolation: true,

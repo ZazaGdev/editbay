@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core'
-import { mkdtemp, rm, readdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
@@ -13,7 +13,8 @@ import { answerSaveDialog, chooseExportFolder, closeExport, discardUnsavedWork, 
  */
 
 const fx = fixtureSet('sequences')
-const root = await mkdtemp(join(tmpdir(), 'editbay-sequences-'))
+// By its real path: a Mac's temp folder is reached through a link, and the app keeps its cache under the real one (task 1388).
+const root = await realpath(await mkdtemp(join(tmpdir(), 'editbay-sequences-')))
 let cleanPath: string
 let counter = 0
 const WAIT = { timeout: 15_000 }
@@ -404,7 +405,6 @@ describe('sequences across a restart', () => {
     expect(await page.getAttribute('[data-testid="monitor-stage"]', 'data-view')).toBe('program')
     expect(await selectedIndex(page)).toBe(0)
     // Opening an older file is not a change of its own.
-    console.log('DBG older', cleanPath, userData, JSON.stringify(await page.evaluate(async () => (await window.api.currentProject()).media)))
     await waitForTitle(page, 'older - Editbay')
     await closeAndWait(app)
   }, 240_000)
