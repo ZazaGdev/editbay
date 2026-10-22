@@ -113,7 +113,8 @@ async function waitForPlayhead(page: Page, frame: number): Promise<void> {
 }
 
 async function waitForTitle(page: Page, title: string): Promise<void> {
-  await page.waitForFunction((want) => document.title === want, title, WAIT)
+  // Polled so a failure says which title it had instead.
+  await expect.poll(() => page.title(), WAIT).toBe(title)
 }
 
 /** Width over height of every clip's crop, sequence by sequence, from the document itself. */

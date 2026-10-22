@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, session, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, Menu, screen, session, shell, systemPreferences } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { join, dirname } from 'node:path'
 import { registerIpc, settingsRead } from './ipc'
@@ -173,7 +173,19 @@ function createWindow(): void {
       win.showInactive()
       // macOS fits a window to the screen as it is shown, and a CI Mac's screen
       // is smaller than the window: sized again after, beyond it (task 1388).
-      if (process.platform === 'darwin') win.setSize(1440, 900)
+      if (process.platform === 'darwin') {
+        win.setSize(1440, 900)
+        // macOS may fit it once more just after, and only for some launches: put
+        // back for a few seconds whenever it lands on the screen's own size. A
+        // test's own size never matches a CI screen's, so that one is kept.
+        const fitToScreen = (): void => {
+          const area = screen.getDisplayMatching(win.getBounds()).workArea
+          const [w, h] = win.getSize()
+          if (w === area.width || h === area.height) win.setSize(1440, 900)
+        }
+        win.on('resize', fitToScreen)
+        setTimeout(() => win.isDestroyed() || win.off('resize', fitToScreen), 5000)
+      }
     })
   }
   // Nothing heard either (task 1097): the page plays and its sound is worked

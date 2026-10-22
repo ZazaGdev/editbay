@@ -3,6 +3,7 @@ import { fontFor } from './fonts/system-fonts'
 import type { FontFigures } from '../shared/font-file'
 import { testLaunch } from './test-launch'
 import { isAbsolute, relative } from 'node:path'
+import { realpath } from 'node:fs/promises'
 import type { AppSettings, Recording, RecordingsListing, FolderListing, FolderSearch } from '../shared/types'
 import { cacheRoot } from './media/cache'
 import { cacheSize, pruneCache } from './media/prune'
@@ -157,8 +158,13 @@ export function registerSourcesIpc(settingsFile: string): void {
   ipcMain.handle('effects:background', async (_e, path: unknown): Promise<BackgroundColour | null> => {
     if (typeof path !== 'string') return null
     const entry = effectsFolderOf((await settings).sourceFolders)
-    if (!entry?.folder || insideOf(entry.folder, relative(entry.folder, path)) === null) return null
-    return detectBackground(path)
+    if (!entry?.folder) return null
+    // Both by their real paths: the folder lists its files that way, and either
+    // may be reached through a link, as a Mac's temp folder is (task 1388).
+    const folder = await realpath(entry.folder).catch(() => entry.folder!)
+    const file = await realpath(path).catch(() => path)
+    if (insideOf(folder, relative(folder, file)) === null) return null
+    return detectBackground(file)
   })
 
   ipcMain.handle('folders:pick', async (event, from?: unknown): Promise<string | null> => {
