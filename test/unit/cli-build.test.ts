@@ -131,6 +131,18 @@ describe('a project made from an edit list', () => {
     ])
   })
 
+  it('plays a source that needs no converted copy from its own file, so it shows at once on opening (task 1943)', () => {
+    const plays = new Map([
+      [SCREEN, { ...FACTS.screen!, playsAsItIs: true }],
+      [CAMERA, { ...FACTS.camera!, playsAsItIs: false }]
+    ])
+    const media = projectFromEditList(readEditList(list()), plays, 'rough cut').media
+    expect(media.map((m) => [m.id, m.playablePath, m.conformed])).toEqual([
+      ['screen', SCREEN, false],
+      ['camera', '', true]
+    ])
+  })
+
   it('lays the kept parts on V1 in order with no gaps, the range and the cuts left out', () => {
     // At 30 fps: out are 10 s to 12 s, 20 s to 25 s, and 50 s to the end.
     expect(spans(firstTimeline(build()).videoTracks[0]!.clips)).toEqual([

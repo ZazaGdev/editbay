@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
+  PIP_PORTRAIT_ASPECT,
+  PIP_PORTRAIT_EDGE_COLOUR,
   PIP_ROUNDED_PX,
+  portraitEdge,
+  portraitRadius,
   pipCorner,
   pipShape,
   placeAtCorner,
@@ -85,6 +89,22 @@ describe('the shape', () => {
     expect(styleForShape({ border: 4, shadow: true }, 'rounded', 324, 182)).toEqual({ border: 4, shadow: true, radius: PIP_ROUNDED_PX })
     expect(styleForShape({ radius: 24, border: 4 }, 'circle', 324, 324)).toEqual({ border: 4, radius: 162 })
     expect(styleForShape({ radius: 24 }, 'square', 324, 182)).toBeNull()
+  })
+
+  it('is a portrait card when the box is 9 by 16 and rounded by a share of its width (task 2159)', () => {
+    const card = placeAtCorner('br', 0.4, 24, PIP_PORTRAIT_ASPECT, false, W, H)
+    const w = card.w * W
+    expect(pipShape({ radius: portraitRadius(w) }, card, W, H)).toBe('portrait')
+    // A little larger or smaller, as a keyframe or a drag leaves it, still reads as one.
+    expect(pipShape({ radius: Math.round(w * 0.1) }, card, W, H)).toBe('portrait')
+    // The plain rounded radius on a tall box is rounded, and the card's radius on a wide box too.
+    expect(pipShape({ radius: PIP_ROUNDED_PX }, card, W, H)).toBe('rounded')
+    expect(pipShape({ radius: portraitRadius(w) }, placeAtCorner('br', 0.4, 24, 16 / 9, false, W, H), W, H)).toBe('rounded')
+  })
+
+  it('writes the portrait card with a thin light edge, keeping a border and a shadow already there', () => {
+    expect(styleForShape({ shadow: true }, 'portrait', 432, 768, 3)).toEqual({ shadow: true, radius: portraitRadius(432), border: 3, borderColour: PIP_PORTRAIT_EDGE_COLOUR })
+    expect(styleForShape({ border: 6, borderColour: '#ff0000' }, 'portrait', 432, 768, 3)).toEqual({ border: 6, borderColour: '#ff0000', radius: portraitRadius(432) })
   })
 })
 
@@ -184,6 +204,33 @@ describe('a clip’s picture in picture', () => {
     t = setPip(t, 'c', { aspect: 16 / 9 })
     const pip = pipOf(t, 'c')!
     expect(pipShape(pip.style, pip.place, W, H)).toBe('rounded')
+  })
+
+  it('becomes a portrait card, 9 by 16 with its edge, whose corners follow its size, and leaves it cleanly (task 2159)', () => {
+    let t = setPip(twoViews(), 'c', { shape: 'portrait' })
+    let pip = pipOf(t, 'c')!
+    expect(pipShape(pip.style, pip.place, W, H)).toBe('portrait')
+    expect((pip.place.w * W) / (pip.place.h * H)).toBeCloseTo(9 / 16, 2)
+    // The picture is cropped to the card, not squashed.
+    expect(pip.crop.w / pip.crop.h).toBeCloseTo(9 / 16, 1)
+    expect(pip.style).toMatchObject({ border: portraitEdge(W, H), borderColour: PIP_PORTRAIT_EDGE_COLOUR })
+    t = setPip(t, 'c', { size: 0.5 })
+    pip = pipOf(t, 'c')!
+    expect(pip.style!.radius).toBe(portraitRadius(pip.place.w * W))
+    expect(pipCorner(pip.place, W, H).corner).toBe('tr')
+    // Another shape takes its edge away, keeps the tall box and keeps a shadow.
+    t = setPip(t, 'c', { shape: 'rounded' })
+    pip = pipOf(t, 'c')!
+    expect(pip.style).toEqual({ radius: PIP_ROUNDED_PX })
+    expect((pip.place.w * W) / (pip.place.h * H)).toBeCloseTo(9 / 16, 2)
+  })
+
+  it('leaves the portrait card for a rounded box when a box that is not tall is asked for', () => {
+    let t = setPip(twoViews(), 'c', { shape: 'portrait' })
+    t = setPip(t, 'c', { aspect: 16 / 9 })
+    const pip = pipOf(t, 'c')!
+    expect(pipShape(pip.style, pip.place, W, H)).toBe('rounded')
+    expect(pip.style!.radius).toBe(PIP_ROUNDED_PX)
   })
 })
 

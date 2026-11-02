@@ -108,16 +108,15 @@ describe('a control that is off says why', () => {
 })
 
 describe('the toasts', () => {
-  it('sit clear of the timeline, which is where the work is', async () => {
+  it('sit at the top in the middle, under the top bar and clear of the inspector (task 2014)', async () => {
     // An edit that offers an Undo raises one. Changing the shape does.
     await page.selectOption('[data-testid="export-preset"]', 'square')
     await page.waitForSelector('[data-testid="toast"][data-kind="setShape"]')
     const toast = (await page.locator('[data-testid="toast"]').first().boundingBox())!
-    const timeline = (await page.locator('[data-testid="timeline-panel"]').boundingBox())!
-    expect(toast.y + toast.height).toBeLessThanOrEqual(timeline.y)
-    // On the right, not over the middle of the window.
-    const window = page.viewportSize() ?? { width: 0, height: 0 }
-    expect(toast.x).toBeGreaterThan(window.width / 2)
+    const bar = (await page.locator('[data-testid="top-bar"]').boundingBox())!
+    expect(toast.y).toBeGreaterThanOrEqual(bar.y + bar.height)
+    const width = await page.evaluate(() => window.innerWidth)
+    expect(Math.abs(toast.x + toast.width / 2 - width / 2)).toBeLessThanOrEqual(2)
     await page.locator('[data-testid="toast-undo"]').click()
     await page.waitForSelector('[data-testid="toast"]', { state: 'detached' })
   })

@@ -4,7 +4,7 @@
  */
 
 import { newId } from './ids'
-import { closeUpStarts, withStarts, type TrackOf, type Span, spanEnd, hasRoom, gapClosable, sourceAt } from './tracks'
+import { closeUpStarts, withStarts, overlapsOn, type TrackOf, type Span, spanEnd, hasRoom, gapClosable, sourceAt } from './tracks'
 import type { Timeline, Clip, SoundClip } from './project'
 import { findClip, linkedIds, allClips, trackOf } from './timeline-query'
 import { asTwoPieces, splitEverything } from './split-join'
@@ -37,15 +37,21 @@ export function onV1(p: Timeline): Set<string> {
  * after them moves earlier by that much, on every track, and what starts
  * inside them moves to `at`. What starts before them stays, so music laid
  * under the whole cut does not move. A linked group moves as one. The clips
- * named in `leave` are left where they are.
+ * named in `leave` are left where they are. Two clips after the stretch that
+ * already overlapped, as sped up pieces a frame longer than the room they were
+ * laid in do, move up together and keep their overlap, rather than every clip
+ * after them being pushed along by it (task 1460).
  */
 export function closeUpStretch(p: Timeline, at: number, length: number, leave: ReadonlySet<string> = new Set()): Timeline {
   if (length <= 0) return p
   const starts = closeUpStarts(allClips(p), at, length, leave, onV1(p))
+  const after = (c: Span): boolean => c.timelineStart >= at + length && !leave.has(c.id)
+  const settled = <T extends Span>(r: TrackOf<T>): TrackOf<T> =>
+    withStarts(r, starts, new Map([...overlapsOn(r.clips)].filter(([id, o]) => after(r.clips.find((c) => c.id === id)!) && after(r.clips.find((c) => c.id === o.after)!))))
   return {
     ...p,
-    videoTracks: p.videoTracks.map((r) => withStarts(r, starts)),
-    audioTracks: p.audioTracks.map((r) => withStarts(r, starts))
+    videoTracks: p.videoTracks.map(settled),
+    audioTracks: p.audioTracks.map(settled)
   }
 }
 

@@ -1,7 +1,7 @@
 ---
 title: Set up picture in picture
 category: Layers
-keywords: pip, corner, square camera, tall, wide, box shape, width, height, circle, round camera, facecam, margin, snap, rounded corners, border, shadow, small picture
+keywords: pip, corner, portrait, phone, card, square camera, tall, wide, box shape, width, height, circle, round camera, facecam, margin, snap, rounded corners, border, shadow, small picture
 ---
 
 Choose the small picture's corner, size, shape, border and shadow.
@@ -25,8 +25,8 @@ recording on a track over another.
 | [Size] | Its width as a share of the frame's; it keeps its corner as it grows |
 | [Box] | Square, Tall (9 by 16), Wide (16 by 9), As recorded, or a width and height in pixels |
 | [Margin] | How far in from the frame's edges a corner sits |
-| [Shape] | Square, Rounded or Circle, a round box for a camera |
-| [Border], [Shadow] | A border with its width and colour, and a shadow |
+| [Shape] | Square, Rounded, Portrait (a tall 9 by 16 card like a phone, with a thin light edge), or Circle, a round box for a camera |
+| [Border], [Shadow] | A border with its width and colour, and a shadow; both work on every shape |
 
 You can also drag a side of the box on the Output view. The picture fills the box, cropped
 rather than stretched, so a camera in a square box shows its middle; move the crop to frame it.

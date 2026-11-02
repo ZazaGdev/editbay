@@ -325,6 +325,7 @@ export function PipSection(props: { timeline: Timeline; clip: Clip; media: Proje
               choices={[
                 { id: 'square' as PipShape, label: 'Square' },
                 { id: 'rounded' as PipShape, label: 'Rounded' },
+                { id: 'portrait' as PipShape, label: 'Portrait', title: 'A tall card like a phone, 9 by 16, with a thin light edge' },
                 { id: 'circle' as PipShape, label: 'Circle', title: 'A round box, square, for a camera' }
               ]}
             />

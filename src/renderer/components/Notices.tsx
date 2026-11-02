@@ -62,6 +62,7 @@ export function Notices(): JSX.Element | null {
 
   return (
     <div
+      data-testid="notices"
       // Read out as they come, for someone using a screen reader (audit 2026-10-01).
       role="status"
       aria-live="polite"

@@ -1,0 +1,224 @@
+name: Mac release check
+
+# Task 2352: the published Mac downloads, checked the way someone would use
+# them, since nobody working on Editbay has a Mac. Started by hand on a release
+# tag. Each chip runs on its own kind of Mac: the .dmg is downloaded from the
+# release, checked against the SHA-256 in its notes, mounted, copied into
+# Applications, opened on a small project, and a picture of the screen kept.
+# Runs on the public repo, where Mac minutes are free.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check, such as v2.0 (empty for the latest)
+        type: string
+        default: ''
+      sound_output:
+        description: Sound output to switch to first, such as Null Audio Device (empty keeps the runner's own)
+        type: string
+        default: ''
+      app_args:
+        description: Extra switches for Editbay, such as --disable-features=X
+        type: string
+        default: ''
+      project:
+        description: Open the small project (off opens Editbay empty)
+        type: boolean
+        default: true
+      build_run:
+        description: Check the .dmg files a Mac workflow run built, by its run id, instead of the release's
+        type: string
+        default: ''
+      audio_probe:
+        description: Instead of the release, find which way of making sound asks for the microphone (task 2355)
+        type: boolean
+        default: false
+
+jobs:
+  # Task 2355: plain Electron, at Editbay's version, making sound each way in
+  # turn on a sound output that is also a microphone, each way's microphone
+  # requests counted.
+  audio-probe:
+    if: inputs.audio_probe
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Electron at Editbay's version
+        run: |
+          V="$(node -p "require('./package.json').devDependencies.electron.replace(/^[^0-9]*/, '')")"
+          mkdir probe && cp .github/mac-audio-probe/main.js probe/ && cd probe
+          npm init -y > /dev/null
+          npm install --no-save "electron@$V"
+          npx electron --version
+      - name: A sound output that is also a microphone
+        run: |
+          brew install switchaudio-osx
+          SwitchAudioSource -t output -s "Null Audio Device"
+          SwitchAudioSource -c -t output
+      - name: Each way of making sound
+        working-directory: probe
+        run: |
+          for v in none context-interactive context-playback context-resumed audio-element; do
+            from="$(date '+%Y-%m-%d %H:%M:%S')"
+            npx electron . --variant=$v > /dev/null 2>&1 || true
+            sleep 2
+            n="$(log show --start "$from" --predicate 'subsystem == "com.apple.TCC"' --style compact 2>/dev/null | grep "preflight=no" | grep -c "kTCCServiceMicrophone" || true)"
+            echo "$v: $n microphone requests" | tee -a ../probe.txt
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audio-probe
+          path: probe.txt
+
+  check:
+    if: ${{ !inputs.audio_probe }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - chip: arm64
+            runner: macos-15
+            node_arch: arm64
+          - chip: intel
+            runner: macos-15-intel
+            node_arch: x64
+    name: ${{ matrix.chip }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APP: /Applications/Editbay.app
+    steps:
+      - name: The release
+        id: release
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Checking $TAG on $(uname -m), macOS $(sw_vers -productVersion)"
+
+      # The command line from the same release builds the small project.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.node_arch }}
+          cache: npm
+
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run cli:build
+
+      - name: Download and check the .dmg
+        run: |
+          mkdir dl && cd dl
+          if [ -n "${{ inputs.build_run }}" ]; then
+            # A build not yet released: the .dmg a Mac workflow run kept, checked against its own hash.
+            gh run download "${{ inputs.build_run }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}"
+            DMG="$(ls */release/Editbay-*-${{ matrix.chip }}.dmg)"
+            HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+            echo "$DMG $HASH"
+            grep -q "$HASH" "$DMG.sha256"
+            echo "The hash matches the one the build kept."
+          else
+            gh release download "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}.dmg"
+            DMG="$(ls Editbay-*-${{ matrix.chip }}.dmg)"
+            HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+            echo "$DMG $HASH"
+            gh release view "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json body --jq .body | grep -q "$HASH"
+            echo "The hash matches the one in the release notes."
+          fi
+          echo "DMG=$PWD/$DMG" >> "$GITHUB_ENV"
+
+      - name: Mount it and copy Editbay into Applications
+        run: |
+          MNT="$(hdiutil attach -nobrowse -readonly "$DMG" | tail -1 | cut -f3-)"
+          ls "$MNT"
+          cp -R "$MNT/Editbay.app" /Applications/
+          hdiutil detach "$MNT"
+          lipo -archs "$APP/Contents/MacOS/Editbay"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" -c "Print :LSMinimumSystemVersion" "$APP/Contents/Info.plist"
+
+      # What a first-time user meets: a download carries the quarantine mark,
+      # and Gatekeeper refuses an app not signed with an Apple certificate.
+      # The README's Terminal line takes the mark off, as Open Anyway does.
+      - name: What Gatekeeper says
+        run: |
+          xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;" "$APP"
+          spctl --assess --type execute -vv "$APP" 2>&1 | tee gatekeeper.txt || true
+          codesign -dv "$APP" 2>&1 | grep -E "Signature|TeamIdentifier" | tee -a gatekeeper.txt
+          xattr -dr com.apple.quarantine "$APP"
+
+      - name: A small project
+        run: |
+          mkdir -p "$HOME/check"
+          "$APP/Contents/Resources/ffmpeg/ffmpeg" -hide_banner -loglevel error -y \
+            -f lavfi -i testsrc2=size=1280x720:rate=30:duration=4 -f lavfi -i sine=frequency=440:duration=4 \
+            -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$HOME/check/clip.mp4"
+          printf '{"version":1,"shape":"landscape","sources":[{"id":"a","path":"%s","offsetSec":0}],"main":"a","sound":"a","cuts":[],"zooms":[],"markers":[]}' \
+            "$HOME/check/clip.mp4" > "$HOME/check/list.json"
+          npm run --silent cli -- build "$HOME/check/list.json" --out "$HOME/check/release-check.editbay"
+
+      # Task 2355: whether a sound output that is also a microphone is what
+      # makes the app ask for the microphone as its preview starts.
+      - name: Switch the sound output
+        if: inputs.sound_output != ''
+        run: |
+          brew install switchaudio-osx
+          SwitchAudioSource -a -t output
+          SwitchAudioSource -t output -s "${{ inputs.sound_output }}"
+          SwitchAudioSource -c -t output
+
+      # Started from its own program rather than with open, so what Chromium
+      # says about the GPU and the picture lands in a file (tasks 2354, 2355).
+      - name: Open Editbay on it
+        run: |
+          system_profiler SPDisplaysDataType SPAudioDataType 2>&1 | tee hardware.txt || true
+          PROJECT=""
+          if [ "${{ inputs.project }}" != "false" ]; then PROJECT="$HOME/check/release-check.editbay"; fi
+          "$APP/Contents/MacOS/Editbay" --enable-logging=stderr ${{ inputs.app_args }} $PROJECT > editbay-stderr.txt 2>&1 &
+          for i in $(seq 1 60); do
+            pgrep -x Editbay > /dev/null && break
+            sleep 1
+          done
+          # Pictures as the window draws and the clip comes in, the last after it has had time to settle.
+          sleep 10
+          screencapture -x "screen-${{ matrix.chip }}-10s.png"
+          sleep 15
+          screencapture -x "screen-${{ matrix.chip }}-25s.png"
+          sleep 20
+          screencapture -x "screen-${{ matrix.chip }}.png"
+          pgrep -lx Editbay
+          osascript -e 'tell application "System Events" to get name of every window of process "Editbay"' 2>&1 | tee windows.txt || true
+          pgrep -x Editbay > /dev/null || { echo "Editbay is no longer running"; exit 1; }
+
+      - name: Logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp gatekeeper.txt windows.txt hardware.txt editbay-stderr.txt logs/ 2>/dev/null || true
+          # Which permission each request asked for, and who asked.
+          log show --last 10m --predicate 'subsystem == "com.apple.TCC" OR process == "tccd"' --style compact 2>/dev/null | grep -i -E "editbay|kTCCService" | tail -200 > logs/tcc.txt || true
+          # The requests that could show a prompt, not the silent checks.
+          grep "preflight=no" logs/tcc.txt | grep -E "kTCCService(Microphone|AudioCapture)" | tee logs/microphone-requests.txt || echo "No microphone requests." | tee logs/microphone-requests.txt
+          cp -R "$HOME/Library/Logs/Editbay" logs/app 2>/dev/null || true
+          log show --last 5m --predicate 'process == "Editbay"' --style compact 2>/dev/null | tail -200 > logs/system.txt || true
+          ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i editbay && cp ~/Library/Logs/DiagnosticReports/*Editbay* logs/ || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-${{ matrix.chip }}
+          if-no-files-found: ignore
+          path: |
+            screen-${{ matrix.chip }}*.png
+            logs/

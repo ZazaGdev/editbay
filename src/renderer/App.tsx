@@ -82,6 +82,7 @@ import { PanelGrid } from './app/PanelGrid'
 import { SECTION_TYPE } from './components/section-host'
 import { ExportWindow } from './app/ExportWindow'
 import { ClipMenu } from './app/ClipMenu'
+import { TargetPicker } from './app/TargetPicker'
 import { GapMenu } from './app/GapMenu'
 import { MarkerMenu } from './app/MarkerMenu'
 import { TransitionMenu } from './app/TransitionMenu'
@@ -769,6 +770,7 @@ export function App(): JSX.Element {
       )}
 
       {paletteOpen && <CommandPalette commands={paletteCommands(app)} onClose={() => setPaletteOpen(false)} />}
+      <TargetPicker app={app} />
 
       {joinAsk && timeline && <JoinAsk app={app} joinAsk={joinAsk} timeline={timeline} />}
       <Dialogs app={app} />

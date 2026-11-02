@@ -435,6 +435,8 @@ export interface SourceFacts {
   audioTracks: number
   /** A picture rather than a recording, which the app gives the nominal length every picture has. */
   still?: boolean
+  /** A recording or sound the app's import would play from the file itself, with no converted copy. */
+  playsAsItIs?: boolean
 }
 
 /**
@@ -460,21 +462,23 @@ interface Removed {
 }
 
 /**
- * A source as the project first holds it: described from its probe, and
- * marked as conformed into a cache that holds nothing yet. Opening the
- * project then takes every source through the app's own import, exactly as
- * after the cache is cleared (`reopen.ts`), so the waveform, filmstrip,
- * converted copy and track copies are the app's own.
+ * A source as the project first holds it: described from its probe. One that
+ * plays as it is plays from its own file, as the app's import leaves it, so
+ * opening the project shows its picture at once and only makes the waveform,
+ * filmstrip and track copies (`reopen.ts`). Any other is marked as conformed
+ * into a cache that holds nothing yet, so opening takes it through the app's
+ * own import, exactly as after the cache is cleared.
  */
 function unimported(id: string, path: string, f: SourceFacts): ProjectMedia {
   if (f.still) {
     return { id, originalPath: path, playablePath: '', conformed: true, conformReasons: [], durationSec: STILL_SEC, width: f.width, height: f.height, fps: PROJECT_FPS, codec: f.codec, hasAudio: false, peaksPath: '', filmstripPath: '', audioTracks: 0, still: true }
   }
+  const asItIs = f.playsAsItIs === true
   return {
     id,
     originalPath: path,
-    playablePath: '',
-    conformed: true,
+    playablePath: asItIs ? path : '',
+    conformed: !asItIs,
     conformReasons: [],
     durationSec: f.durationSec,
     width: f.width,

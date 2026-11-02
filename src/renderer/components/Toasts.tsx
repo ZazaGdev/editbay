@@ -1,57 +1,58 @@
-import { useEffect, useState, type JSX } from 'react'
+import { useLayoutEffect, useState, type JSX } from 'react'
 import { dismissToast, useToasts } from '../state/toasts'
 import { surface, ink, space, radius, type, elevation } from '../theme'
 import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 
-/** The gap between a toast and whatever it is sitting above. */
+/** The gap between a toast and whatever it is sitting under. */
 const CLEAR = 10
 
-/**
- * How high the toasts sit: just above the timeline, which is where the work
- * is. They used to be centred over it, so the thing they were telling you
- * about was the thing they covered.
- *
- * Measured from the timeline rather than set to a number, because the panel
- * grows when the silence review opens and shrinks again when it closes.
- */
-function useAboveTimeline(): number {
-  const [bottom, setBottom] = useState(CLEAR)
+/** What sits across the top of the window, so a toast goes below all of it. */
+const ABOVE = ['top-bar', 'ffmpeg-banner', 'missing-media', 'notices'].map((id) => `[data-testid="${id}"]`).join(',')
 
-  useEffect(() => {
-    const panel = document.querySelector('[data-testid="timeline-panel"]')
+/**
+ * How low the toasts sit: just under the top bar, over the top of the preview.
+ * Low on the right they sat over the inspector, and covered the setting you had
+ * just changed (task 2014).
+ *
+ * Measured rather than set to a number, because a banner or a notice that
+ * waits for an answer comes and goes under the top bar, and a toast must not
+ * cover the buttons on it. Measured each time the toasts change, not watched,
+ * so playback redrawing the timeline costs nothing here.
+ */
+function useBelowTopBar(count: number): number {
+  const [top, setTop] = useState(56)
+
+  useLayoutEffect(() => {
     const measure = (): void => {
-      const r = panel?.getBoundingClientRect()
-      setBottom(r ? Math.max(CLEAR, window.innerHeight - r.top + CLEAR) : CLEAR)
+      let bottom = 0
+      for (const el of document.querySelectorAll(ABOVE)) bottom = Math.max(bottom, el.getBoundingClientRect().bottom)
+      setTop(bottom + CLEAR)
     }
     measure()
     window.addEventListener('resize', measure)
-    const watch = panel ? new ResizeObserver(measure) : null
-    if (panel) watch?.observe(panel)
-    return () => {
-      window.removeEventListener('resize', measure)
-      watch?.disconnect()
-    }
-  }, [])
+    return () => window.removeEventListener('resize', measure)
+  }, [count])
 
-  return bottom
+  return top
 }
 
-/** The short notices, low on the right and clear of the timeline, newest last. */
+/** The short notices, at the top in the middle under the top bar, newest last. */
 export function Toasts(): JSX.Element | null {
   const toasts = useToasts()
-  const bottom = useAboveTimeline()
+  const top = useBelowTopBar(toasts.length)
   if (toasts.length === 0) return null
   return (
     <div
       data-testid="toasts"
       style={{
         position: 'fixed',
-        bottom,
-        right: space.lg,
+        top,
+        left: '50%',
+        transform: 'translateX(-50%)',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         gap: space.sm,
         // Over a window's scrim, so what a window's own button did can be
         // read and acted on while the window is open; under a context menu.

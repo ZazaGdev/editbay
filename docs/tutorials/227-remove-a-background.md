@@ -24,6 +24,12 @@ on, takes that colour out and tells you which one it found. The button then read
 colour, as in ordinary footage of a room, it says it cannot remove it and leaves the clip as it
 was. The same button is in the [Tools] group of the inspector.
 
+It is in the command search too: press Ctrl+K, type "rem" and choose [Remove background]. The
+pointer turns into a picker and a hint shows at the top. Click the clip to take its background
+out, or press Enter for the clip already selected. Click an asset in your assets folder instead
+and it goes over the selected clip with its background taken out. Press Esc or right click to
+cancel. [Make captions for a clip] and [Show where a clip came from] work the same way.
+
 Turn [Strength] up to take out colours closer to the background too, or down if parts of the
 subject are going see-through. On V1, with nothing under it, the background turns black. The
 Output view shows the result exactly as the export writes it.

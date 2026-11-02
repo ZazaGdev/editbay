@@ -10,7 +10,18 @@ import {
   refitInView, tidyPlace, isSideBySide, type Place, tidyFreePlace, placeAspect, MAX_LAYERS, viewsOf,
   layoutPlaces, cropInView, type NamedLayout, FULL_PLACE, layoutPictures, isFullFrame, viewOf, placeInNewFrame
 } from './layout'
-import { type PipCorner, type PipShape, pipCorner, pipShape, resizedInPlace, placeAtCorner, styleForShape } from './pip'
+import {
+  type PipCorner,
+  type PipShape,
+  PIP_PORTRAIT_ASPECT,
+  pipCorner,
+  pipShape,
+  portraitEdge,
+  resizedInPlace,
+  placeAtCorner,
+  styleForShape,
+  withoutPortraitEdge
+} from './pip'
 import { MAIN_PICTURE } from './project-core'
 import type { Timeline, Rect, Clip, Layer, ProjectMedia, PictureStyle } from './project'
 import { setPictureStyle } from './clip-looks'
@@ -334,14 +345,22 @@ export function setPip(p: Timeline, clipId: string, change: PipChange): Timeline
   const size = change.size ?? pip.place.w
   const view = viewOf(pip.crop, m.width, m.height)
   const asked = change.aspect === 'own' ? view.w / view.h : change.aspect
-  // A circle is square: another shape asked for makes it a rounded box instead.
-  const shape = change.shape ?? (asked !== undefined && Math.abs(asked - 1) > 0.01 && shapeNow === 'circle' ? 'rounded' : shapeNow)
+  // A circle is square and a portrait card 9 by 16: another shape asked for makes it a rounded box instead.
+  const leaves = (own: number): boolean => asked !== undefined && Math.abs(asked - own) / own > 0.01
+  const shape =
+    change.shape ?? ((shapeNow === 'circle' && leaves(1)) || (shapeNow === 'portrait' && leaves(PIP_PORTRAIT_ASPECT)) ? 'rounded' : shapeNow)
   const circle = shape === 'circle'
+  const portrait = shape === 'portrait'
   // A rectangle keeps its own shape, or takes the one asked for; one coming out of a circle takes its view's.
-  const aspect = asked ?? (shapeNow === 'circle' ? view.w / view.h : (pip.place.w * W) / (pip.place.h * H))
+  const aspect = portrait ? PIP_PORTRAIT_ASPECT : asked ?? (shapeNow === 'circle' ? view.w / view.h : (pip.place.w * W) / (pip.place.h * H))
   const place = corner === 'custom' ? resizedInPlace(pip.place, size, aspect, circle, W, H) : placeAtCorner(corner, size, margin, aspect, circle, W, H)
   let next = setPlace(p, clipId, pip.picture, place, true)
-  if (change.shape !== undefined || circle || shape !== shapeNow) next = setPictureStyle(next, clipId, pip.picture, styleForShape(pip.style, shape, place.w * W, place.h * H))
+  if (change.shape !== undefined || circle || portrait || shape !== shapeNow) {
+    // Leaving a portrait card takes away the edge it was given, not one chosen.
+    const edge = portraitEdge(W, H)
+    const kept = shapeNow === 'portrait' && !portrait ? withoutPortraitEdge(pip.style, edge) : pip.style
+    next = setPictureStyle(next, clipId, pip.picture, styleForShape(kept, shape, place.w * W, place.h * H, edge))
+  }
   return next
 }
 

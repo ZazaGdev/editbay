@@ -31,8 +31,8 @@ jobs:
     steps:
       - id: pick
         run: |
-          ARM='{"chip":"arm64","node_arch":"arm64","builder":"--arm64","whisper":"arm64","app":"mac-arm64","name":"Editbay-1.2-arm64","minimum":"14.0"}'
-          INTEL='{"chip":"intel","node_arch":"x64","builder":"--x64","whisper":"x86_64","app":"mac","name":"Editbay-1.2-intel","minimum":"13.4"}'
+          ARM='{"chip":"arm64","node_arch":"arm64","builder":"--arm64","whisper":"arm64","app":"mac-arm64","name":"Editbay-2.0-arm64","minimum":"14.0"}'
+          INTEL='{"chip":"intel","node_arch":"x64","builder":"--x64","whisper":"x86_64","app":"mac","name":"Editbay-2.0-intel","minimum":"13.4"}'
           case "${{ inputs.chips }}" in
             arm64) echo "list=[$ARM]" >> "$GITHUB_OUTPUT" ;;
             intel) echo "list=[$INTEL]" >> "$GITHUB_OUTPUT" ;;

@@ -100,6 +100,50 @@ describe('a picture in picture, framed', () => {
   })
 })
 
+describe('a portrait card picture in picture (task 2159)', () => {
+  it('exports tall with its rounded corners, thin light edge and shadow, as its keyframes move it and after its crop is moved', async () => {
+    session.resetProject()
+    const red = await importFile(await fx.redClip(), ...quiet())
+    const green = await importFile(await fx.greenClip(), ...quiet())
+    session.addAsset(red)
+    session.addAsset(green)
+    session.applyEdit({ sequenceId: S1, kind: 'addSource', mediaId: red.id, clipId: 'r' })
+    session.applyEdit({ sequenceId: S1, kind: 'addTrack', trackKind: 'video', trackId: 'V2' })
+    session.applyEdit({ sequenceId: S1, kind: 'addSource', mediaId: green.id, clipId: 'g', at: 0, onTrack: 'V2' })
+    session.applyEdit({ sequenceId: S1, kind: 'setPlace', clipId: 'g', picture: 'main', place: { x: 0.5, y: 0.05, w: 0.4, h: 243 / 1920 }, reshapeCrop: true })
+    session.applyEdit({ sequenceId: S1, kind: 'setPip', clipId: 'g', change: { shape: 'portrait', corner: 'tr', size: 0.4 } })
+    let clip = findVideoClip(firstTimeline(session.getProject()), 'g')!.clip
+    session.applyEdit({ sequenceId: S1, kind: 'setPictureStyle', clipId: 'g', picture: 'main', style: { ...clip.transform.style, shadow: true } })
+    // Centre on face moves the crop and keeps its size: the card stays a card.
+    session.applyEdit({ sequenceId: S1, kind: 'setCropsOn', crops: [{ clipId: 'g', crop: { ...clip.transform.crop, x: 0 } }] })
+    clip = findVideoClip(firstTimeline(session.getProject()), 'g')!.clip
+    const start = clip.transform.place
+    // Keyframes slide it from the top right down to the bottom left over the first two seconds.
+    const end = { ...start, x: 24 / 1080, y: 1 - start.h - 24 / 1920 }
+    session.applyEdit({ sequenceId: S1, kind: 'setBoxKey', clipId: 'g', at: 0, place: start })
+    session.applyEdit({ sequenceId: S1, kind: 'setBoxKey', clipId: 'g', at: 60, place: end })
+    const out = await exportJoined('portrait')
+    const edge = clip.transform.style!.border!
+    expect(clip.transform.style!.borderColour).toBe('#d9d9d9')
+
+    for (const [at, place] of [[0, start], [2.5, end]] as const) {
+      const box = placeInPixels(place, 1080, 1920)
+      const midX = box.x + box.w / 2
+      expect(isGreen(await rgb(out, midX, box.y + box.h / 2, at))).toBe(true)
+      // The light edge just outside the top: blue in it, which neither the red nor the green has.
+      // Three pixels wide, its colour is shared with its neighbours by the export's colour sampling.
+      const [, eg, eb] = await rgb(out, midX, box.y - edge, at)
+      expect(eb).toBeGreaterThan(80)
+      expect(eg).toBeGreaterThan(80)
+      // Its rounded corner: the red underneath shows just inside the box's own corner.
+      expect(isRed(await rgb(out, box.x + 4, box.y + 4, at))).toBe(true)
+      // The shadow darkens the red under it.
+      const [sr] = await rgb(out, midX, box.y + box.h + edge + 4, at)
+      expect(sr).toBeLessThan(200)
+    }
+  })
+})
+
 describe("a border's colour", () => {
   it('is the colour chosen, as the preview draws it (audit 2026-10-01)', async () => {
     session.resetProject()

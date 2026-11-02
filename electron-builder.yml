@@ -121,7 +121,7 @@ mac:
   hardenedRuntime: false
   # ONNX Runtime 1.30's Apple Silicon library is built for macOS 14.
   minimumSystemVersion: '14.0'
-  artifactName: Editbay-1.2-arm64.${ext}
+  artifactName: Editbay-2.0-arm64.${ext}
   extendInfo:
     NSMicrophoneUsageDescription: Editbay records your voice over from the microphone.
   extraResources:
@@ -147,7 +147,7 @@ mac:
 nsis:
   # Releases are named with two numbers, 1.0, 1.1, where people see them; package.json keeps
   # three (1.0.0) because the build tools need it. Change this with the version.
-  artifactName: Editbay Setup 1.2.${ext}
+  artifactName: Editbay Setup 2.0.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

@@ -16,7 +16,7 @@ import { peaksKey } from '../shared/sound'
 import { loudnessEnvelope, matchBySound, refineMatch } from '../shared/sync-by-sound'
 import { isProjectPath } from '../shared/project-ext'
 import type { PeaksData } from '../shared/types'
-import { isStillPath, probeAny, type ProbeResult, type SoundProbe } from '../main/media/probe'
+import { conformReasons, isStillPath, probeAny, soundPlaysAsItIs, type ProbeResult, type SoundProbe } from '../main/media/probe'
 import { detectVfr } from '../main/media/vfr'
 import { targetFrameRate } from '../main/media/conform'
 import { decodePeaks, extractPeaks } from '../main/media/waveform'
@@ -150,7 +150,7 @@ async function pictureFacts(file: string): Promise<SourceFacts> {
 function factsOf(p: Probed): SourceFacts {
   if (p.kind === 'sound') {
     // Only a sound file's first track plays, so the app records it as having one, and so does this.
-    return { durationSec: p.probe.durationSec, width: 0, height: 0, fps: 0, codec: p.probe.audio.codec, hasAudio: true, hasVideo: false, audioTracks: 1 }
+    return { durationSec: p.probe.durationSec, width: 0, height: 0, fps: 0, codec: p.probe.audio.codec, hasAudio: true, hasVideo: false, audioTracks: 1, playsAsItIs: soundPlaysAsItIs(p.probe) }
   }
   const r = p.probe
   return {
@@ -161,7 +161,8 @@ function factsOf(p: Probed): SourceFacts {
     codec: r.video.codec,
     hasAudio: r.audio !== null,
     hasVideo: true,
-    audioTracks: r.audioTracks
+    audioTracks: r.audioTracks,
+    playsAsItIs: conformReasons(r, p.variableFrameRate).length === 0
   }
 }
 

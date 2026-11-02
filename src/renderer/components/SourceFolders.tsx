@@ -640,7 +640,7 @@ function SearchResults(props: { results: FolderSearch | null; imported: Set<stri
 }
 
 /** A file in a folder that is only sound, which takes the sound icon rather than the film. */
-const SOUND_FILE = /\.(wav|mp3|m4a|aac|flac|ogg|opus)$/i
+export const SOUND_FILE = /\.(wav|mp3|m4a|aac|flac|ogg|opus)$/i
 
 /**
  * A file in one of your folders, ready to bring in, or already in the project.
@@ -657,6 +657,7 @@ function FileRow(props: { file: FolderFile; imported: Set<string>; onImport: (pa
     <div
       data-testid="folder-file"
       data-name={f.name}
+      data-path={f.path}
       data-state={inProject ? 'imported' : 'ready'}
       data-effect={fx ? 'yes' : undefined}
       draggable={fx !== undefined}

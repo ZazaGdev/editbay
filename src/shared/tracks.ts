@@ -250,14 +250,32 @@ export function tailLimit(clips: Span[], clip: Span, mediaFrames: number): numbe
 /**
  * A track's clips in time order, with any that would overlap the one before
  * moved right to start where it ends. Only a start moves; a length never does.
+ * `kept` names, by clip, an overlap with the clip before it that is let stand:
+ * one the track already had, as a sped up clip a frame longer than the room it
+ * was laid in, which every clip after it would otherwise be pushed along by.
  */
-export function settleTrack<T extends Span>(clips: T[]): T[] {
+export function settleTrack<T extends Span>(clips: T[], kept: ReadonlyMap<string, { after: string; frames: number }> = new Map()): T[] {
   let end = 0
+  let last: string | null = null
   return byStart(clips).map((c) => {
-    const next = c.timelineStart < end ? { ...c, timelineStart: end } : c
+    const overlap = kept.get(c.id)
+    const from = overlap && overlap.after === last ? end - overlap.frames : end
+    const next = c.timelineStart < from ? { ...c, timelineStart: from } : c
     end = spanEnd(next)
+    last = c.id
     return next
   })
+}
+
+/** Each clip on a track that overlaps the one before it, by how much: the overlaps `settleTrack` is to leave as they are. */
+export function overlapsOn(clips: Span[]): Map<string, { after: string; frames: number }> {
+  const out = new Map<string, { after: string; frames: number }>()
+  const sorted = byStart(clips)
+  for (let i = 1; i < sorted.length; i++) {
+    const frames = spanEnd(sorted[i - 1]!) - sorted[i]!.timelineStart
+    if (frames > 0) out.set(sorted[i]!.id, { after: sorted[i - 1]!.id, frames })
+  }
+  return out
 }
 
 /**
@@ -301,11 +319,15 @@ export function closeUpStarts(clips: Span[], at: number, length: number, leave: 
   return out
 }
 
-/** A track with each clip moved to where `starts` says, then settled so that none overlaps. */
-export function withStarts<T extends Span>(track: TrackOf<T>, starts: ReadonlyMap<string, number>): TrackOf<T> {
+/** A track with each clip moved to where `starts` says, then settled so that none overlaps, but for the overlaps `kept` lets stand. */
+export function withStarts<T extends Span>(
+  track: TrackOf<T>,
+  starts: ReadonlyMap<string, number>,
+  kept: ReadonlyMap<string, { after: string; frames: number }> = new Map()
+): TrackOf<T> {
   return {
     ...track,
-    clips: settleTrack(track.clips.map((c) => ({ ...c, timelineStart: Math.max(0, starts.get(c.id) ?? c.timelineStart) })))
+    clips: settleTrack(track.clips.map((c) => ({ ...c, timelineStart: Math.max(0, starts.get(c.id) ?? c.timelineStart) })), kept)
   }
 }
 
