@@ -3,6 +3,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { captureText } from './spawn'
 
+// A Mac program has no extension (plan 104).
+const EXE = process.platform === 'win32' ? '.exe' : ''
+const FFMPEG = `ffmpeg${EXE}`
+
 /**
  * Where ffmpeg and ffprobe are (plan 89): one gyan.dev build, in the installed
  * app's resources/ffmpeg, or else in the vendor/ffmpeg that `npm install`
@@ -11,11 +15,11 @@ import { captureText } from './spawn'
  */
 export function binariesFolder(): string {
   const resources = (process as { resourcesPath?: string }).resourcesPath
-  if (resources && existsSync(join(resources, 'ffmpeg', 'ffmpeg.exe'))) return join(resources, 'ffmpeg')
+  if (resources && existsSync(join(resources, 'ffmpeg', FFMPEG))) return join(resources, 'ffmpeg')
   let dir = dirname(fileURLToPath(import.meta.url))
   for (;;) {
     const here = join(dir, 'vendor', 'ffmpeg')
-    if (existsSync(join(here, 'ffmpeg.exe'))) return here
+    if (existsSync(join(here, FFMPEG))) return here
     const up = dirname(dir)
     if (up === dir) break
     dir = up
@@ -36,8 +40,8 @@ export function parseEncoderList(stdout: string): Set<string> {
 }
 
 const folder = binariesFolder()
-export const ffmpegPath = join(folder, 'ffmpeg.exe')
-export const ffprobePath = join(folder, 'ffprobe.exe')
+export const ffmpegPath = join(folder, FFMPEG)
+export const ffprobePath = join(folder, `ffprobe${EXE}`)
 
 export interface FfmpegCapabilities {
   version: string

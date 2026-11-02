@@ -26,6 +26,7 @@ import { cleanWorkspace, defaultWorkspace, type Workspace } from '../shared/work
 import { joinProjectFile, splitProjectFile } from '../shared/project-file'
 import { verifyFfmpeg } from './ffmpeg/locate'
 import { makeProxy, stopLighterCopies } from './media/proxy'
+import { cleanPcmRequest, soundPcm } from './sound-pcm'
 import { detectRemovable } from './media/background'
 import { findFaces } from './media/face-find'
 import type { FacesFound } from '../shared/face-follow'
@@ -184,6 +185,17 @@ export function registerIpc(): void {
     }
   })
   ipcMain.handle('media:stopLighterCopies', (): void => stopLighterCopies())
+  // Plan 106: sound for the preview's engine, the recording looked up by id as above.
+  ipcMain.handle('media:soundPcm', async (_e, raw: unknown): Promise<Float32Array | null> => {
+    const req = cleanPcmRequest(raw)
+    const m = req ? session.getProject().media.find((x) => x.id === req.mediaId) : undefined
+    if (!req || !m) return null
+    try {
+      return await soundPcm(m, req)
+    } catch {
+      return null
+    }
+  })
 
   ipcMain.handle('ffmpeg:status', async (): Promise<FfmpegStatus> => {
     try {

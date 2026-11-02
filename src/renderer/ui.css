@@ -736,6 +736,17 @@ pre,
   background: var(--accent-base);
 }
 
+/* The bar that folds the sections right of the timeline down under the Inspector (task 1137). */
+.ui-tuck-bar:hover {
+  background: var(--surface-control-hover) !important;
+  color: var(--ink-primary) !important;
+}
+
+.ui-tuck-bar:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: -2px;
+}
+
 /* -------------------------------------------------------------- the small */
 
 .ui-kbd {

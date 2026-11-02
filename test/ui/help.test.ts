@@ -48,7 +48,7 @@ afterAll(async () => {
 
 async function newProject(): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"]').length === 0)
 }
 
@@ -69,7 +69,7 @@ async function withAClip(): Promise<void> {
 
 async function openPalette(): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('Control+k')
+  await page.keyboard.press('ControlOrMeta+k')
   await page.waitForSelector('[data-testid="command-palette"]')
 }
 
@@ -85,7 +85,7 @@ describe('an empty window', () => {
     expect(keys).toContain('S')
     expect(keys).toContain('I')
     expect(keys).toContain('O')
-    expect(keys).toContain('Ctrl+E')
+    expect(keys).toContain(process.platform === 'darwin' ? '⌘E' : 'Ctrl+E')
   })
 
   it('offers the tutorials, and opens them, which is the line a first-time user sees', async () => {
@@ -186,7 +186,7 @@ describe('an empty window', () => {
     await withAClip()
     const saved = join(root, 'lately.editbay')
     await answerSaveDialog(app, saved)
-    await page.keyboard.press('Control+Shift+s')
+    await page.keyboard.press('ControlOrMeta+Shift+s')
     for (let i = 0; i < 100 && !(await stat(saved).catch(() => null)); i++) await new Promise((r) => setTimeout(r, 100))
     await newProject()
     await page.waitForSelector('[data-testid="welcome-recent"]')

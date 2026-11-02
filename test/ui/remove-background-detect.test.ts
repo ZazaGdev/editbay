@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
@@ -19,7 +19,8 @@ import { discardUnsavedWork } from './dialogs'
  */
 
 const WAIT = { timeout: 15_000 }
-const root = await mkdtemp(join(tmpdir(), 'editbay-bg-detect-'))
+// Its real path: a Mac's temp folder is under a link, and the app keeps media by the real one.
+const root = await realpath(await mkdtemp(join(tmpdir(), 'editbay-bg-detect-')))
 let app: ElectronApplication
 let page: Page
 

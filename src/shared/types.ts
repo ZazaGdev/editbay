@@ -137,6 +137,23 @@ export interface RecordingsListing {
   recordings: Recording[]
 }
 
+/** Plan 106: which stretch of which sound to decode for the preview's sound engine. */
+export interface SoundPcmRequest {
+  mediaId: string
+  /** Which of the recording's sound tracks, from 0. */
+  track: number
+  /** Its cleaned or enhanced copy, as the clip plays it. */
+  denoise: boolean
+  voice?: VoiceStrength
+  /** One side played on both, as the clip asks (task 1188). */
+  side?: 'left' | 'right'
+  /** Where in the file to start, in seconds from its start; before 0 is silence. */
+  fromSec: number
+  /** How many samples, at `rate`. */
+  frames: number
+  rate: number
+}
+
 export interface FfmpegStatus {
   ok: boolean
   message: string
@@ -191,8 +208,12 @@ export type ClipEdit =
   | { kind: 'setTrackHidden'; trackId: string; hidden: boolean }
   /** Take a gap's time out of the sequence. */
   | { kind: 'closeUpGap'; gap: Gap }
-  /** Take stretches of the sequence out through V1's pictures, closing up, as Remove silences does. */
-  | { kind: 'removeStretches'; stretches: { from: number; to: number }[] }
+  /**
+   * Take stretches of the sequence out through V1's pictures, closing up, as
+   * Remove silences does, and through the clips on the audio tracks `listen`
+   * names, which the pauses were found in.
+   */
+  | { kind: 'removeStretches'; stretches: { from: number; to: number }[]; listen?: string[] }
   /**
    * A clip to another time, and track of its kind, covering what it lands on;
    * with `insert`, Ctrl held, taken out and put in instead. `newTrack` makes
@@ -341,6 +362,12 @@ export type ClipEdit =
   | { kind: 'applyLayout'; clipId: string; layout: NamedLayout }
   | { kind: 'swapPictures'; clipId: string }
   | { kind: 'applyLayoutToSource'; clipId: string }
+  /**
+   * A clip's speed, and its linked clips' with it, its length changing with it
+   * (plan 105); or its sound kept outside 0.5x to 2x, or its slow motion in
+   * plain frames. Only the fields given change.
+   */
+  | { kind: 'setSpeed'; clipId: string; speed?: number; keepSound?: boolean; plainFrames?: boolean }
   /** A sound clip's volume and mute. */
   | { kind: 'setClipAudio'; clipId: string; gain: number; muted: boolean }
   /** Every other sound clip of the same recording and stream as this clip's sound, the same volume and mute. */
@@ -767,6 +794,8 @@ export interface EditbayApi {
    * its path, or null for a source that gets none or a copy that failed.
    */
   lighterCopy(mediaId: string): Promise<string | null>
+  /** Plan 106: a stretch of a recording's sound decoded for the preview's sound engine, stereo float interleaved, or null. */
+  soundPcm(request: SoundPcmRequest): Promise<Float32Array | null>
   /** The plain background the picture a clip starts on, `from` seconds into its source, stands on: green, blue, black or another colour (plan 98). */
   mediaBackground(mediaId: string, from: number): Promise<FoundBackground | null>
   /** The faces on a recording from `from` to `to` seconds, each sample on a frame at `fps` (plan 100, Follow face). */

@@ -1,7 +1,7 @@
 import { useState, type JSX } from 'react'
 import { keyDraggedTo, keyMarks, timelineZoom } from '../../shared/zoom-edit'
 import type { Clip } from '../../shared/project'
-import { snapFrameTo } from '../../shared/tracks'
+import { snapFrameTo, sourceAt, timelineAt } from '../../shared/tracks'
 import { formatTimecode } from '../../shared/time'
 import { accent, ink, radius, surface, type } from '../theme'
 
@@ -47,7 +47,9 @@ export function ClipKeyframes(props: {
   const [drag, setDrag] = useState<{ from: number; to: number; x: number; moved: boolean; targets: number[] } | null>(null)
   if (!zoom || props.width < KEY_MARK) return null
   const marks = keyMarks(zoom.frames, props.pxPerFrame, KEY_MARK - 2)
-  const onSequence = (sourceFrame: number): number => c.timelineStart + sourceFrame - c.sourceIn
+  // At the clip's speed (plan 105).
+  const onSequence = (sourceFrame: number): number => timelineAt(c, sourceFrame)
+  const speed = c.speed ?? 1
   const end = (): void => {
     setDrag(null)
     props.onSnap?.(null)
@@ -93,7 +95,7 @@ export function ClipKeyframes(props: {
               // Alt held lets it go anywhere, as on a clip's edge.
               const caught = e.altKey ? null : snapFrameTo(onSequence(raw), drag.targets, props.snap.within)
               // Caught, it lands on that frame of the recording, still kept on the clip.
-              const to = caught && caught.caught !== null ? keyDraggedTo(c, caught.frame - c.timelineStart + c.sourceIn, 0, props.pxPerFrame) : raw
+              const to = caught && caught.caught !== null ? keyDraggedTo(c, Math.round(sourceAt(c, caught.frame)), 0, props.pxPerFrame) : raw
               props.onSnap?.(caught && caught.caught !== null && onSequence(to) === caught.frame ? caught.frame : null)
               setDrag({ ...drag, moved, to })
             }}
@@ -108,7 +110,7 @@ export function ClipKeyframes(props: {
             onPointerCancel={end}
             style={{
               position: 'absolute',
-              left: Math.min(props.width - KEY_GRAB, Math.max(0, (at - c.sourceIn + 0.5) * props.pxPerFrame - KEY_GRAB / 2)),
+              left: Math.min(props.width - KEY_GRAB, Math.max(0, ((at - c.sourceIn) / speed + 0.5) * props.pxPerFrame - KEY_GRAB / 2)),
               bottom: 0,
               width: KEY_GRAB,
               height: KEY_GRAB,

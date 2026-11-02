@@ -48,6 +48,11 @@ function playlist(segment: string): string {
 
 /** Whether anything on this computer has tried to reach `host` on port 445, the Windows share port. */
 async function reached(host: string): Promise<boolean> {
+  // A Mac's netstat writes the port after a dot, as 192.0.2.71.445.
+  if (process.platform === 'darwin') {
+    const { stdout } = await promisify(execFile)('/usr/sbin/netstat', ['-an', '-p', 'tcp'])
+    return stdout.includes(`${host}.445`)
+  }
   const { stdout } = await promisify(execFile)('C:\\Windows\\System32\\NETSTAT.EXE', ['-ano', '-p', 'tcp'])
   return stdout.includes(`${host}:445`)
 }

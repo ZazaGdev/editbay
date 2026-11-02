@@ -3,9 +3,9 @@ import { DEFAULT_BORDER_COLOUR, blurSigma, shadowOf } from '../../shared/picture
 import { FULL_PLACE, fitInPlace, freePlaceInPixels, placeInPixels, type Place } from '../../shared/layout'
 import { fitInBox } from '../../shared/crop-geometry'
 import { outputSizeFor, presetById } from '../../shared/presets'
-import { alphaOfKey, colourCanvas, colourFilterId, distanceOfKey, distanceTable, feColorMatrixValues, isKeyed, matrixOfKey } from '../../shared/looks'
+import { alphaOfKey, colourCanvas, colourFilterId, colourKey, distanceOfKey, distanceTable, feColorMatrixValues, isKeyed, matrixOfKey, type Coloured } from '../../shared/looks'
 import type { BlurRegion } from '../../shared/blur'
-import { rgbSplitAt, spinAt, zoomOutAt } from '../../shared/transitions'
+import { blurAt, rgbSplitAt, spinAt, zoomOutAt } from '../../shared/transitions'
 import { pixelate, splitColours } from './stylised'
 import { drawCaption } from './drawCaption'
 
@@ -95,8 +95,8 @@ export interface Mix {
    * `alpha(d)` is 1, not at all where it is 0, for a soft circle.
    */
   radial?: { x: number; y: number; reach: number; alpha: (d: number) => number }
-  /** Blurred across by a box this many layout pixels wide, reaching right of each point, as `hblur` does. */
-  blurX?: number
+  /** Blurred both ways by a gaussian of this deviation, in layout pixels, for a blur. */
+  gauss?: { sigma: number }
   /** Not drawn at all. */
   hidden?: boolean
   /** Turned this far clockwise, in radians, about this point, for a spin (plan 95). */
@@ -116,7 +116,7 @@ export interface DrawPlan {
 /** A clip to draw: its pictures, the main one first, each a crop of its recording and a place in the frame. */
 export interface DrawnClip {
   /** Each picture's crop and place, and where its keyframes put its box at this frame (plan 97). */
-  pictures: { crop: Rect; place: Place; style?: PictureStyle; box?: { place: Place; opacity: number } }[]
+  pictures: ({ crop: Rect; place: Place; style?: PictureStyle; box?: { place: Place; opacity: number } } & Coloured)[]
   /** The bars round its pictures filled with the picture blurred. Never on an overlay placed freely. */
   blurFill?: boolean
   /** On a track over the lowest one shown, so its main picture is framed as a picture in picture. */
@@ -180,6 +180,9 @@ export function drawPlan(timeline: Timeline, clips: DrawnClip[], box: { width: n
       // Framed as the export frames it: a layer always, the main picture only
       // when the clip lies over another track, and never an overlay placed freely.
       const style = framed && !free && !keyed && (j > 0 || (c.over ?? source > 0)) ? p.style : undefined
+      // A layer's own look (task 1188), after its clip's, as the export lays it on its crop.
+      const own = j > 0 ? colourFilter(colourKey(p)) : undefined
+      const filtered = own ? (filter ? `${filter} ${own}` : own) : filter
       const radius = Math.min(style?.radius ?? 0, Math.floor(Math.min(place.w, place.h) / 2))
       const border = style?.border ?? 0
       const shadow = style?.shadow === true ? shadowOf(size.width, size.height) : null
@@ -210,7 +213,7 @@ export function drawPlan(timeline: Timeline, clips: DrawnClip[], box: { width: n
         ...(c.wash && framed && !free && !(c.over ?? source > 0) ? { washOver: { frame } } : {}),
         ...(c.wash && free ? { washOver: 'pixels' as const } : {}),
         ...(c.mix ? { mix: c.mix } : {}),
-        ...(filter ? { filter } : {}),
+        ...(filtered ? { filter: filtered } : {}),
         ...(c.blurs ? { blurs: c.blurs } : {}),
         ...(free?.rotation ? { turn: (free.rotation * Math.PI) / 180 } : {}),
         ...(free?.opacity !== undefined && free.opacity < 1 ? { alpha: free.opacity } : {}),
@@ -306,11 +309,10 @@ export function mixFor(kind: string, p: number, frame: Rect, outputWidth = 1080)
       const zf = smoothstep(0.5, 1, P)
       return { out: { zoom: { x: cx, y: cy, k: 1 / Math.max(zf, 0.002) } }, into: { alpha: 1 - smoothstep(0, 0.5, P) } }
     }
-    // Both blurred across, most at the middle, while one turns into the other.
+    // Both blurred, most at the middle, while one dissolves into the other.
     case 'blur': {
-      const prog = P <= 0.5 ? P * 2 : (1 - P) * 2
-      const box = ((1 + (outputWidth / 2) * prog) * w) / Math.max(1, outputWidth)
-      return { out: { blurX: box }, into: { blurX: box, alpha: at } }
+      const gauss = { sigma: (blurAt(at, outputWidth) * w) / Math.max(1, outputWidth) }
+      return { out: { gauss }, into: { gauss, alpha: at } }
     }
     // Plan 95. The next picture enlarged, pulling back to its own size as it dissolves in.
     case 'zoomOut':
@@ -378,7 +380,7 @@ export function drawOnto(
     if (mix?.hidden) continue
     // A soft mask or a blur is drawn apart, then laid on: neither is a canvas
     // setting that reaches a single draw.
-    const apart = mix !== undefined && (mix.radial !== undefined || (mix.blurX ?? 0) > 0 || mix.pixel !== undefined || mix.split !== undefined)
+    const apart = mix !== undefined && (mix.radial !== undefined || (mix.gauss?.sigma ?? 0) > 0 || mix.pixel !== undefined || mix.split !== undefined)
     const c = apart ? kept(ctx.canvas.width, ctx.canvas.height) : ctx
     if (apart) {
       c.setTransform(1, 0, 0, 1, 0, 0)
@@ -641,7 +643,7 @@ function kept(width: number, height: number, use = ''): CanvasRenderingContext2D
 
 /**
  * A step drawn apart laid onto the monitor: its soft circle cut out of it,
- * or it blurred across, then drawn at its alpha. Both in device pixels, as
+ * or it blurred, then drawn at its alpha. Both in device pixels, as
  * the canvases are.
  */
 function layApart(ctx: CanvasRenderingContext2D, c: CanvasRenderingContext2D, mix: Mix, scale: number): void {
@@ -664,25 +666,24 @@ function layApart(ctx: CanvasRenderingContext2D, c: CanvasRenderingContext2D, mi
     c.fillRect(0, 0, c.canvas.width / scale, c.canvas.height / scale)
     c.restore()
   }
-  const blur = (mix.blurX ?? 0) * scale
+  const blur = (mix.gauss?.sigma ?? 0) * scale
+  if (blur > 0) {
+    // Over itself sharp, so its edges, which a canvas blurs into nothing
+    // where `gblur` holds the edge, stay the picture and never fade to black.
+    const soft = kept(c.canvas.width, c.canvas.height, 'gauss')
+    soft.setTransform(1, 0, 0, 1, 0, 0)
+    soft.clearRect(0, 0, soft.canvas.width, soft.canvas.height)
+    soft.filter = 'none'
+    soft.drawImage(from, 0, 0)
+    soft.filter = `blur(${blur}px)`
+    soft.drawImage(from, 0, 0)
+    soft.filter = 'none'
+    from = soft.canvas
+  }
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.globalAlpha = mix.alpha !== undefined ? Math.min(1, Math.max(0, mix.alpha)) : 1
-  if (blur > 1) {
-    // Across only, as `hblur` blurs: squeezed to one column per box and
-    // stretched back, which averages each run of the box's width. Its box
-    // reaches right of each point, so the picture it gives sits half a box left.
-    const w = c.canvas.width
-    const h = c.canvas.height
-    const narrow = Math.max(1, Math.round(w / blur))
-    const squash = kept(narrow, h)
-    squash.imageSmoothingQuality = 'high'
-    squash.clearRect(0, 0, narrow, h)
-    squash.drawImage(c.canvas, 0, 0, w, h, 0, 0, narrow, h)
-    from = squash.canvas
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(from, 0, 0, narrow, h, -blur / 2, 0, w, h)
-  } else ctx.drawImage(from, 0, 0)
+  ctx.drawImage(from, 0, 0)
   ctx.restore()
 }
 

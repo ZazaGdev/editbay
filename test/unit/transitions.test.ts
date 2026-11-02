@@ -19,6 +19,7 @@ import {
   transitionWindows,
   washAt,
   washColour,
+  washOver,
   type Transition,
   type Transitioned
 } from '../../src/shared/transitions'
@@ -162,6 +163,27 @@ describe('a dip through a colour, which never wants two pictures at once', () =>
     const [w] = transitionWindows(track, 'picture')
     expect(w?.splitAt).toBe(100)
     expect(blends(w!)).toBe(false)
+  })
+
+  it('hands over on the cut when more of it falls after, so it is darkest on the cut (task 1092)', () => {
+    // The owner's own: 22 frames, 9 before the cut.
+    const off = [clip('a', 0), put(clip('b', 100), 'in', { length: 22, before: 9, kind: 'toBlack' })]
+    const [w] = transitionWindows(off, 'picture')
+    expect(w).toMatchObject({ from: 91, to: 113, splitAt: 100 })
+    expect(washAt(w!, 100)).toBe(1)
+    expect(washAt(w!, 99)).toBeLessThan(1)
+    expect(washAt(w!, 101)).toBeLessThan(1)
+    const shown = shownSpans(off, 'picture')
+    expect(shown.get('a')?.to).toBe(100)
+    expect(shown.get('b')?.from).toBe(100)
+  })
+
+  it('puts the same colour over both clips of a dip, whichever the preview draws (task 1092)', () => {
+    const late = [clip('a', 0), put(clip('b', 100), 'in', { length: 30, before: 0, kind: 'toBlack' })]
+    const windows = transitionWindows(late, 'picture')
+    // Handed over at 115, the second clip is already on the players from the cut.
+    expect(washOver(windows, 'a', 105)).toEqual(washOver(windows, 'b', 105))
+    expect(washOver(windows, 'b', 105)!.alpha).toBeCloseTo(5 / 15, 6)
   })
 
   it('shows the first clip up to the handover and the second from it', () => {

@@ -20,6 +20,7 @@ import { freePlaceInPixels, placeInPixels, type Place } from './layout'
 import { colourFfmpeg, colourKey, colourKeyOf, isKeyed } from './looks'
 import { blurFfmpeg, type BlurBox } from './blur'
 import { BT601_TO_709 } from './colour-space'
+import { framesToSeconds } from './time'
 import { DEFAULT_BORDER_COLOUR, blurSigma, shadowOf } from './picture-style'
 import { cropFilters, layerMove, type Clock, type Move } from './render-moves'
 import { level } from './render-sound'
@@ -43,6 +44,49 @@ export function rate(fps: number): string {
   return `fps=${fps}:start_time=0`
 }
 
+/** How a clip's picture is timed, when it plays at a speed of its own (plan 105). */
+export interface Timing {
+  speed: number
+  /** Slowed down, its frames blended into each other rather than repeated. */
+  blend: boolean
+}
+
+/** A clip's timing, or nothing at 1x, which is almost every clip. */
+export function timingOf(c: Pick<Clip, 'speed' | 'plainFrames'>): Timing | undefined {
+  const speed = c.speed ?? 1
+  return speed === 1 ? undefined : { speed, blend: speed < 1 && c.plainFrames !== true }
+}
+
+/**
+ * The frame rate at the head of a picture's chain, at its speed: its time
+ * divided by the speed first, then the project's frames taken from it, made
+ * between two of the recording's by blending them where slow motion asks for
+ * that, and by repeating one where it does not. At 1x, `rate` alone.
+ */
+export function timedRate(fps: number, timing?: Timing, part = 0): string {
+  if (!timing) return rate(fps)
+  // Read from the whole frame before a head that sits part way into one, as
+  // `seekFrom` reads it, and that part taken off its clock, so its first frame
+  // is the one the preview shows there (audit 2026-10-19).
+  const off = part > 0 ? `-${String(Number((part / fps).toFixed(6)))}/TB` : ''
+  const pts = `setpts=(PTS-STARTPTS${off})/${timing.speed}`
+  return timing.blend ? `${pts},framerate=fps=${fps}` : `${pts},${rate(fps)}`
+}
+
+/**
+ * Where a recording is read from for a piece whose first frame is at
+ * recording frame `at`: the whole frame at or before it, in seconds, and how
+ * far into that frame the piece starts. Read from the exact second of a part
+ * frame, ffmpeg's accurate seek threw the frame the head sits in away, and the
+ * piece opened a frame on from the preview and from its own sound.
+ */
+export function seekFrom(at: number, fps: number): { fromSec: string; part: number } {
+  const from = Math.max(0, at)
+  const whole = Math.floor(from + 1e-6)
+  const part = from - whole > 1e-6 ? from - whole : 0
+  return { fromSec: framesToSeconds(whole, fps).toFixed(6), part }
+}
+
 /** A clip's blur, with its recording's size, which its boxes are placed on (plan 85), and whether its colours are BT.601. */
 export interface HeadBlur {
   bt601?: true
@@ -62,10 +106,19 @@ export function blurField(timeline: Timeline, c: Clip): { headBlur: HeadBlur } |
 /**
  * A recording made by BT.601 turned into BT.709 first, before its look:
  * everything after, and the file written, reads it as BT.709 (audit 2026-10-01).
+ * Any other recording is said to be BT.709 on its frames. The input option
+ * `AS_BT709` is enough for a file that says nothing of its colours, but one
+ * whose header names the primaries and leaves the matrix unspecified is read
+ * by the header, its frames come out unknown, and ffmpeg 9 converted them as
+ * BT.601: #E02020 came out 205,9,31 (audit 2026-10-19). Only the matrix is
+ * said, not the range, which a full-range phone recording says rightly.
  */
-export function matrixFilters(b: HeadBlur | undefined): string[] {
-  return b?.bt601 ? [BT601_TO_709] : []
+export function matrixFilters(b: HeadBlur | undefined, recording: boolean): string[] {
+  return b?.bt601 ? [BT601_TO_709] : recording ? [RECORDING_BT709] : []
 }
+
+/** A recording's frames said to be BT.709, as the export reads every recording that is not BT.601. */
+export const RECORDING_BT709 = 'setparams=colorspace=bt709'
 
 /** The filters that blur a picture at the head of its chain, after its colour; `tag` keeps their labels its own. */
 export function blurFilters(b: HeadBlur | undefined, tag: string, keepAlpha = false): string[] {
@@ -187,16 +240,18 @@ export function videoFilter(
   still = false,
   animStart?: { start: number; into: number; once?: boolean },
   headBlur?: HeadBlur,
-  tag = 'v'
+  tag = 'v',
+  timing?: Timing,
+  part = 0
 ): string {
   return [
-    `${animationHead(animStart)}${rate(fps)}`,
+    `${animationHead(animStart)}${timedRate(fps, timing, part)}`,
     // Frames cloned onto the front where a transition reaches back past the
     // recording's own first frame: the held frame at the other end.
     ...(startHold > 0 ? [`tpad=start_mode=clone:start=${startHold}`] : []),
     // A picture's format first, so a look works on it with its transparency.
     ...stillFilters(still, false),
-    ...matrixFilters(headBlur),
+    ...matrixFilters(headBlur, !still && animStart === undefined),
     ...lookFilters(look, false, tag),
     ...blurFilters(headBlur, tag),
     // A picture that moves takes the window `zoompan` gives it, in place of
@@ -328,6 +383,8 @@ export function pictureGraph(
     headBlur?: HeadBlur
     /** The piece's clock, when a further picture has a move of its own on it. */
     clock?: Clock
+    /** How far into its first recording frame the piece starts, read from that whole frame: see `seekFrom`. */
+    part?: number
     /** A picture laid over another track, placed freely: its turn and opacity. */
     free?: { rotation?: number; opacity?: number }
     /** Lying over another track, so its main picture is framed as a picture in picture too. */
@@ -351,10 +408,10 @@ export function pictureGraph(
   // track: black there would cover what is underneath it.
   const alpha = at.transparent === true
   const head =
-    `[${at.input ?? 0}:v]${animationHead(at.animStart)}${rate(fps)}` +
+    `[${at.input ?? 0}:v]${animationHead(at.animStart)}${timedRate(fps, timingOf(clip), at.part)}` +
     `${(at.startHold ?? 0) > 0 ? `,tpad=start_mode=clone:start=${at.startHold}` : ''}` +
     stillFilters(at.still === true, alpha).map((f) => `,${f}`).join('') +
-    matrixFilters(at.headBlur).map((f) => `,${f}`).join('') +
+    matrixFilters(at.headBlur, at.still !== true && at.animStart === undefined).map((f) => `,${f}`).join('') +
     lookFilters(colourKeyOf(clip), alpha, last).map((f) => `,${f}`).join('') +
     blurFilters(at.headBlur, last, alpha).map((f) => `,${f}`).join('') +
     `${alpha ? ',format=yuva420p' : ''}`
@@ -373,7 +430,9 @@ export function pictureGraph(
     const box = free ? freePlaceInPixels(p.place, width, height) : placeInPixels(p.place, width, height)
     const blur = clip.blurFill === true && !free && !keyed ? blurSigma(width, height) : null
     const move = i === 0 ? at.move : layerMove(p.keys, at.clock)
-    const fitted = boxed(`[s${g}${i}]`, cropFilters(p.crop, move, fps, box.w).join(','), box, blur, clear, `${g}${i}`)
+    // A layer's own look (task 1188), on its crop alone, over its clip's.
+    const own = i > 0 ? lookFilters(colourKeyOf(clip.layers[i - 1]!), alpha, `${last}l${g}${i}`) : []
+    const fitted = boxed(`[s${g}${i}]`, [...cropFilters(p.crop, move, fps, box.w), ...own].join(','), box, blur, clear, `${g}${i}`)
     const frame =
       !keyed && (i > 0 || (at.overOther === true && !free)) ? framedBox(fitted, box, p.style, fps, { w: width, h: height }, `${g}${i}`) : null
     // A box its keyframes move (plan 97): laid over a canvas of the frame, the

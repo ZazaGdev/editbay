@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react'
-import { MAIN_PICTURE, simpleLoses, zoomOf, type Clip, type ProjectMedia, type Timeline } from '../../shared/project'
+import { MAIN_PICTURE, isStill, simpleLoses, zoomOf, type Clip, type ProjectMedia, type Timeline } from '../../shared/project'
 import { hasKeys, isSimple, keysInClip } from '../../shared/zoom-edit'
 import type { Keymap } from '../../shared/keymap'
 import { space } from '../theme'
@@ -9,7 +9,7 @@ import type { PlayheadStore } from '../state/playheadStore'
 import { KeyframeZoom } from './KeyframeZoom'
 import { SimpleZoom } from './SimpleZoom'
 import { CentreOnFace, FollowFace } from './FollowFace'
-import { callout, note, type Edit, type ZoomTools } from './zoom-parts'
+import { ZoomPart, callout, note, type Edit, type ZoomTools } from './zoom-parts'
 
 export type { PresetEdit, ZoomTools } from './zoom-parts'
 
@@ -99,10 +99,6 @@ export function ZoomGroup(props: {
           { id: 'keys', label: 'Keyframes', title: 'Keyframes anywhere in the clip, as many as you like' }
         ]}
       />
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <FollowFace clip={clip} media={props.media} timeline={props.timeline} picture={picture} onEdit={props.onEdit} />
-        <CentreOnFace clip={clip} media={props.media} timeline={props.timeline} picture={picture} onEdit={props.onEdit} />
-      </div>
       {asking === whose && !simple && (
         <div data-testid="zoom-to-simple" role="alertdialog" aria-label="Go back to Simple?" style={callout}>
           <strong>Go back to Simple?</strong> This clip has {keys.length} keyframes. Simple keeps the picture on the clip&apos;s
@@ -121,6 +117,15 @@ export function ZoomGroup(props: {
         <SimpleZoom {...props} onKeyframes={() => choose('keys')} />
       ) : (
         <KeyframeZoom {...props} />
+      )}
+      {/* A still picture has no face to find, and neither button draws for one. */}
+      {!isStill(props.media) && props.media.hasVideo !== false && (
+        <ZoomPart testid="zoom-part-face" name="Face" hint="let the app find the face">
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <FollowFace clip={clip} media={props.media} timeline={props.timeline} picture={picture} onEdit={props.onEdit} />
+            <CentreOnFace clip={clip} media={props.media} timeline={props.timeline} picture={picture} onEdit={props.onEdit} />
+          </div>
+        </ZoomPart>
       )}
     </div>
   )

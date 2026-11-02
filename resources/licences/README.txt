@@ -25,9 +25,14 @@ FFmpeg 9.0.2, the exact revision this build of FFmpeg and FFprobe was made from:
 The Windows build and the options it was configured with:
   https://www.gyan.dev/ffmpeg/builds/
 
-FFmpeg-build-and-source.txt, beside this file, is the build's own record of its
-version, its source commit and its full configuration, exactly as its publisher
-wrote it.
+The Mac builds (the same FFmpeg release) and the scripts they were made with:
+  https://ffmpeg.martin-riedl.de/
+  https://git.martin-riedl.de/ffmpeg/build-script
+
+FFmpeg-build-and-source.txt, beside this file, is the Windows build's own record
+of its version, its source commit and its full configuration, exactly as its
+publisher wrote it. FFmpeg-build-and-source-mac.txt is the same for the Mac
+builds.
 
 Written offer for the complete source (GPL version 3, section 6(b))
 -------------------------------------------------------------------
@@ -55,6 +60,15 @@ Anton, Bebas Neue and Poppins, the other caption fonts, are used under the SIL
 Open Font License 1.1. Their full texts and copyright notices are in
 Montserrat-OFL.txt, Anton-OFL.txt, BebasNeue-OFL.txt and Poppins-OFL.txt.
 
+The fonts texts can be drawn in come from Google Fonts. Archivo Black, Barlow,
+DM Sans, Dancing Script, Fira Sans, Inter, JetBrains Mono, Lato, Lobster,
+Merriweather, Noto Sans, Nunito, Open Sans, Oswald, PT Serif, Pacifico,
+Playfair Display, Quicksand, Raleway, Roboto, Rubik, Source Sans 3, Space
+Grotesk and Work Sans are used under the SIL Open Font License 1.1, and Roboto
+Slab and Permanent Marker under the Apache License 2.0. Each one's full text
+and copyright notice is in the file named after it, such as Inter-OFL.txt or
+RobotoSlab-Apache.txt.
+
 ONNX Runtime, which runs the face model for Follow face, and YuNet, that face
 model, are MIT licensed. Their full texts and copyright notices are in
 ONNXRuntime-MIT.txt and YuNet-MIT.txt, and the libraries built into ONNX
@@ -63,9 +77,11 @@ Runtime are listed in ONNXRuntime-ThirdPartyNotices.txt.
 React (with its scheduler) and the lucide icons are built into Editbay's own
 code. Their licences are React-MIT.txt and lucide-ISC.txt.
 
-whisper.cpp and its speech model are not part of this installer. They are
+whisper.cpp and its speech model are not part of the Windows installer. They are
 downloaded once, only if you ask Editbay for captions, and both are MIT
-licensed. See THIRD-PARTY-NOTICES.md, beside this file, for versions and links.
+licensed. On a Mac, whisper.cpp's program comes inside the app, with its
+licence beside it in the whisper folder, and only the model is downloaded. See
+THIRD-PARTY-NOTICES.md, beside this file, for versions and links.
 
 Electron, React and the other libraries Editbay is built from are listed with
 their licences in THIRD-PARTY-NOTICES.md, beside this file. Electron's and

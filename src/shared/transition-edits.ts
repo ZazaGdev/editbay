@@ -3,7 +3,7 @@
  * and filling the cuts an edit makes.
  */
 
-import { spanEnd } from './tracks'
+import { spanEnd, spanLength } from './tracks'
 import {
   type KindSet, pictureKind, soundKind, defaultKind, type TransitionSide, type Transition,
   MIN_TRANSITION_FRAMES, beforeFor
@@ -115,7 +115,7 @@ export function removeTransition(p: Timeline, clipId: string, side: TransitionSi
 export function setFade(p: Timeline, clipId: string, side: TransitionSide, length: number): Timeline {
   const found = findClip(p, clipId)
   if (!found || found.kind !== 'audio') return p
-  const most = Math.floor((found.clip.sourceOut - found.clip.sourceIn) / 2)
+  const most = Math.floor(spanLength(found.clip) / 2)
   const frames = Math.min(most, Math.round(length))
   if (frames < MIN_TRANSITION_FRAMES) return removeTransition(p, clipId, side, true)
   const had = transitionOn(found.clip, side) !== undefined

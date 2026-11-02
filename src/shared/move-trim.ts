@@ -6,7 +6,7 @@
 import { newId } from './ids'
 import {
   spanLength, placeCovering, type Span, headLimit, tailLimit, spanEnd, closedUpStart, closeUpStarts,
-  type TrackOf, withStarts
+  type TrackOf, withStarts, toSource, toTimeline, speedOf, sourceAt
 } from './tracks'
 import { clamp } from './project-core'
 import type { TrackKind, Timeline, Clip, SoundClip } from './project'
@@ -137,9 +137,20 @@ export function setClipIn(p: Timeline, clipId: string, frame: number, alone = fa
     low = Math.max(low, headLimit(m.track, m.clip) - m.clip.timelineStart)
     high = Math.min(high, spanLength(m.clip) - 1)
   }
-  const d = clamp(Math.round(frame) - found.clip.sourceIn, low, high)
+  // In frames of the timeline; a clip at a speed of its own moves its recording by as many of its own (plan 105).
+  const d = clamp(toTimeline(found.clip, Math.round(frame) - found.clip.sourceIn), low, high)
   if (d === 0 || low > high) return p
-  return reshape(p, new Set(members.map((m) => m.clip.id)), (c) => ({ ...c, sourceIn: c.sourceIn + d, timelineStart: c.timelineStart + d }))
+  return reshape(p, new Set(members.map((m) => m.clip.id)), (c) => ({ ...c, sourceIn: Math.max(0, c.sourceIn + toSource(c, d)), timelineStart: c.timelineStart + d }))
+}
+
+/** A clip `d` frames of the timeline longer at its end, or shorter, at its own speed. */
+function endMovedBy<T extends Span>(c: T, d: number): T {
+  return speedOf(c) === 1 ? { ...c, sourceOut: c.sourceOut + d } : { ...c, sourceOut: c.sourceIn + toSource(c, spanLength(c) + d) }
+}
+
+/** A clip `d` frames of the timeline shorter at its head, or longer, at its own speed, keeping its start. */
+function headMovedBy<T extends Span>(c: T, d: number): T {
+  return { ...c, sourceIn: Math.max(0, c.sourceIn + toSource(c, d)) }
 }
 
 /**
@@ -158,9 +169,9 @@ export function setClipOut(p: Timeline, clipId: string, frame: number, alone = f
     low = Math.max(low, 1 - spanLength(m.clip))
     high = Math.min(high, tailLimit(m.track, m.clip, m.frames) - spanEnd(m.clip))
   }
-  const d = clamp(Math.round(frame) - found.clip.sourceOut, low, high)
+  const d = clamp(toTimeline(found.clip, Math.round(frame) - found.clip.sourceOut), low, high)
   if (d === 0 || low > high) return p
-  return reshape(p, new Set(members.map((m) => m.clip.id)), (c) => ({ ...c, sourceOut: c.sourceOut + d }))
+  return reshape(p, new Set(members.map((m) => m.clip.id)), (c) => endMovedBy(c, d))
 }
 
 /**
@@ -197,7 +208,13 @@ export function rippleTrimBlockers(p: Timeline, clipId: string, edge: 'start' | 
  * its picture, and a title starting before `at`, over the picture's last
  * frames, stays. The clips named in `leave` stay as they are.
  */
-function openUpAfter(p: Timeline, at: number, length: number, leave: ReadonlySet<string>, anchors: ReadonlySet<string>): Timeline {
+export function openUpAfter(p: Timeline, at: number, length: number, leave: ReadonlySet<string>, anchors: ReadonlySet<string>): Timeline {
+  const starts = openUpStarts(p, at, length, leave, anchors)
+  return { ...p, videoTracks: p.videoTracks.map((r) => withStarts(r, starts)), audioTracks: p.audioTracks.map((r) => withStarts(r, starts)) }
+}
+
+/** Where `openUpAfter` means each clip it moves to start, by id, before its tracks are settled. */
+export function openUpStarts(p: Timeline, at: number, length: number, leave: ReadonlySet<string>, anchors: ReadonlySet<string>): Map<string, number> {
   const clips = allClips(p).filter((c) => !leave.has(c.id))
   const from = new Map<string, number>()
   for (const c of clips) if (c.link !== undefined) from.set(c.link, Math.min(from.get(c.link) ?? Infinity, c.timelineStart))
@@ -206,7 +223,7 @@ function openUpAfter(p: Timeline, at: number, length: number, leave: ReadonlySet
   for (const c of clips) {
     if ((c.link === undefined ? c.timelineStart : from.get(c.link)!) >= at) starts.set(c.id, c.timelineStart + length)
   }
-  return { ...p, videoTracks: p.videoTracks.map((r) => withStarts(r, starts)), audioTracks: p.audioTracks.map((r) => withStarts(r, starts)) }
+  return starts
 }
 
 function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: number, alone: boolean): { result: Timeline; blockers: (Clip | SoundClip)[] } {
@@ -217,16 +234,16 @@ function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: n
   const c = found.clip
   const members = membersOf(p, clipId, false)
   const ids = new Set(members.map((m) => m.clip.id))
-  const wanted = Math.round(frame) - (edge === 'start' ? c.sourceIn : c.sourceOut)
+  const wanted = toTimeline(c, Math.round(frame) - (edge === 'start' ? c.sourceIn : c.sourceOut))
   let low = -Infinity
   let high = Infinity
   for (const m of members) {
     if (edge === 'start') {
-      low = Math.max(low, -m.clip.sourceIn)
+      low = Math.max(low, -Math.floor(m.clip.sourceIn / speedOf(m.clip)))
       high = Math.min(high, spanLength(m.clip) - 1)
     } else {
       low = Math.max(low, 1 - spanLength(m.clip))
-      high = Math.min(high, m.frames - m.clip.sourceOut)
+      high = Math.min(high, Math.floor((m.frames - m.clip.sourceOut) / speedOf(m.clip)))
     }
   }
   const d = clamp(wanted, low, high)
@@ -241,7 +258,7 @@ function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: n
     const onV1 = new Set(p.videoTracks[0]!.clips.map((x) => x.id))
     const picture = members.find((m) => onV1.has(m.clip.id))
     const point = picture ? picture.clip.timelineStart : Math.min(...members.map((m) => m.clip.timelineStart))
-    const trimmed = reshape(p, ids, (x) => ({ ...x, sourceIn: x.sourceIn + d }))
+    const trimmed = reshape(p, ids, (x) => headMovedBy(x, d))
     // Shorter at the head: its first `d` frames come out. Longer: that much comes in.
     if (d > 0) {
       const blockers = closeUpBlockers(trimmed, point, d, ids)
@@ -253,7 +270,7 @@ function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: n
     return done(picture ? openUpAfter(trimmed, point, -d, ids, onV1) : openUpStretch(trimmed, point, -d, ids))
   }
   const point = Math.min(...members.map((m) => spanEnd(m.clip)))
-  const trimmed = reshape(p, ids, (x) => ({ ...x, sourceOut: x.sourceOut + d }))
+  const trimmed = reshape(p, ids, (x) => endMovedBy(x, d))
   // From the picture's own end on V1: the next shot's sound leading in under
   // it ends this group's sound early, and closing up or opening up from there
   // moved what sits over its last frames (audit 2026-10-10).
@@ -277,22 +294,49 @@ function ripplePlan(p: Timeline, clipId: string, edge: 'start' | 'end', frame: n
  * many tracks as it did, the others stay on their tracks.
  */
 export function rearrangeClip(p: Timeline, clipId: string, trackId: string, start: number): Timeline {
+  const plan = rearrangePlan(p, clipId, trackId, start)
+  return plan.blockers.length > 0 ? p : plan.result
+}
+
+/**
+ * What would stop `rearrangeClip` putting a clip in at `start`, as it refuses
+ * it: the clips taking it out would push out of step, or its own sound that
+ * would have to start before the sequence does. None when it can be made.
+ */
+export function rearrangeBlockers(p: Timeline, clipId: string, trackId: string, start: number): (Clip | SoundClip)[] {
+  return rearrangePlan(p, clipId, trackId, start).blockers
+}
+
+/**
+ * The stretch a group takes out of V1 and puts in is its picture's there, as
+ * `takenStretch` measures a removal: a J-cut's sound leading in, or an
+ * L-cut's running on, is not time of its own. Measured by its earliest clip,
+ * the sound, it opened up the lead-in's length again on V1 as black and cut
+ * the shot it landed in (audit 2026-10-19). The sound goes in as far off its
+ * picture as it was, over what is there.
+ */
+function rearrangePlan(p: Timeline, clipId: string, trackId: string, start: number): { result: Timeline; blockers: (Clip | SoundClip)[] } {
+  const done = (result: Timeline, blockers: (Clip | SoundClip)[] = []): { result: Timeline; blockers: (Clip | SoundClip)[] } => ({ result, blockers })
   const found = findClip(p, clipId)
   const dest = trackOf(p, trackId)
-  if (!found || !dest || dest.kind !== found.kind) return p
+  if (!found || !dest || dest.kind !== found.kind) return done(p)
   const ids = linkedIds(p, clipId)
   const members = ids.map((id) => findClip(p, id)!)
-  const from = Math.min(...members.map((m) => m.clip.timelineStart))
-  const length = Math.max(...members.map((m) => spanEnd(m.clip))) - from
-  const groupStart = Math.max(0, Math.round(start) - (found.clip.timelineStart - from))
   const sameKind = members.filter((m) => m.kind === found.kind).map((m) => m.index)
   const shift = clamp(dest.index - found.index, -Math.min(...sameKind), maxTracks(found.kind) - 1 - Math.max(...sameKind))
   const landsAt = (m: { kind: TrackKind; index: number }): number => (m.kind === found.kind ? m.index + shift : m.index)
   const fromV1 = members.some((m) => m.kind === 'video' && m.index === 0)
   const ontoV1 = members.some((m) => m.kind === 'video' && landsAt(m) === 0)
+  const picture = members.find((m) => m.kind === 'video' && (m.index === 0 || landsAt(m) === 0))
+  const measured = picture ? [picture] : members
+  const from = Math.min(...measured.map((m) => m.clip.timelineStart))
+  const length = Math.max(...measured.map((m) => spanEnd(m.clip))) - from
+  const groupStart = Math.max(0, Math.round(start) - (found.clip.timelineStart - from))
   const at = fromV1 ? closedUpStart(groupStart, from, length) : groupStart
   // Let go where it began: nothing to take out or put in.
-  if (at === from && shift === 0) return p
+  if (at === from && shift === 0) return done(p)
+  const early = members.filter((m) => m.clip.timelineStart - from + at < 0).map((m) => m.clip)
+  if (early.length > 0) return done(p, early)
   // Cut through on the tracks it goes in on, and on every video track.
   const landsOn = new Set([
     ...p.videoTracks.map((r) => r.id),
@@ -304,7 +348,8 @@ export function rearrangeClip(p: Timeline, clipId: string, trackId: string, star
   ])
   const out = without(p, new Set(ids))
   // Not when taking it out would push a clip out of step: see closeUpBlockers.
-  if (fromV1 && closeUpBlockers(out, from, length).length > 0) return p
+  const pushed = fromV1 ? closeUpBlockers(out, from, length) : []
+  if (pushed.length > 0) return done(p, pushed)
   const closed = fromV1 ? closeUpStretch(out, from, length) : out
   const opened = ontoV1 ? openUpStretch(closed, at, length, new Set(), landsOn) : closed
   const videoTracks = [...opened.videoTracks]
@@ -322,7 +367,7 @@ export function rearrangeClip(p: Timeline, clipId: string, trackId: string, star
       audioTracks[index] = { ...track, clips: placeCovering(track.clips, { ...m.clip, timelineStart: start }, newId, asTwoPieces) }
     }
   }
-  return relinkCovered({ ...opened, videoTracks, audioTracks })
+  return done(relinkCovered({ ...opened, videoTracks, audioTracks }))
 }
 
 /**
@@ -369,12 +414,11 @@ export function trimToFrame(p: Timeline, clipId: string, edge: 'start' | 'end', 
   const found = findClip(p, clipId)
   if (!found || !strictlyInside(found.clip, frame)) return p
   const c = found.clip
-  const into = frame - c.timelineStart
   const closing = closingTrim(p, clipId, edge, frame, alone)
   if (!closing) {
     // Selected alone, it was detached on purpose: trimmed where it is, leaving a gap.
     const own = alone ? null : ownTracksTrim(p, clipId, edge, frame)
-    if (!own) return edge === 'start' ? setClipIn(p, clipId, c.sourceIn + into, alone) : setClipOut(p, clipId, c.sourceIn + into, alone)
+    if (!own) return edge === 'start' ? setClipIn(p, clipId, sourceAt(c, frame), alone) : setClipOut(p, clipId, sourceAt(c, frame), alone)
     return own.blockers.length === 0 ? own.result : p
   }
   // Not when it would push a clip out of step: see closeUpBlockers, and tooShortFor.
@@ -421,8 +465,8 @@ function closingTrim(
   const ids = new Set(linkedIds(p, clipId))
   const trimmed = reshape(p, ids, (x) =>
     edge === 'start'
-      ? { ...x, sourceIn: Math.min(x.sourceIn + length, x.sourceOut - 1) }
-      : { ...x, sourceOut: Math.max(x.sourceOut - length, x.sourceIn + 1) }
+      ? { ...x, sourceIn: Math.min(x.sourceIn + toSource(x, length), x.sourceOut - 1) }
+      : { ...x, sourceOut: Math.max(x.sourceOut - toSource(x, length), x.sourceIn + 1) }
   )
   return { trimmed, at: edge === 'start' ? c.timelineStart : spanEnd(c) - length, length, ids, short: tooShortFor(p, ids, length) }
 }
@@ -467,8 +511,8 @@ function ownTracksTrim(
   const length = edge === 'start' ? into : spanLength(c) - into
   const trimmed = reshape(p, ids, (x) =>
     edge === 'start'
-      ? { ...x, sourceIn: Math.min(x.sourceIn + length, x.sourceOut - 1) }
-      : { ...x, sourceOut: Math.max(x.sourceOut - length, x.sourceIn + 1) }
+      ? { ...x, sourceIn: Math.min(x.sourceIn + toSource(x, length), x.sourceOut - 1) }
+      : { ...x, sourceOut: Math.max(x.sourceOut - toSource(x, length), x.sourceIn + 1) }
   )
   const at = edge === 'start' ? c.timelineStart : frame
   const tracks = new Set([...trimmed.videoTracks, ...trimmed.audioTracks].filter((r) => (r.clips as Span[]).some((x) => ids.has(x.id))).map((r) => r.id))

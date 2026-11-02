@@ -5,7 +5,7 @@
  */
 
 import { newId } from './ids'
-import { spanEnd, type Span } from './tracks'
+import { spanEnd, sourceAt, timelineAt, type Span } from './tracks'
 import {
   type TimedWord, groupWords, type Stretch, mergeStretches, captionsWithin, type CaptionClip, captionEnd,
   retimeCaption, splitCaption, editCaptionWords, type CaptionStyleChange, cleanCaptionStyle, type CaptionStyle,
@@ -74,8 +74,8 @@ export function stretchedTimeline(t: Timeline, stretches: readonly Stretch[]): T
         clips.push({
           ...rest,
           id: `${c.id}@${s.from}`,
-          sourceIn: c.sourceIn + (from - c.timelineStart),
-          sourceOut: c.sourceIn + (to - c.timelineStart),
+          sourceIn: sourceAt(c, from),
+          sourceOut: sourceAt(c, to),
           timelineStart: offset + (from - s.from)
         } as SoundClip)
       }
@@ -340,11 +340,11 @@ function clipAt<T extends Span>(lane: readonly T[], frame: number): T | undefine
 function anchorAt(audio: readonly SoundClip[][], video: readonly Clip[][], frame: number): Anchor | null {
   for (const lane of audio) {
     const c = clipAt(lane, frame)
-    if (c) return { clipId: c.id, kind: 'audio', mediaId: c.mediaId, stream: c.track, source: c.sourceIn + (frame - c.timelineStart) }
+    if (c) return { clipId: c.id, kind: 'audio', mediaId: c.mediaId, stream: c.track, source: sourceAt(c, frame) }
   }
   for (const lane of video) {
     const c = clipAt(lane, frame)
-    if (c) return { clipId: c.id, kind: 'video', mediaId: c.mediaId, stream: null, source: c.sourceIn + (frame - c.timelineStart) }
+    if (c) return { clipId: c.id, kind: 'video', mediaId: c.mediaId, stream: null, source: sourceAt(c, frame) }
   }
   return null
 }
@@ -374,7 +374,7 @@ function whereNow(after: AfterClips, a: Anchor, before: ReadonlyMap<string, Clip
   const was = (c: Clip | SoundClip): Clip | SoundClip | undefined => before.get(c.id)
   const clips: readonly (Clip | SoundClip)[] = a.kind === 'audio' ? after.audio : after.video
   const piece = same ?? clips.find((c) => heard(c) && !(was(c) && heard(was(c)!)))
-  return piece ? piece.timelineStart + (a.source - piece.sourceIn) : null
+  return piece ? timelineAt(piece, a.source) : null
 }
 
 /**

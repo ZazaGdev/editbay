@@ -372,7 +372,7 @@ describe('planRender, one file per clip', () => {
     const [one, two] = plan.segments
     // Its first stream from the recording itself, its third from the copy; the song and the picture on V2 left out.
     expect(inputs(one!.args)).toEqual(['C:\\v\\obs take.mp4', 'C:\\cache\\track-3.m4a'])
-    expect(graphOf(one!.args)).toContain('[0:v]fps=30:start_time=0,split=2[s0][s1]')
+    expect(graphOf(one!.args)).toContain('[0:v]fps=30:start_time=0,setparams=colorspace=bt709,split=2[s0][s1]')
     expect(soundOf(one!.args)).toBe(
       `${heardChain(0, 1, 's0', 0, 0, declicked(10))};${heardChain(1, 1, 's1', 0, 0, declicked(10))};[s0][s1]amix=inputs=2:duration=longest:normalize=0,apad,${FORMAT}[a]`
     )
@@ -515,7 +515,7 @@ describe('a clip with layers', () => {
     const graph = graphOf(planRender(request(t)).segments[0]!.args)
     // The frame rate once, before the split, so both pictures share frames, with
     // the first frame at the segment's start, as every picture has now.
-    expect(graph).toContain('[0:v]fps=30:start_time=0,split=2[s0][s1]')
+    expect(graph).toContain('[0:v]fps=30:start_time=0,setparams=colorspace=bt709,split=2[s0][s1]')
     const main = c.transform.crop
     const layer = c.layers[0]!.crop
     expect(graph).toContain(`[s0]crop=${main.w}:${main.h}:${main.x}:${main.y},scale=1080:960:`)
@@ -584,7 +584,7 @@ describe('a plain clip', () => {
     const c = v1Clips(t)[0]!.transform.crop
     const graph = graphOf(planRender(request(t)).segments[0]!.args)
     expect(graph.split(';')[0]).toBe(
-      `[0:v]fps=30:start_time=0,crop=${c.w}:${c.h}:${c.x}:${c.y},` +
+      `[0:v]fps=30:start_time=0,setparams=colorspace=bt709,crop=${c.w}:${c.h}:${c.x}:${c.y},` +
         'scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,' +
         'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1[vt]'
     )
@@ -605,7 +605,7 @@ describe('input 0 shared with the picture\'s own first stream', () => {
       '-ss', '0.000000', '-colorspace', 'bt709', '-advanced_editlist', '0',
       '-i', 'C:\\v\\a take.mp4',
       '-filter_complex',
-      `[0:v]fps=30:start_time=0,crop=${c.w}:${c.h}:${c.x}:${c.y},` +
+      `[0:v]fps=30:start_time=0,setparams=colorspace=bt709,crop=${c.w}:${c.h}:${c.x}:${c.y},` +
         'scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,' +
         'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1[vt];' +
         `${TAGGED};` +
@@ -630,7 +630,7 @@ describe('input 0 shared with the picture\'s own first stream', () => {
       '-i', 'C:\\v\\a take.mp4',
       '-f', 'lavfi', '-t', '10.000000', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
       '-filter_complex',
-      `[0:v]fps=30:start_time=0,crop=${c.w}:${c.h}:${c.x}:${c.y},` +
+      `[0:v]fps=30:start_time=0,setparams=colorspace=bt709,crop=${c.w}:${c.h}:${c.x}:${c.y},` +
         'scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,' +
         'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1[vt];' +
         TAGGED,
@@ -864,7 +864,7 @@ describe('the spans of the whole sequence', () => {
     expect(inputs(over.args)).toEqual(['C:\\v\\phone take.mp4', SILENCE])
     expect(seeks(over.args)).toEqual(['0.000000'])
     expect(graphOf(over.args)).toBe(
-      `[0:v]fps=30:start_time=0,${cropOf(picture(t, 'p1').transform.crop)},` +
+      `[0:v]fps=30:start_time=0,setparams=colorspace=bt709,${cropOf(picture(t, 'p1').transform.crop)},` +
         'scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,' +
         'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1[vt];' +
         TAGGED
@@ -883,7 +883,7 @@ describe('the spans of the whole sequence', () => {
     const box = placeInPixels(p.place, 1080, 1920)
     const plan = planRender(request(t))
     expect(graphOf(plan.segments[2]!.args)).toBe(
-      `[0:v]fps=30:start_time=0[s0];[s0]${cropOf(p.crop)},` +
+      `[0:v]fps=30:start_time=0,setparams=colorspace=bt709[s0];[s0]${cropOf(p.crop)},` +
         `scale=${box.w}:${box.h}:force_original_aspect_ratio=decrease:flags=lanczos,` +
         `pad=${box.w}:${box.h}:(ow-iw)/2:(oh-ih)/2:color=black,` +
         `pad=1080:1920:${box.x}:${box.y}:color=black,setsar=1,tpad=stop_mode=clone:stop=-1[vt];${TAGGED}`
@@ -957,8 +957,8 @@ describe('the order of a segment\'s inputs', () => {
       'C:\\v\\b take.mp4'
     ])
     const graph = graphOf(args)
-    expect(graph).toContain(`[4:v]fps=30:start_time=0,${cropOf(picture(t, 'p1').transform.crop)},`)
-    expect(graph).toContain(`[5:v]fps=30:start_time=0,${cropOf(picture(t, 'p2').transform.crop)},`)
+    expect(graph).toContain(`[4:v]fps=30:start_time=0,setparams=colorspace=bt709,${cropOf(picture(t, 'p1').transform.crop)},`)
+    expect(graph).toContain(`[5:v]fps=30:start_time=0,setparams=colorspace=bt709,${cropOf(picture(t, 'p2').transform.crop)},`)
     expect(graph).toContain(
       `${heardChain(1, 1, 's0', 0, 0, FADE_IN)};${heardChain(2, 1, 's1', 0, 0, FADE_IN)};${heardChain(3, 1, 's2', 0, 0, FADE_IN)};` +
         `[s0][s1][s2]amix=inputs=3:duration=longest:normalize=0,apad,${FORMAT}[a]`
@@ -989,7 +989,7 @@ describe('the order of a segment\'s inputs', () => {
       'pad=1080:960:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1'
     const graph = graphOf(args)
     expect(graph).toContain(
-      '[b];[1:v]fps=30:start_time=0,split=2[i0_0][i0_1];' +
+      '[b];[1:v]fps=30:start_time=0,setparams=colorspace=bt709,split=2[i0_0][i0_1];' +
         `[i0_0]${fitted(p.transform.crop)}[q0];[b][q0]overlay=x=0:y=0[u0];` +
         `[i0_1]${fitted(p.layers[0]!.crop)}[q1];[u0][q1]overlay=x=0:y=960[vt];`
     )
@@ -1341,6 +1341,12 @@ describe('transitions in the plan', () => {
     expect(split).toContain('scale=in_color_matrix=bt709:in_range=tv,format=gbrp,sendcmd=c=\'0.000000 rgbashift rh 0, rgbashift bh 0;')
     expect(split).toContain('0.483333 rgbashift rh -32, rgbashift bh 32;')
     expect(split).toContain("',rgbashift,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p")
+    // Blurred both ways on the mix, none on the first frame and the most half way (task 1092).
+    const blur = graphFor('blur')
+    expect(blur).toContain("xfade=transition=fade:duration=1.000000:offset=0,sendcmd=c='0.000000 gblur@tblurb sigma 0, gblur@tblurb sigmaV 0;")
+    expect(blur).toContain('0.483333 gblur@tblurb sigma 16.2, gblur@tblurb sigmaV 16.2;')
+    expect(blur).toContain("',gblur@tblurb=sigma=0")
+    expect(blur).not.toContain('hblur')
   })
 
   it('holds the first frame where a window reaches back past the start of the recording', () => {

@@ -1,4 +1,4 @@
-import { spanEnd, type Span } from './tracks'
+import { spanEnd, speedOf, type Span } from './tracks'
 
 /**
  * Transitions: a window over a seam, inside which both clips it touches are
@@ -100,7 +100,7 @@ export const PICTURE_KINDS: readonly PictureKind[] = [
   { id: 'box', name: 'Box', xfade: 'rectcrop', needsNeighbour: true },
   { id: 'zoomIn', name: 'Zoom in', xfade: 'zoomin', needsNeighbour: true },
   { id: 'zoomOut', name: 'Zoom out', xfade: 'fade', needsNeighbour: true },
-  { id: 'blur', name: 'Blur', xfade: 'hblur', needsNeighbour: true },
+  { id: 'blur', name: 'Blur', xfade: 'fade', needsNeighbour: true },
   { id: 'pixelate', name: 'Pixelate', xfade: 'pixelize', needsNeighbour: true },
   { id: 'rgbSplit', name: 'RGB split', xfade: 'fade', needsNeighbour: true },
   { id: 'spin', name: 'Spin', xfade: 'fade', needsNeighbour: true }
@@ -402,7 +402,9 @@ function made(
   }
   const outgoing = side === 'in' ? (partner?.id ?? null) : c.id
   const incoming = side === 'in' ? c.id : (partner?.id ?? null)
-  // A dip through a colour hands the picture over in the middle, and only when
+  // A dip through a colour hands the picture over on the cut, so it is darkest
+  // there however much of it falls before (task 1092); one that ends or starts
+  // at the cut, in the middle, so it still goes down and comes back. Only when
   // there are two pictures to hand over between.
   const dips = kinds === 'picture' && washColour(kind) !== null && outgoing !== null && incoming !== null
   return {
@@ -414,7 +416,7 @@ function made(
     to,
     fromClipId: outgoing,
     toClipId: incoming,
-    splitAt: dips ? from + Math.round((to - from) / 2) : null,
+    splitAt: dips ? (cut > from && cut < to ? cut : from + Math.round((to - from) / 2)) : null,
     stored
   }
 }
@@ -501,8 +503,8 @@ function middleOf(w: TransitionWindow): number {
 
 /**
  * The colour over a clip's picture at a frame, and how much of it, or null
- * where none is. Only for the clip actually being shown there: over a dip at a
- * cut, the outgoing clip up to the handover and the incoming one after it.
+ * where none is. The same over both clips of a dip at a cut, whichever of
+ * the two is drawn at that frame.
  */
 export function washOver(
   windows: readonly TransitionWindow[],
@@ -512,8 +514,10 @@ export function washOver(
   for (const w of windows) {
     const colour = washColour(w.kind)
     if (colour === null || frame < w.from || frame >= w.to) continue
-    const shown = w.splitAt !== null ? (frame < w.splitAt ? w.fromClipId : w.toClipId) : (w.fromClipId ?? w.toClipId)
-    if (shown !== clipId) continue
+    // Over either clip, not only the one handed to: where a dip hands over
+    // away from the cut both are on the player's screen there, and the one
+    // drawn on top must not show through bright (task 1092).
+    if (!windowHolds(w, clipId)) continue
     const alpha = washAt(w, frame)
     if (alpha > 0) return { colour, alpha }
   }
@@ -598,6 +602,19 @@ export function rgbSplitAt(q: number, width: number): number {
   return Math.round(0.03 * width * (1 - Math.abs(2 * Math.min(1, Math.max(0, q)) - 1)))
 }
 
+/** How blurred a blur transition is at its middle, as a share of the frame's width. */
+export const BLUR_PEAK = 0.015
+
+/**
+ * How blurred both pictures are through a blur transition, as the deviation
+ * of a gaussian in whole pixels of a frame `width` wide: none at either end,
+ * the most at the middle, rising and falling smoothly. The same both ways, so
+ * it softens the picture rather than smearing it sideways (task 1092).
+ */
+export function blurAt(q: number, width: number): number {
+  return Math.round(BLUR_PEAK * width * Math.sin(Math.PI * Math.min(1, Math.max(0, q))) * 10) / 10
+}
+
 /** Two pictures of one track being mixed at a frame, and how far through it is. */
 export interface Blending {
   /** The clip the window starts on, drawn underneath. */
@@ -663,9 +680,11 @@ export function fadeGainAt(windows: readonly TransitionWindow[], clipId: string,
  * marks with diagonal bars and fills with the last frame it has.
  */
 export function heldFrames(clip: Transitioned, shown: Shown, sourceFrames: number): { head: number; tail: number } {
+  // The footage either side, as frames of the timeline at the clip's speed (plan 105).
+  const s = speedOf(clip)
   return {
-    head: Math.max(0, clip.timelineStart - shown.from - clip.sourceIn),
-    tail: Math.max(0, shown.to - spanEnd(clip) - Math.max(0, sourceFrames - clip.sourceOut))
+    head: Math.max(0, clip.timelineStart - shown.from - Math.floor(clip.sourceIn / s + 1e-9)),
+    tail: Math.max(0, shown.to - spanEnd(clip) - Math.floor(Math.max(0, sourceFrames - clip.sourceOut) / s + 1e-9))
   }
 }
 

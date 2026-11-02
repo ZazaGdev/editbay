@@ -21,6 +21,7 @@ import type { TextStyle } from '../../shared/text'
 
 import { Folds, Group, dim, mono, row, small, heading, type Edit, type InspectorFolds, type Painting } from './inspector-parts'
 import { Level, SoundSection } from './InspectorSound'
+import { SpeedSection } from './InspectorSpeed'
 import { CaptionPanel } from './InspectorCaptions'
 import { PicturePanel } from './InspectorPicture'
 import { Sections } from './section-host'
@@ -304,6 +305,8 @@ function InspectorBody(props: InspectorProps): JSX.Element | null {
           quieter.
         </p>
       )}
+      {/* A picture or a title is one frame, with no speed to play at (plan 105). */}
+      {media && !isStill(media) && !found.clip.group && <SpeedSection timeline={t} clip={found.clip} onEdit={props.onEdit} />}
       <Group name="Linked" when={group.length > 1}>
         <div style={{ ...row, alignItems: 'center' }}>
           <span data-testid="linked-count" data-count={group.length} style={dim}>

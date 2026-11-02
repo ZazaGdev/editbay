@@ -22,6 +22,7 @@ export const SECTION_NAMES: readonly string[] = [
   'Blur',
   'Tools',
   'Sound',
+  'Speed',
   'Linked',
   'Source',
   'Caption',

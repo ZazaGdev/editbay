@@ -25,7 +25,7 @@ Every kind of transition there is, and how to pick one.
 - **Iris** and **Box**: the picture closes to black in a circle or a box, and opens on the next.
 - **Zoom in**: into the middle of the picture going, then the next fades in.
 - **Zoom out**: the next picture fades in enlarged and pulls back to its own size.
-- **Blur**: both pictures blurred sideways through the cut.
+- **Blur**: both pictures softly blurred, most at the cut, while one dissolves into the other.
 - **Pixelate**: both pictures break into squares, largest at the cut, while one turns into the
   other.
 - **RGB split**: red and blue pull apart through the cut, a glitch look, while one turns into

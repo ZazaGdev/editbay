@@ -1,5 +1,86 @@
 # Changelog
 
+## 2.0
+
+Editbay on a Mac, clip speed, a Portrait picture in picture, a tidier Inspector, and a long
+list of fixes to the timeline, the preview and the export.
+
+### Changed
+
+- **Projects saved by 2.0 open only in 2.0 and later.** They are written as a newer kind of
+  file, because a clip can now have a speed. Editbay 1.0 to 1.2 say such a file needs a newer
+  app rather than opening it out of step. 2.0 opens every project the older versions saved.
+- The Inspector's sections each sit on a card with the heading on a darker band, and Zoom is
+  split into Framing, One-click zooms and Face, each named with what it is for.
+- The sections to the right of the timeline fold down to a thin bar under the Inspector, which
+  takes their height, and the bar opens them again.
+- The font lists offer the 30 fonts Editbay brings with it and the common ones on the computer,
+  rather than every font installed.
+- The preview plays its sound through the browser's own audio engine, at normal speed and
+  seamless across cuts.
+- The export folder's button is **Choose...**, which picks the folder to export into. Opening the
+  folder moves to a small icon beside it.
+- Short notices, such as "Saved <file>.editbay", show at the top in the middle, under the top
+  bar, rather than low on the right over the Inspector.
+
+### Added
+
+- **Mac versions**, one for Apple Silicon and one for Intel, built and tested on GitHub's Macs.
+  They are not signed by Apple; the README's **Mac** section says how to open them. Shortcuts
+  use Cmd, the menu bar has the app's menus, and speech and face follow work on both chips.
+- **Clip speed**, in the Inspector, the preview and the export: a time-lapse up to 16x and slow
+  motion down to 0.1x. The sound stays from 0.5x to 2x, keeping its pitch, and is silent beyond
+  that. Captions made for a clip at a speed hear all of its recording.
+- **Portrait**, a tall 9 by 16 card like a phone, with corners that grow with it and a thin light
+  edge, as a picture in picture shape beside Square, Rounded and Circle, in the Inspector and
+  the toolbar. It exports as previewed.
+- **Remove background from the command search.** The pointer becomes a picker, and the clip or
+  asset clicked next is the one it acts on; Enter takes the selected clip, and Esc or a right
+  click cancels. Make captions for a clip and Show where a clip came from work the same way.
+- A sound clip can play one side of its track on both sides, for a voice recorded on the left
+  only, in the preview and the export.
+- A layer can have a look of its own, over its clip's.
+- The command line's edit lists can lay layers, pictures and overlay clips over the cut, end
+  the cut with a dip to black (`endDipToBlackSec`), set how long a smooth zoom pushes in
+  (`easeSec`), show both halves of a side-by-side recording as the Split layout does, lay sound
+  effects and songs with volume and fades, raise or lower a reel's own sound over a stretch,
+  play one channel on both sides (`soundChannel`), and grade one camera's pictures. See
+  `docs/edit-list.md`.
+
+### Fixed
+
+- A speed on a shot whose sound leads in or runs on keeps the sound in step at both ends, or is
+  refused, naming the clip in the way.
+- A slowed clip whose start falls part way into a frame opens the export on the frame the
+  preview shows, and stays with its sound.
+- A gap closes, and a clip taken out closes up, when sped-up clips further on already overlap by
+  a frame: they move up together rather than drifting out of step with the music under them.
+- Ctrl+drag of a shot whose sound leads in or runs on moves only its picture's stretch, so no
+  black is left, and names what is in the way.
+- Remove silences cuts every track it listened to at each pause, linked to V1 or not, so a
+  separately recorded voice stays in step with the pictures.
+- A locked track refuses every edit to its clips, a fade, a volume, a link, a group or a look,
+  not only a move in time.
+- A dip to black is darkest on the cut, and the blur transition blurs both ways instead of
+  smearing sideways.
+- A recording whose file names BT.709 colours but no matrix keeps its colours in the export.
+- Ctrl+wheel zoom keeps the moment under the pointer on a long cut, also while playing and after
+  reaching either end.
+- Resizing the crop box keeps up with the pointer on a clip whose zoom has keyframes.
+- Export progress never moves backwards.
+- A key that moves the playhead just after an edit is no longer undone by the preview catching
+  up.
+- The Export dialog shows the mode and names from Settings from the start, rather than the
+  project's own for a moment.
+- A menu taller than the window stays inside it and scrolls, and a dropdown no longer closes as
+  it opens just after a scroll.
+- A file in a folder reached through a link shows as imported.
+- Long, grouped timelines stay smooth: playback redraws only the playhead, and an edit settles
+  groups in a few milliseconds even on an hour of footage.
+- A project built by the command line plays its recordings from their own files, so a large OBS
+  recording shows its picture on first open instead of staying black while it is imported
+  again.
+
 ## 1.2
 
 Cropping that only crops, and fixes to J-cuts and L-cuts on the timeline.

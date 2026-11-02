@@ -226,6 +226,9 @@ export function ExportDialog(props: {
     await run.start(r)
   }
 
+  // The picker starts at the folder shown, and the folder chosen is the one the export writes into.
+  const pickFolder = (): void => void window.api.pickExportFolder(folder ?? undefined).then((f) => f && props.onFolder(f))
+
   const exportClicked = async (): Promise<void> => {
     const r = request()
     if (!r || checking) return
@@ -479,7 +482,7 @@ export function ExportDialog(props: {
           <Button
             testid="export-folder"
             icon="open"
-            onClick={() => void window.api.pickExportFolder(folder ?? undefined).then((f) => f && props.onFolder(f))}
+            onClick={pickFolder}
             disabled={run.running}
             whyDisabled="An export is running"
             title={folder ?? 'Choose a folder'}
@@ -487,13 +490,17 @@ export function ExportDialog(props: {
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{folder ?? 'Choose a folder...'}</span>
           </Button>
+          <Button testid="export-folder-choose" onClick={pickFolder} disabled={run.running} whyDisabled="An export is running">
+            Choose...
+          </Button>
           <Button
+            testid="export-folder-show"
+            icon="open"
             onClick={() => folder && void window.api.revealPath(folder)}
             disabled={!folder}
             whyDisabled="Choose a folder first"
-          >
-            Open
-          </Button>
+            title="Show the folder"
+          />
         </div>
       </div>
 

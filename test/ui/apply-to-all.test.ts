@@ -58,7 +58,7 @@ async function selectText(mediaId: string): Promise<void> {
 
 async function setNumber(testid: string, value: string): Promise<void> {
   await page.click(`[data-testid="${testid}"]`)
-  await page.keyboard.press('Control+a')
+  await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type(value)
   await page.keyboard.press('Tab')
 }
@@ -79,7 +79,7 @@ beforeAll(async () => {
   page = await app.firstWindow()
   await page.waitForSelector('main')
   await discardUnsavedWork(app)
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   // Two texts in the first sequence, one after the other, and a third in a sequence of its own.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.keyboard.press('t')
@@ -150,7 +150,7 @@ describe('Apply to all texts', () => {
 
   it('takes the whole of it back in one undo', async () => {
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await texts())[1]!.style.italic, WAIT).toBe(true)
     const back = await texts()
     expect(back[1]!.style.size).not.toBe(140)

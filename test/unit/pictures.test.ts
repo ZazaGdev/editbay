@@ -233,7 +233,7 @@ describe('the export of pictures on video tracks', () => {
     const p = picture(t, 'p1').transform
     // Input 1 is a's sound, running on from the segment before; the picture is input 2.
     expect(graph).toContain(
-      `[2:v]fps=30:start_time=0,crop=${p.crop.w}:${p.crop.h}:${p.crop.x}:${p.crop.y},` +
+      `[2:v]fps=30:start_time=0,setparams=colorspace=bt709,crop=${p.crop.w}:${p.crop.h}:${p.crop.x}:${p.crop.y},` +
         'scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,' +
         'setsar=1,tpad=stop_mode=clone:stop=-1[q0];[b][q0]overlay=x=0:y=0[vt]'
     )
@@ -269,7 +269,7 @@ describe('the export of pictures on video tracks', () => {
     expect(inputs(last)).toEqual(['C:\\v\\phone.mp4', 'anullsrc=channel_layout=stereo:sample_rate=48000'])
     // 30 frames of the picture were over b, so this part starts a second in.
     expect(last[last.indexOf('-ss') + 1]).toBe('1.000000')
-    expect(graphOf(last)).toMatch(/^\[0:v\]fps=30:start_time=0,crop=.*,pad=1080:1920:\(ow-iw\)\/2:\(oh-ih\)\/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1\[vt\];\[vt\]setparams=color_primaries=bt709:color_trc=bt709\[v\]$/)
+    expect(graphOf(last)).toMatch(/^\[0:v\]fps=30:start_time=0,setparams=colorspace=bt709,crop=.*,pad=1080:1920:\(ow-iw\)\/2:\(oh-ih\)\/2:color=black,setsar=1,tpad=stop_mode=clone:stop=-1\[vt\];\[vt\]setparams=color_primaries=bt709:color_trc=bt709\[v\]$/)
     expect(plan.segments[3]!.label).toBe('phone')
   })
 

@@ -17,6 +17,13 @@ export interface Span {
   timelineStart: number
   /** Shared by the clips that came onto the timeline together. */
   link?: string
+  /**
+   * How many frames of the recording one frame of the timeline plays (plan
+   * 105): 4 a time-lapse, 0.5 slow motion. Absent for 1. `sourceIn` and
+   * `sourceOut` stay frames of the recording; the clip's length on the
+   * timeline is what `spanLength` makes of them at this speed.
+   */
+  speed?: number
 }
 
 /** A track of clips, by id. */
@@ -80,20 +87,28 @@ export function lockedTrackChanged(
   return null
 }
 
-/** Whether two lists of clips are the same clips, in the same places. */
+/**
+ * Whether two lists of clips are the same clips, the same in every way. Only
+ * their place in time was compared, so a fade, a volume, a link taken off or
+ * put on, a group, a crop or a look went through on a locked track (audit
+ * 2026-10-19); taking its link off let the next move leave it behind, the one
+ * thing a lock is for.
+ */
 function sameClips(a: readonly Span[], b: readonly Span[]): boolean {
-  if (a.length !== b.length) return false
-  return a.every((c, i) => {
-    const other = b[i]
-    return (
-      other !== undefined &&
-      other.id === c.id &&
-      other.mediaId === c.mediaId &&
-      other.sourceIn === c.sourceIn &&
-      other.sourceOut === c.sourceOut &&
-      other.timelineStart === c.timelineStart
-    )
-  })
+  return a.length === b.length && a.every((c, i) => sameValue(c, b[i]))
+}
+
+/** Whether two values hold the same, whatever order their fields were written in; a field left undefined is one that is not there. */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  if (Array.isArray(a)) return a.length === (b as unknown[]).length && a.every((x, i) => sameValue(x, (b as unknown[])[i]))
+  const x = a as Record<string, unknown>
+  const y = b as Record<string, unknown>
+  const keys = new Set([...Object.keys(x), ...Object.keys(y)])
+  for (const k of keys) if (!sameValue(x[k], y[k])) return false
+  return true
 }
 
 /** Whether a track is silent, whatever its clips say. */
@@ -124,8 +139,43 @@ export function cleanTrackName(raw: unknown): string | undefined {
 export const MAX_VIDEO_TRACKS = 8
 export const MAX_AUDIO_TRACKS = 16
 
+/** A clip's speed: 1 when it has none of its own. */
+export function speedOf(c: { speed?: number }): number {
+  return c.speed ?? 1
+}
+
+/**
+ * A length of the timeline, in frames, as frames of the clip's recording at
+ * its speed. Not rounded: at 0.5x one frame of the timeline is half a frame
+ * of the recording, and a clip at a speed of its own keeps its ends wherever
+ * its frames of the timeline put them, so a split or a trim lands exactly
+ * where it was asked to and the pieces still add up.
+ */
+export function toSource(c: { speed?: number }, frames: number): number {
+  const s = speedOf(c)
+  return s === 1 ? frames : frames * s
+}
+
+/** A length of the clip's recording, in frames, as frames of the timeline at its speed. */
+export function toTimeline(c: { speed?: number }, frames: number): number {
+  const s = speedOf(c)
+  return s === 1 ? frames : Math.round(frames / s)
+}
+
+/** The frame of its recording a clip shows on `frame` of the timeline, part way between two at a speed of its own. */
+export function sourceAt(c: Span, frame: number): number {
+  return c.sourceIn + toSource(c, frame - c.timelineStart)
+}
+
+/** The frame of the timeline a clip shows `sourceFrame` of its recording on. */
+export function timelineAt(c: Span, sourceFrame: number): number {
+  return c.timelineStart + toTimeline(c, sourceFrame - c.sourceIn)
+}
+
+/** How many frames of the timeline a clip covers: its recording's frames at its speed, never less than one. */
 export function spanLength(c: Span): number {
-  return c.sourceOut - c.sourceIn
+  const s = speedOf(c)
+  return s === 1 ? c.sourceOut - c.sourceIn : Math.max(1, Math.round((c.sourceOut - c.sourceIn) / s))
 }
 
 export function spanEnd(c: Span): number {
@@ -166,8 +216,8 @@ export function placeCovering<T extends Span>(clips: T[], clip: T, newId: () => 
       out.push(c)
       continue
     }
-    const head = cStart < start ? { ...c, sourceOut: c.sourceIn + (start - cStart) } : null
-    const tail = cEnd > end ? { ...c, id: head ? newId() : c.id, sourceIn: c.sourceIn + (end - cStart), timelineStart: end } : null
+    const head = cStart < start ? { ...c, sourceOut: sourceAt(c, start) } : null
+    const tail = cEnd > end ? { ...c, id: head ? newId() : c.id, sourceIn: sourceAt(c, end), timelineStart: end } : null
     if (head && tail) out.push(...pair(head, tail))
     else if (head) out.push(head)
     else if (tail) out.push(tail)
@@ -184,7 +234,7 @@ export function placeCovering<T extends Span>(clips: T[], clip: T, newId: () => 
 export function headLimit(clips: Span[], clip: Span): number {
   const before = clips.filter((c) => c.id !== clip.id && spanEnd(c) <= clip.timelineStart)
   const neighbour = before.length > 0 ? Math.max(...before.map(spanEnd)) : 0
-  return Math.max(neighbour, clip.timelineStart - clip.sourceIn)
+  return Math.max(neighbour, clip.timelineStart - toTimeline(clip, clip.sourceIn))
 }
 
 /**
@@ -194,20 +244,38 @@ export function headLimit(clips: Span[], clip: Span): number {
 export function tailLimit(clips: Span[], clip: Span, mediaFrames: number): number {
   const after = clips.filter((c) => c.id !== clip.id && c.timelineStart >= spanEnd(clip))
   const neighbour = after.length > 0 ? Math.min(...after.map((c) => c.timelineStart)) : Infinity
-  return Math.min(neighbour, clip.timelineStart + (mediaFrames - clip.sourceIn))
+  return Math.min(neighbour, clip.timelineStart + toTimeline(clip, mediaFrames - clip.sourceIn))
 }
 
 /**
  * A track's clips in time order, with any that would overlap the one before
  * moved right to start where it ends. Only a start moves; a length never does.
+ * `kept` names, by clip, an overlap with the clip before it that is let stand:
+ * one the track already had, as a sped up clip a frame longer than the room it
+ * was laid in, which every clip after it would otherwise be pushed along by.
  */
-export function settleTrack<T extends Span>(clips: T[]): T[] {
+export function settleTrack<T extends Span>(clips: T[], kept: ReadonlyMap<string, { after: string; frames: number }> = new Map()): T[] {
   let end = 0
+  let last: string | null = null
   return byStart(clips).map((c) => {
-    const next = c.timelineStart < end ? { ...c, timelineStart: end } : c
+    const overlap = kept.get(c.id)
+    const from = overlap && overlap.after === last ? end - overlap.frames : end
+    const next = c.timelineStart < from ? { ...c, timelineStart: from } : c
     end = spanEnd(next)
+    last = c.id
     return next
   })
+}
+
+/** Each clip on a track that overlaps the one before it, by how much: the overlaps `settleTrack` is to leave as they are. */
+export function overlapsOn(clips: Span[]): Map<string, { after: string; frames: number }> {
+  const out = new Map<string, { after: string; frames: number }>()
+  const sorted = byStart(clips)
+  for (let i = 1; i < sorted.length; i++) {
+    const frames = spanEnd(sorted[i - 1]!) - sorted[i]!.timelineStart
+    if (frames > 0) out.set(sorted[i]!.id, { after: sorted[i - 1]!.id, frames })
+  }
+  return out
 }
 
 /**
@@ -251,11 +319,15 @@ export function closeUpStarts(clips: Span[], at: number, length: number, leave: 
   return out
 }
 
-/** A track with each clip moved to where `starts` says, then settled so that none overlaps. */
-export function withStarts<T extends Span>(track: TrackOf<T>, starts: ReadonlyMap<string, number>): TrackOf<T> {
+/** A track with each clip moved to where `starts` says, then settled so that none overlaps, but for the overlaps `kept` lets stand. */
+export function withStarts<T extends Span>(
+  track: TrackOf<T>,
+  starts: ReadonlyMap<string, number>,
+  kept: ReadonlyMap<string, { after: string; frames: number }> = new Map()
+): TrackOf<T> {
   return {
     ...track,
-    clips: settleTrack(track.clips.map((c) => ({ ...c, timelineStart: Math.max(0, starts.get(c.id) ?? c.timelineStart) })))
+    clips: settleTrack(track.clips.map((c) => ({ ...c, timelineStart: Math.max(0, starts.get(c.id) ?? c.timelineStart) })), kept)
   }
 }
 
@@ -450,6 +522,8 @@ export function snapTrim(t: {
   outAt: number
   targets: number[]
   within: number
+  /** The clip's speed (plan 105). Absent for 1. */
+  speed?: number
 }): number {
   return snapTrimTo(t).frame
 }
@@ -464,10 +538,13 @@ export function snapTrimTo(t: {
   outAt: number
   targets: number[]
   within: number
+  speed?: number
 }): Snapped {
-  const onScreen = t.closesUp && t.edge === 'start' ? t.startAt + (t.outAt - t.frame) : t.startAt + (t.frame - t.inAt)
+  // Frames of the recording as frames of the timeline, at the clip's speed (plan 105).
+  const s = t.speed ?? 1
+  const onScreen = Math.round(t.closesUp && t.edge === 'start' ? t.startAt + (t.outAt - t.frame) / s : t.startAt + (t.frame - t.inAt) / s)
   const shift = nearestShift(onScreen, t.targets, t.within)
   if (shift === null) return { frame: t.frame, caught: null }
   // A head trim that closes up moves the clip's end the other way from its first frame.
-  return { frame: t.closesUp && t.edge === 'start' ? t.frame - shift : t.frame + shift, caught: onScreen + shift }
+  return { frame: t.closesUp && t.edge === 'start' ? t.frame - shift * s : t.frame + shift * s, caught: onScreen + shift }
 }

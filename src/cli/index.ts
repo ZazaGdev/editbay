@@ -3,7 +3,10 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import path, { basename, dirname, extname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
-import { EditListError, buildFromEditList, cutsReport, readEditList, reelsOf, type EditList, type EditSource, type SourceFacts } from '../shared/edit-list'
+import { EditListError, buildFromEditList, cutsReport, readEditList, reelsOf, type EditList, type EditListV1, type EditReel, type SourceFacts } from '../shared/edit-list'
+import { LAYER_TRACK } from '../shared/edit-list-layers'
+import { MUSIC_TRACK, SOUND_TRACK } from '../shared/edit-list-sounds'
+import { spanEnd } from '../shared/tracks'
 import { joinProjectFile } from '../shared/project-file'
 import { defaultWorkspace } from '../shared/workspace'
 import { A1_ID, addSource, createTimeline, timelineOf, upsertTimelineMedia, v1Clips, type ProjectMedia, type Timeline } from '../shared/project'
@@ -13,7 +16,7 @@ import { peaksKey } from '../shared/sound'
 import { loudnessEnvelope, matchBySound, refineMatch } from '../shared/sync-by-sound'
 import { isProjectPath } from '../shared/project-ext'
 import type { PeaksData } from '../shared/types'
-import { probeAny, type ProbeResult, type SoundProbe } from '../main/media/probe'
+import { conformReasons, isStillPath, probeAny, soundPlaysAsItIs, type ProbeResult, type SoundProbe } from '../main/media/probe'
 import { detectVfr } from '../main/media/vfr'
 import { targetFrameRate } from '../main/media/conform'
 import { decodePeaks, extractPeaks } from '../main/media/waveform'
@@ -126,11 +129,28 @@ async function probe(file: string): Promise<Probed> {
   return { kind: 'video', probe: found.probe, variableFrameRate: await detectVfr(file, v.nominalFps, v.averageFps) }
 }
 
+/**
+ * What a project needs to know about a picture: its size upright, as the app's
+ * import makes it, so a phone photo turned by its EXIF keeps its shape.
+ */
+async function pictureFacts(file: string): Promise<SourceFacts> {
+  let found: Awaited<ReturnType<typeof probeAny>>
+  try {
+    found = await probeAny(file)
+  } catch (err) {
+    throw new Refusal(`${file} could not be read as a picture: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  if (found.kind !== 'video') throw new Refusal(`${file} has no picture in it`)
+  const v = found.probe.video
+  const turned = Math.abs(v.rotationDeg) % 180 === 90
+  return { durationSec: 0, width: turned ? v.height : v.width, height: turned ? v.width : v.height, fps: 0, codec: v.codec, hasAudio: false, hasVideo: true, audioTracks: 0, still: true }
+}
+
 /** What a project needs to know about a source, from its probe. */
 function factsOf(p: Probed): SourceFacts {
   if (p.kind === 'sound') {
     // Only a sound file's first track plays, so the app records it as having one, and so does this.
-    return { durationSec: p.probe.durationSec, width: 0, height: 0, fps: 0, codec: p.probe.audio.codec, hasAudio: true, hasVideo: false, audioTracks: 1 }
+    return { durationSec: p.probe.durationSec, width: 0, height: 0, fps: 0, codec: p.probe.audio.codec, hasAudio: true, hasVideo: false, audioTracks: 1, playsAsItIs: soundPlaysAsItIs(p.probe) }
   }
   const r = p.probe
   return {
@@ -141,7 +161,8 @@ function factsOf(p: Probed): SourceFacts {
     codec: r.video.codec,
     hasAudio: r.audio !== null,
     hasVideo: true,
-    audioTracks: r.audioTracks
+    audioTracks: r.audioTracks,
+    playsAsItIs: conformReasons(r, p.variableFrameRate).length === 0
   }
 }
 
@@ -324,7 +345,8 @@ async function framesCommand(argv: string[]): Promise<unknown> {
 
 /** Where Editbay keeps the speech engine it downloaded, which `transcribe` uses rather than downloading its own. */
 function speechFolder(): string {
-  const appData = process.env.APPDATA
+  // A Mac keeps app data in the home folder's Application Support (plan 104).
+  const appData = process.platform === 'darwin' && process.env.HOME ? join(process.env.HOME, 'Library', 'Application Support') : process.env.APPDATA
   if (!appData) throw new Refusal('APPDATA is not set, so the speech engine Editbay downloaded cannot be found')
   return join(appData, 'editbay', 'speech')
 }
@@ -476,9 +498,15 @@ async function buildCommand(argv: string[]): Promise<unknown> {
     throw err
   }
   // A source's path is taken from the list's own folder when it is not a whole path.
-  const whole = (sources: EditSource[]): EditSource[] => sources.map((s) => ({ ...s, path: resolve(dirname(listPath!), s.path) }))
-  const resolved: EditList =
-    list.version === 1 ? { ...list, sources: whole(list.sources) } : { ...list, reels: list.reels.map((r) => ({ ...r, sources: whole(r.sources) })) }
+  const whole = <T extends { path: string }>(files: T[]): T[] => files.map((s) => ({ ...s, path: resolve(dirname(listPath!), s.path) }))
+  const wholeReel = <R extends EditReel | EditListV1>(r: R): R => ({
+    ...r,
+    sources: whole(r.sources),
+    ...(r.layers ? { layers: whole(r.layers) } : {}),
+    ...(r.sounds ? { sounds: whole(r.sounds) } : {})
+  })
+  const withMusic = <L extends EditList>(l: L): L => (l.music ? { ...l, music: whole(l.music) } : l)
+  const resolved: EditList = withMusic(list.version === 1 ? wholeReel(list) : { ...list, reels: list.reels.map(wholeReel) })
   // Each file probed once, however many reels or roles it has.
   const facts = new Map<string, SourceFacts>()
   for (const [r, reel] of reelsOf(resolved).entries()) {
@@ -487,6 +515,21 @@ async function buildCommand(argv: string[]): Promise<unknown> {
       if (!existsSync(s.path)) throw new Refusal(`${resolved.version === 1 ? '' : `reels[${r}].`}sources[${i}].path: ${s.path} does not exist`)
       facts.set(s.path, factsOf(await probe(s.path)))
     }
+    for (const [i, l] of (reel.layers ?? []).entries()) {
+      if (facts.has(l.path)) continue
+      if (!existsSync(l.path)) throw new Refusal(`${resolved.version === 1 ? '' : `reels[${r}].`}layers[${i}].path: ${l.path} does not exist`)
+      facts.set(l.path, isStillPath(l.path) ? await pictureFacts(l.path) : factsOf(await probe(l.path)))
+    }
+    for (const [i, s] of (reel.sounds ?? []).entries()) {
+      if (facts.has(s.path)) continue
+      if (!existsSync(s.path)) throw new Refusal(`${resolved.version === 1 ? '' : `reels[${r}].`}sounds[${i}].path: ${s.path} does not exist`)
+      facts.set(s.path, factsOf(await probe(s.path)))
+    }
+  }
+  for (const [i, s] of (resolved.music ?? []).entries()) {
+    if (facts.has(s.path)) continue
+    if (!existsSync(s.path)) throw new Refusal(`music[${i}].path: ${s.path} does not exist`)
+    facts.set(s.path, factsOf(await probe(s.path)))
   }
 
   let built
@@ -504,7 +547,7 @@ async function buildCommand(argv: string[]): Promise<unknown> {
   const t = timelineOf(project, project.sequences[0]!.id)
   const fps = project.fps
   const pieces = v1Clips(t)
-  const end = pieces.reduce((n, c) => Math.max(n, c.timelineStart + c.sourceOut - c.sourceIn), 0)
+  const end = pieces.reduce((n, c) => Math.max(n, spanEnd(c)), 0)
   const reelOf = (frame: number): number => built.reels.findIndex((r) => frame >= r.startFrame && frame < r.endFrame)
   return {
     project: out,
@@ -516,8 +559,18 @@ async function buildCommand(argv: string[]): Promise<unknown> {
     pieces: pieces.map((c) => ({ reel: reelOf(c.timelineStart), fromSec: sec(c.sourceIn / fps), toSec: sec(c.sourceOut / fps), atSec: sec(c.timelineStart / fps) })),
     // Every stretch taken out, `fromSec` and `toSec` on the reel's main recording's clock, with its words.
     cuts: cutsReport(resolved),
-    corner: t.videoTracks.length > 1,
+    corner: t.videoTracks.some((r) => r.id !== t.videoTracks[0]!.id && !r.id.startsWith(LAYER_TRACK)),
     zooms: reelsOf(resolved).reduce((n, r) => n + r.zooms.length, 0),
+    // Each picture and overlay clip laid, where it is in the cut.
+    layers: t.videoTracks
+      .filter((r) => r.id.startsWith(LAYER_TRACK))
+      .flatMap((r) => r.clips.map((c) => ({ path: project.media.find((m) => m.id === c.mediaId)?.originalPath, atSec: sec(c.timelineStart / fps), toSec: sec(spanEnd(c) / fps) })))
+      .sort((a, b) => a.atSec - b.atSec),
+    // Each sound effect and song laid, where it is in the cut, and how loud.
+    sounds: t.audioTracks
+      .filter((r) => r.id.startsWith(SOUND_TRACK) || r.id.startsWith(MUSIC_TRACK))
+      .flatMap((r) => r.clips.map((c) => ({ path: project.media.find((m) => m.id === c.mediaId)?.originalPath, atSec: sec(c.timelineStart / fps), toSec: sec(spanEnd(c) / fps), gainDb: sec(20 * Math.log10(c.gain)) })))
+      .sort((a, b) => a.atSec - b.atSec),
     markers: t.markers.map((m) => ({ atSec: sec(m.frame / fps), name: m.name }))
   }
 }
@@ -528,7 +581,12 @@ async function openCommand(argv: string[]): Promise<unknown> {
   if (!isProjectPath(project!)) throw new Refusal(`${project} is not an Editbay project`, 2)
   // Beside this tool, which is built into out/cli of the repository.
   const flag = args.flags.get('app')
-  const app = flag !== undefined ? given(flag) : join(__dirname, '..', '..', 'release', 'win-unpacked', 'Editbay.exe')
+  const release = join(__dirname, '..', '..', 'release')
+  const built =
+    process.platform === 'darwin'
+      ? join(release, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app', 'Contents', 'MacOS', 'Editbay')
+      : join(release, 'win-unpacked', 'Editbay.exe')
+  const app = flag !== undefined ? given(flag) : built
   if (!existsSync(app)) throw new Refusal(`Editbay is not at ${app}: build it with npm run dist:dir, or give --app <Editbay.exe>`)
   const child = spawn(app, [project!], { detached: true, stdio: 'ignore', windowsHide: false })
   await new Promise<void>((done, fail) => {

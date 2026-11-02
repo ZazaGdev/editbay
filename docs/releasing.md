@@ -80,6 +80,30 @@ words the scan should look for, such as a workplace name, go one per line in
 
 Create the release on the public repo, not this one, and attach the installer there.
 
+## The Mac versions
+
+Nobody working on Editbay has a Mac, so the Mac versions are built and tested on GitHub's Macs
+by `.github/workflows/mac.yml` (plan 104). They run free only on the public repo: this one has
+no Mac minutes to spare, and GitHub refuses the job once the month's free minutes are gone.
+
+After publishing the source and pushing it, start **Mac** on the public repo's Actions page
+(both chips), or `gh workflow run mac.yml --repo ZazaGdev/editbay --field chips=both`. Each
+chip's job runs the type check, the unit and e2e tests, builds the speech program, builds the
+`.dmg`, checks every program in it is signed, runs the packaged test against the app and
+takes a picture of its window. When both are green:
+
+- download the two files from the run (`Editbay-<version>-arm64` and `Editbay-<version>-intel`)
+  and look at each screenshot
+- attach both `.dmg` files to the release, and put each one's SHA-256 (the `.sha256` beside it)
+  in the notes, with the "how to open it" steps from the README's **Mac** section
+- change the version in the workflow's two names and in `electron-builder.yml`'s
+  `mac.artifactName` with the version, as for the Windows installer
+
+While Mac work is being built, tries go to a `mac-dev` branch of the public repo instead, which
+starts the workflow on every push: check that branch out in the public clone before running
+`publish-public.mjs`, and push it with `git push origin HEAD:mac-dev`. Its `main` moves only at a
+release.
+
 **First time only:** create the public repo on GitHub, clone it to a folder of its own (or
 `git init` an empty folder and add the remote), run the step, and push.
 

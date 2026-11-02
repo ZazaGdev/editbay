@@ -4,6 +4,7 @@ import { drawCaption, drawOnto, drawOutput, drawPlan, mixFor, type DrawnClip, ty
 import { addClip, createTimeline, setCaptions, v1Clips, type ProjectMedia, type Timeline } from '../../../src/shared/project'
 import { layoutCaption } from '../../../src/shared/captions'
 import { FULL_PLACE } from '../../../src/shared/layout'
+import { blurAt } from '../../../src/shared/transitions'
 
 function media(id: string): ProjectMedia {
   return {
@@ -369,14 +370,15 @@ describe('the two sides of a blend', () => {
     expect(mixFor('zoomIn', 1, frame).into.alpha).toBe(1)
   })
 
-  it('blurs both across most in the middle, while one turns into the other', () => {
+  it('blurs both both ways, most in the middle and not at all at the ends, while one dissolves into the other (task 1092)', () => {
     const middle = mixFor('blur', 0.5, frame, 1080)
     const early = mixFor('blur', 0.1, frame, 1080)
-    expect(middle.out.blurX!).toBeGreaterThan(early.out.blurX!)
-    expect(middle.into.blurX).toBe(middle.out.blurX)
+    expect(middle.out.gauss!.sigma).toBeGreaterThan(early.out.gauss!.sigma)
+    expect(middle.into.gauss).toEqual(middle.out.gauss)
     expect(middle.into.alpha).toBe(0.5)
-    // As wide on a 540 wide monitor as `hblur` is on the 1080 wide output.
-    expect(middle.out.blurX).toBeCloseTo((541 * 540) / 1080, 5)
+    expect(mixFor('blur', 0, frame, 1080).out.gauss!.sigma).toBe(0)
+    // As strong on a 540 wide monitor as the export's gaussian is on the 1080 wide output.
+    expect(middle.out.gauss!.sigma).toBeCloseTo((blurAt(0.5, 1080) * 540) / 1080, 5)
   })
 
   it('pulls the next picture back from four times its size while it dissolves in (plan 95)', () => {

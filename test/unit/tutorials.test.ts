@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// The files name Windows' keys: pinned so the Mac runner reads them the same.
+vi.mock('../../src/shared/system', async (original) => ({ ...(await original<typeof import('../../src/shared/system')>()), RUNNING_SYSTEM: 'windows', COMMAND_KEY_NAME: 'Ctrl' }))
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import {

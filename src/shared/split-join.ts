@@ -5,7 +5,7 @@
 
 import { newId } from './ids'
 import { cropAtKeys } from './crop-geometry'
-import { type Span, spanEnd, type TrackOf } from './tracks'
+import { type Span, spanEnd, type TrackOf, sourceAt } from './tracks'
 import type { Appear } from './appear'
 import type { Transition } from './transitions'
 import { MAIN_PICTURE } from './project-core'
@@ -48,8 +48,8 @@ export function clipToCut(p: Timeline, frame: number, clipId?: string | null): s
  * put a transition where there had been none.
  */
 function pieces<T extends Span>(c: T, rest: Omit<T, 'link'>, frame: number, link: string | undefined): T[] {
-  const at = c.sourceIn + (frame - c.timelineStart)
-  const second = { ...rest, id: newId(), sourceIn: at, timelineStart: frame, ...(link !== undefined ? { link } : {}) } as unknown as T
+  const at = sourceAt(c, frame)
+  const second ={ ...rest, id: newId(), sourceIn: at, timelineStart: frame, ...(link !== undefined ? { link } : {}) } as unknown as T
   return asTwoPieces({ ...c, sourceOut: at }, second)
 }
 
@@ -223,6 +223,8 @@ function continues(p: Timeline, first: string, second: string, removed = 0): boo
   if (!a || !b || a.kind !== b.kind || a.track.id !== b.track.id) return false
   if (a.clip.mediaId !== b.clip.mediaId) return false
   if (a.kind === 'audio' && (a.clip as SoundClip).track !== (b.clip as SoundClip).track) return false
+  // Two pieces at different speeds are two clips, not one cut in two (plan 105).
+  if (a.clip.speed !== b.clip.speed) return false
   return b.clip.timelineStart === spanEnd(a.clip) && b.clip.sourceIn === a.clip.sourceOut + removed
 }
 
@@ -235,7 +237,8 @@ function continues(p: Timeline, first: string, second: string, removed = 0): boo
 export function removedBetween(p: Timeline, first: string, second: string): number {
   const a = findClip(p, first)
   const b = findClip(p, second)
-  if (!a || !b || a.clip.mediaId !== b.clip.mediaId) return 0
+  // At a speed of its own, frames brought back would not be as many frames of the timeline: not brought back.
+  if (!a || !b || a.clip.mediaId !== b.clip.mediaId || a.clip.speed !== undefined) return 0
   const removed = b.clip.sourceIn - a.clip.sourceOut
   return removed > 0 && continues(p, first, second, removed) ? removed : 0
 }

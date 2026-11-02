@@ -156,7 +156,8 @@ describe('a long recording', () => {
     expect(peaks.length / 2).toBeGreaterThanOrEqual(minutes * 60 * 100 - 100)
     // Sound in the last full second, not a waveform cut short.
     expect(Math.max(...Array.from(peaks.slice(-400, -200)))).toBeGreaterThan(1000)
-  }, 120_000)
+    // Longer for the Intel Mac build, whose ffmpeg runs through Rosetta on GitHub's Macs (task 1388).
+  }, 300_000)
 })
 
 describe('a file with no audio', () => {

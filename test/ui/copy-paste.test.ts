@@ -46,12 +46,12 @@ describe('copy and paste', () => {
   it('pastes a recording again at the playhead, picture and sound linked to each other and not to the original, in one undo', async () => {
     const clip = (await page.locator('[data-testid="clip"][data-kind="video"]').first().boundingBox())!
     await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2)
-    await page.keyboard.press('Control+c')
+    await page.keyboard.press('ControlOrMeta+c')
     // To the end of the sequence, as far as the playhead goes: the stretch after the clip is free.
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     await page.keyboard.press('End')
     const end = Number(await page.getAttribute('[data-testid="timecode"]', 'data-playhead'))
-    await page.keyboard.press('Control+v')
+    await page.keyboard.press('ControlOrMeta+v')
     await expect.poll(async () => (await sequence()).videoTracks[0]!.clips.length, WAIT).toBe(2)
     const s = await sequence()
     const [first, pasted] = s.videoTracks[0]!.clips
@@ -61,7 +61,7 @@ describe('copy and paste', () => {
     expect(sounds[1]!.link).toBe(pasted!.link)
     expect(pasted!.link).not.toBe(first!.link)
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await sequence()).videoTracks[0]!.clips.length, WAIT).toBe(1)
     expect((await sequence()).audioTracks[0]!.clips).toHaveLength(1)
   })
@@ -71,9 +71,9 @@ describe('copy and paste', () => {
     await page.keyboard.press('Home')
     await page.keyboard.press('t')
     await page.waitForSelector('[data-testid="text-panel"]', WAIT)
-    await page.keyboard.press('Control+c')
+    await page.keyboard.press('ControlOrMeta+c')
     await playheadTo(300)
-    await page.keyboard.press('Control+v')
+    await page.keyboard.press('ControlOrMeta+v')
     await expect.poll(async () => (await texts()).length, WAIT).toBe(2)
     // The pasted one is selected: change its words.
     await page.fill('[data-testid="text-words"]', 'Only the copy')
@@ -84,7 +84,7 @@ describe('copy and paste', () => {
     const tracksBefore = (await sequence()).videoTracks.length
     await page.keyboard.press('Home')
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+v')
+    await page.keyboard.press('ControlOrMeta+v')
     await expect.poll(async () => (await sequence()).videoTracks.length, WAIT).toBe(tracksBefore + 1)
     // What was there is still there.
     expect((await sequence()).videoTracks[0]!.clips[0]!.timelineStart).toBe(0)
@@ -93,10 +93,10 @@ describe('copy and paste', () => {
   it('keeps Ctrl+C and Ctrl+V for a field while typing in it', async () => {
     const before = (await texts()).length
     await page.click('[data-testid="text-words"]')
-    await page.keyboard.press('Control+a')
-    await page.keyboard.press('Control+c')
+    await page.keyboard.press('ControlOrMeta+a')
+    await page.keyboard.press('ControlOrMeta+c')
     await page.keyboard.press('End')
-    await page.keyboard.press('Control+v')
+    await page.keyboard.press('ControlOrMeta+v')
     await page.waitForTimeout(500)
     expect((await texts()).length).toBe(before)
   })
@@ -106,14 +106,14 @@ describe('copy and paste', () => {
     const first = (await page.locator('[data-testid="track"][data-track-id="v1"] [data-testid="clip"]').first().boundingBox())!
     await page.mouse.click(first.x + first.width / 2, first.y + first.height / 2)
     // A second clip after it, so taking the first away leaves a gap rather than an empty track.
-    await page.keyboard.press('Control+c')
+    await page.keyboard.press('ControlOrMeta+c')
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     await page.keyboard.press('End')
-    await page.keyboard.press('Control+v')
+    await page.keyboard.press('ControlOrMeta+v')
     await expect.poll(async () => (await sequence()).videoTracks[0]!.clips.length, WAIT).toBe(2)
     await page.mouse.click(first.x + first.width / 2, first.y + first.height / 2)
     const count = (await sequence()).videoTracks[0]!.clips.length
-    await page.keyboard.press('Control+x')
+    await page.keyboard.press('ControlOrMeta+x')
     await expect.poll(async () => (await sequence()).videoTracks[0]!.clips.length, WAIT).toBe(count - 1)
     // Right click the gap it left, and paste there.
     await page.mouse.click(first.x + first.width / 2, first.y + first.height / 2, { button: 'right' })

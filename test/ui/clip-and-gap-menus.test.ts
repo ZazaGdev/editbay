@@ -86,7 +86,7 @@ describe('the volume in a sound clip\'s right click menu', () => {
     await expect.poll(gain, WAIT).not.toBeCloseTo(was)
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="clip-menu"]', { state: 'detached', ...WAIT })
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(gain, WAIT).toBeCloseTo(was)
   })
 

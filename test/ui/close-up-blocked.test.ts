@@ -119,7 +119,7 @@ describe('closing up with a clip in the way', () => {
     await selectX()
     await press('Delete')
     await expect.poll(v1, WAIT).toEqual([before[0], before[2]])
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await v1()).length, WAIT).toBe(3)
   })
 })

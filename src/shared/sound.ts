@@ -1,7 +1,8 @@
 import { playedCopy, trackFile, type ProjectMedia, type Timeline } from './project'
 import type { VoiceStrength } from './voice'
 import { peakAtSecond } from './peaks'
-import { spanHolds } from './tracks'
+import { spanHolds, sourceAt } from './tracks'
+import { soundHeard } from './speed'
 import type { PeaksData } from './types'
 
 /**
@@ -23,7 +24,12 @@ import type { PeaksData } from './types'
  * in the preview. More than two are mixed down as ffmpeg does; a count not
  * known, from a source brought in before it was kept, is taken as one or two.
  */
-export function toStereo(channels: number | undefined): string {
+export function toStereo(channels: number | undefined, side?: 'left' | 'right'): string {
+  // One side on both (task 1188), by the channel's place, which a mono track has only the first of: there it changes nothing.
+  if (side !== undefined && channels !== 1) {
+    const from = side === 'left' ? 'c0' : 'c1'
+    return `pan=stereo|c0=${from}|c1=${from}`
+  }
   return channels !== undefined && channels > 2 ? 'aformat=channel_layouts=stereo' : 'pan=stereo|FL=FL+FC|FR=FR+FC'
 }
 
@@ -173,10 +179,10 @@ export function levelAt(t: Timeline, peaks: Map<string, PeaksData>, frame: numbe
   let loudest: number | null = null
   for (const track of t.audioTracks) {
     for (const c of track.clips) {
-      if (c.muted || c.gain <= 0 || !spanHolds(c, frame)) continue
+      if (c.muted || c.gain <= 0 || !spanHolds(c, frame) || !soundHeard(c)) continue
       const data = peaks.get(peaksKey(c.mediaId, c.track))
       if (!data) continue
-      const sec = (c.sourceIn + (frame - c.timelineStart)) / t.fps
+      const sec = sourceAt(c, frame) / t.fps
       loudest = Math.max(loudest ?? 0, peakAtSecond(data.peaks, data.peaksPerSecond, sec) * c.gain)
     }
   }

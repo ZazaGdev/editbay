@@ -3,8 +3,9 @@
  * and the transport bar below it.
  */
 
-import type { JSX } from 'react'
-import { allClips, findVideoClip, targetAspect, type Timeline as TimelineData } from '../../shared/project'
+import { useRef, type JSX } from 'react'
+import { allClips, findVideoClip, targetAspect, type Clip, type Timeline as TimelineData } from '../../shared/project'
+import { sourceAt } from '../../shared/tracks'
 import { cropEdit } from '../../shared/zoom-edit'
 import { boxKeysOf } from '../../shared/box-keys'
 import { SourceStrip } from '../components/SourceStrip'
@@ -21,6 +22,14 @@ export function MonitorArea({ app, timeline }: { app: AppState; timeline: Timeli
     voice, scrubbing, rate, loopRange, fullscreen, setFullscreen, assets, keys, status, importPaths, setTutorialsOpen, resized, blurBox, shapeDrawing,
     shapeDrawn, shapeLanded, shapeLine, textEdit, startTextEdit, setTextEdit, endTextEdit, setMonitorVolume, total, canPlay, phase, run, togglePlay, seek, level,
     changeRecordSettings, loopOn } = app
+  /**
+   * The clip as it was when a crop drag began. Every movement of a drag is
+   * applied to the document as it was then, so each is worked out from this
+   * clip too: one worked out from the clip the last movement left, against a
+   * zoom with keyframes, moved them from the wrong crop and the box swung
+   * back and forth across the pointer (task 1096).
+   */
+  const cropDragFrom = useRef<Clip | null>(null)
   return (
     <>
       {skimming !== null && timeline?.media.some((m) => m.id === skimming) && (
@@ -133,7 +142,10 @@ export function MonitorArea({ app, timeline }: { app: AppState; timeline: Timeli
           // that zooms, the keyframe there, made if there is none, and
           // for a Simple zoom its Start or End, whichever is chosen, while
           // one is picked in the Zoom panel; otherwise only the crop.
-          const c = findVideoClip(framing ?? timeline, clipId)?.clip
+          const now = findVideoClip(framing ?? timeline, clipId)?.clip
+          const began = cropDragFrom.current
+          const c = continuing && began?.id === clipId ? began : now
+          if (!continuing) cropDragFrom.current = now ?? null
           editClip(c ? cropEdit(c, playhead, rect, pic, zoomEnd, zoomPicked) : { kind: 'setCrop', clipId, rect, picture: pic }, continuing)
         }}
         onPlaceChange={(clipId, pic, place, continuing, reshaped, fromCrop) => {
@@ -141,7 +153,7 @@ export function MonitorArea({ app, timeline }: { app: AppState; timeline: Timeli
           // keyframe made there if there is none (plan 97).
           const keyed = findVideoClip(framing ?? timeline, clipId)?.clip
           if (keyed && (boxKeysOf(keyed, pic)?.length ?? 0) > 0) {
-            void editClip({ kind: 'setBoxKey', clipId, at: keyed.sourceIn + playhead - keyed.timelineStart, place, picture: pic }, continuing)
+            void editClip({ kind: 'setBoxKey', clipId, at: Math.round(sourceAt(keyed, playhead)), place, picture: pic }, continuing)
             return
           }
           // A text's box moved or scaled by hand: drawn again at its new size once let go.

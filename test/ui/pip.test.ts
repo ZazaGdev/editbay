@@ -21,7 +21,7 @@ let app: ElectronApplication
 let page: Page
 
 type Box = { x: number; y: number; w: number; h: number }
-type Style = { radius?: number; border?: number; shadow?: boolean }
+type Style = { radius?: number; border?: number; borderColour?: string; shadow?: boolean }
 
 /** The small picture's place and style, from the project. */
 async function small(): Promise<{ place: Box; style: Style | undefined; layout: string }> {
@@ -94,6 +94,22 @@ describe('the Picture in picture section', () => {
     }, WAIT).toBeGreaterThan(1)
   })
 
+  it('makes it a portrait card, tall with a thin light edge, and a rounded box again after (task 2159)', async () => {
+    await page.click('[data-testid="pip-shape-portrait"]')
+    await expect.poll(async () => {
+      const p = (await small()).place
+      return Math.round(((p.w * W) / (p.h * H)) * 100) / 100
+    }, WAIT).toBe(0.56)
+    expect((await small()).style).toMatchObject({ borderColour: '#d9d9d9' })
+    await page.click('[data-testid="pip-shape-rounded"]')
+    await expect.poll(async () => (await small()).style?.borderColour, WAIT).toBeUndefined()
+    await page.click('[data-testid="pip-box-own"]')
+    await expect.poll(async () => {
+      const p = (await small()).place
+      return Math.round(((p.w * W) / (p.h * H)) * 100) / 100
+    }, WAIT).toBe(1.78)
+  })
+
   it('takes a square, tall or wide box, and a width and height typed (bugs and notes 2, note 34)', async () => {
     const shape = async (): Promise<number> => {
       const p = (await small()).place
@@ -137,7 +153,7 @@ describe('the small picture on the Output view', () => {
     await page.click('[data-testid="pip-toolbar-corners-tl"]')
     await expect.poll(where, WAIT).toBe('Top left')
     await page.click('[data-testid="pip-toolbar-shape"]')
-    await expect.poll(() => page.getAttribute('[data-testid="pip-shape-circle"]', 'aria-pressed'), WAIT).toBe('true')
+    await expect.poll(() => page.getAttribute('[data-testid="pip-shape-portrait"]', 'aria-pressed'), WAIT).toBe('true')
     // One box on the Output view however many changes: none left behind from before.
     expect(await page.locator('[data-testid="place-rect"]').count()).toBe(1)
   })
@@ -163,7 +179,7 @@ describe('the small picture on the Output view', () => {
     await expect.poll(where, WAIT).toBe('Bottom right')
     // The drag and its snap are one step.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await small()).place.x, WAIT).toBeCloseTo(custom.x, 3)
     await expect.poll(where, WAIT).toBe('Custom')
   })

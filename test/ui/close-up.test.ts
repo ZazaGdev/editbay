@@ -71,7 +71,7 @@ async function sound(): Promise<number[][][]> {
 
 async function undo(): Promise<void> {
   await page.locator('[data-testid="timecode"]').click()
-  await page.keyboard.press('Control+z')
+  await page.keyboard.press('ControlOrMeta+z')
 }
 
 async function centre(locator: ReturnType<Page['locator']>): Promise<{ x: number; y: number }> {
@@ -92,14 +92,15 @@ async function ctrlDrag(from: { x: number; y: number }, ...to: { x: number; y: n
 async function drag(ctrl: boolean, from: { x: number; y: number }, ...to: { x: number; y: number }[]): Promise<void> {
   await page.mouse.move(from.x, from.y)
   await page.mouse.down()
-  if (ctrl) await page.keyboard.down('Control')
+  // Ctrl on Windows, Cmd on a Mac, as the app reads it there.
+  if (ctrl) await page.keyboard.down('ControlOrMeta')
   let at = from
   for (const next of to) {
     for (let i = 1; i <= 4; i++) await page.mouse.move(at.x + ((next.x - at.x) * i) / 4, at.y + ((next.y - at.y) * i) / 4)
     at = next
   }
   await page.mouse.up()
-  if (ctrl) await page.keyboard.up('Control')
+  if (ctrl) await page.keyboard.up('ControlOrMeta')
 }
 
 describe('drags that close up and open up', () => {
@@ -217,11 +218,11 @@ describe('drags that close up and open up', () => {
       page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.videoTracks[1]!.clips.map((c) => c.timelineStart))
     const count = (await on()).length
     // Let go at 270, well away from anything to snap to.
-    await page.keyboard.down('Control')
+    await page.keyboard.down('ControlOrMeta')
     await page.dragAndDrop(`[data-testid="asset"][data-asset-id="${ids.silent}"]`, track, {
       targetPosition: { x: 270 * PX + 0.1, y: box.height / 2 }
     })
-    await page.keyboard.up('Control')
+    await page.keyboard.up('ControlOrMeta')
     await expect.poll(async () => (await on()).length).toBe(count + 1)
     expect(await on()).toContain(270)
     expect(await v1()).toEqual(before)

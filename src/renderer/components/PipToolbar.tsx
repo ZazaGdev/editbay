@@ -10,8 +10,8 @@ const BAR_H = 36
 const GAP = 10
 /** A step of the minus and plus buttons, as a share of the frame's width. */
 const SIZE_STEP = 0.02
-const NEXT_SHAPE: Record<PipShape, PipShape> = { square: 'rounded', rounded: 'circle', circle: 'square' }
-const SHAPE_NAMES: Record<PipShape, string> = { square: 'Square', rounded: 'Rounded', circle: 'Circle' }
+const NEXT_SHAPE: Record<PipShape, PipShape> = { square: 'rounded', rounded: 'portrait', portrait: 'circle', circle: 'square' }
+const SHAPE_NAMES: Record<PipShape, string> = { square: 'Square', rounded: 'Rounded', portrait: 'Portrait', circle: 'Circle' }
 
 /**
  * The small picture's own toolbar, beside it on the Output view while it is
@@ -109,7 +109,13 @@ export function PipToolbar(props: {
       </span>
       {button('pip-toolbar-larger', 'Larger', null, () => resize(SIZE_STEP), '+')}
       {button('pip-toolbar-shape', `Shape: ${SHAPE_NAMES[props.shape]}, click for ${SHAPE_NAMES[NEXT_SHAPE[props.shape]]}`, null, () => props.onEdit(setPipEdit(props.clipId, { shape: NEXT_SHAPE[props.shape] })), icon(
-        props.shape === 'circle' ? <circle cx="7" cy="7" r="5.5" /> : <rect x="1.5" y="3" width="11" height="8" rx={props.shape === 'rounded' ? 3 : 0.5} />
+        props.shape === 'circle' ? (
+          <circle cx="7" cy="7" r="5.5" />
+        ) : props.shape === 'portrait' ? (
+          <rect x="3.5" y="1" width="7" height="12" rx="2" />
+        ) : (
+          <rect x="1.5" y="3" width="11" height="8" rx={props.shape === 'rounded' ? 3 : 0.5} />
+        )
       ))}
       {button('pip-toolbar-border', 'Border', (style.border ?? 0) > 0, () => {
         const { border: _b, ...rest } = style

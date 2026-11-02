@@ -15,6 +15,9 @@ const { planRender, exportNames } = await import('../../src/shared/render-plan')
 const { presetById } = await import('../../src/shared/presets')
 const { runExport } = await import('../../src/main/render/runner')
 const session = await import('../../src/main/project/session')
+const { conformArgs } = await import('../../src/main/media/conform')
+const { probeFile } = await import('../../src/main/media/probe')
+const { runFfmpeg } = await import('../../src/main/ffmpeg/run')
 const { S1, firstTimeline } = await import('../project-helpers')
 
 /**
@@ -76,5 +79,55 @@ describe('a recording that says nothing of its colours', () => {
     const v2 = await at(out!, 100, 100)
     const v1 = await at(out!, 800, 1600)
     expect(Math.max(...v2.map((v, i) => Math.abs(v - v1[i]!)))).toBeLessThanOrEqual(4)
+  })
+})
+
+/** The same red, its header naming BT.709 primaries and transfer but leaving the matrix unspecified. */
+async function matrixUnspecified(): Promise<string> {
+  const file = join(work, 'matrix-unspecified.mp4')
+  await capture(ffmpegPath, [
+    '-v', 'error', '-y',
+    '-f', 'lavfi', '-i', 'color=c=0xE02020:s=1280x720:r=30:d=3',
+    '-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=colorspace=unknown',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '4',
+    '-bsf:v', 'h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=2',
+    file
+  ])
+  return file
+}
+
+/** A colour as near #E02020, 224,32,32, as video gives it back. */
+function nearRed(got: number[]): void {
+  for (const [i, want] of [224, 32, 32].entries()) expect(Math.abs(got[i]! - want), got.join(',')).toBeLessThanOrEqual(4)
+}
+
+describe('a recording that names its primaries and leaves its matrix unspecified (audit 2026-10-19)', () => {
+  it('exports its own red, not one converted as BT.601', async () => {
+    // It came out 205,9,31: the header won over the input option, and the frames were converted as BT.601.
+    const asset = await importFile(await matrixUnspecified(), ...quiet())
+    session.resetProject()
+    session.addAsset(asset)
+    session.applyEdit({ sequenceId: S1, kind: 'addSource', mediaId: asset.id, clipId: 'base' })
+    const project = session.getProject()
+    const t = firstTimeline(project)
+    const scratch = join(work, 'scratch-unspecified')
+    const plan = planRender({
+      timeline: t,
+      names: { ...exportNames(project, S1), joined: 'unspecified' },
+      preset: presetById(t.presetId),
+      mode: 'join',
+      outputDir: join(work, 'out-unspecified'),
+      scratchDir: scratch,
+      filenamePattern: '{project}'
+    })
+    const [out] = await runExport({ plan, fps: project.fps, scratchDir: scratch, onProgress: () => {} })
+    nearRed(await at(out!, 500, 900))
+  })
+
+  it('keeps its red in the copy made to play it', async () => {
+    const file = await matrixUnspecified()
+    const conformed = join(work, 'matrix-unspecified-conformed.mp4')
+    await runFfmpeg(conformArgs({ probe: await probeFile(file), output: conformed, hasZscale: false }))
+    nearRed(await at(conformed, 600, 300))
   })
 })

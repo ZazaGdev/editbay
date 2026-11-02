@@ -10,7 +10,14 @@
  *
  * Only the actions you change are stored. Defaults fill in the rest at load, so
  * an action added later arrives with its default key rather than none.
+ *
+ * On a Mac (plan 104) a binding's `Ctrl` is the Cmd key, and `Meta` the
+ * Control key, so every default reads as a Mac person expects (Cmd+S saves)
+ * and is shown with the Mac's own signs.
  */
+import { RUNNING_SYSTEM, type System } from './system'
+
+const MAC = RUNNING_SYSTEM === 'mac'
 
 export type ActionId =
   | 'playPause'
@@ -108,8 +115,9 @@ export const ACTIONS: ActionDef[] = [
   { id: 'stepForward', label: 'Forward one frame', group: 'Playback', defaults: ['ArrowRight'] },
   { id: 'jumpBack', label: 'Back one second', group: 'Playback', defaults: ['Shift+ArrowLeft'] },
   { id: 'jumpForward', label: 'Forward one second', group: 'Playback', defaults: ['Shift+ArrowRight'] },
-  { id: 'goToStart', label: 'Go to start', group: 'Playback', defaults: ['Home'] },
-  { id: 'goToEnd', label: 'Go to end', group: 'Playback', defaults: ['End'] },
+  // A Mac laptop has no Home or End key: Cmd and the arrows, as in its own apps.
+  { id: 'goToStart', label: 'Go to start', group: 'Playback', defaults: ['Home', ...(MAC ? ['Ctrl+ArrowLeft'] : [])] },
+  { id: 'goToEnd', label: 'Go to end', group: 'Playback', defaults: ['End', ...(MAC ? ['Ctrl+ArrowRight'] : [])] },
   // Up and Down, as in Premiere: every clip's start and end, on any track.
   { id: 'previousCut', label: 'Go to the previous cut', group: 'Playback', defaults: ['ArrowUp'] },
   { id: 'nextCut', label: 'Go to the next cut', group: 'Playback', defaults: ['ArrowDown'] },
@@ -189,7 +197,8 @@ export const ACTIONS: ActionDef[] = [
   { id: 'toggleSnapping', label: 'Turn snapping on the timeline on or off', group: 'Editing', defaults: ['KeyN'] },
   { id: 'fullscreen', label: 'Monitor full screen', group: 'View', defaults: ['KeyF'] },
   { id: 'showShortcuts', label: 'Keyboard shortcuts', group: 'View', defaults: ['Ctrl+Slash'] },
-  { id: 'showTutorials', label: 'Tutorials', group: 'View', defaults: ['F1'] },
+  // F1 needs Fn on a Mac, whose apps open their help with Cmd+?.
+  { id: 'showTutorials', label: 'Tutorials', group: 'View', defaults: ['F1', ...(MAC ? ['Ctrl+Shift+Slash'] : [])] },
   { id: 'showSettings', label: 'Settings', group: 'View', defaults: ['Ctrl+Comma'] },
   { id: 'commandPalette', label: 'Search every action', group: 'View', defaults: ['Ctrl+KeyK'] },
   { id: 'searchSources', label: 'Search the sources, recordings and library', group: 'View', defaults: ['Ctrl+KeyF'] },
@@ -250,13 +259,14 @@ const DEFAULTS = new Map<ActionId, string[]>(ACTIONS.map((a) => [a.id, a.default
  * The binding a keypress makes, or null for one that cannot be a shortcut: a
  * modifier pressed on its own, or a key the browser could not identify.
  */
-export function comboFromEvent(e: KeyLike): string | null {
+export function comboFromEvent(e: KeyLike, system: System = RUNNING_SYSTEM): string | null {
   if (!e.code || e.code === 'Unidentified' || MODIFIER_CODES.has(e.code)) return null
+  const mac = system === 'mac'
   const parts: string[] = []
-  if (e.ctrlKey) parts.push('Ctrl')
+  if (mac ? e.metaKey : e.ctrlKey) parts.push('Ctrl')
   if (e.altKey) parts.push('Alt')
   if (e.shiftKey) parts.push('Shift')
-  if (e.metaKey) parts.push('Meta')
+  if (mac ? e.ctrlKey : e.metaKey) parts.push('Meta')
   parts.push(e.code)
   return parts.join('+')
 }
@@ -273,9 +283,12 @@ const MOUSE_CODES: Record<number, string> = {
  * side, held with any modifiers, as a key is. Null for the left and right
  * buttons, which click and open menus and are never shortcuts.
  */
-export function comboFromMouse(e: { button: number; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean }): string | null {
+export function comboFromMouse(
+  e: { button: number; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean },
+  system: System = RUNNING_SYSTEM
+): string | null {
   const code = MOUSE_CODES[e.button]
-  return code ? comboFromEvent({ ...e, code }) : null
+  return code ? comboFromEvent({ ...e, code }, system) : null
 }
 
 /** Whether a string is a binding comboFromEvent could have produced. */
@@ -335,10 +348,27 @@ function codeLabel(code: string): string {
   return code
 }
 
-/** A binding as a person reads it: `Ctrl+Shift+KeyZ` becomes `Ctrl+Shift+Z`. */
-export function formatCombo(combo: string): string {
+/** The Mac's signs for the modifiers, in the order its menus show them. */
+const MAC_SIGNS: [string, string][] = [
+  ['Meta', '⌃'],
+  ['Alt', '⌥'],
+  ['Shift', '⇧'],
+  ['Ctrl', '⌘']
+]
+
+/**
+ * A binding as a person reads it: `Ctrl+Shift+KeyZ` becomes `Ctrl+Shift+Z`,
+ * and on a Mac `⇧⌘Z`.
+ */
+export function formatCombo(combo: string, system: System = RUNNING_SYSTEM): string {
   const parts = combo.split('+')
   const code = parts.pop() ?? ''
+  if (system === 'mac') {
+    const label = codeLabel(code)
+    const signs = MAC_SIGNS.filter(([mod]) => parts.includes(mod)).map(([, sign]) => sign).join('')
+    // A word, such as Space or a mouse button, reads better apart from the signs.
+    return signs !== '' && label.length > 1 ? `${signs} ${label}` : `${signs}${label}`
+  }
   return [...parts, codeLabel(code)].join('+')
 }
 

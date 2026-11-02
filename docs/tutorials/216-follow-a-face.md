@@ -11,7 +11,7 @@ Have the crop follow a face, so someone who moves stays in a narrow vertical fra
 1. Select the clip on the timeline. {show: clip on:video}
 2. With more than one person in it, drag the crop roughly over the one you want. {show: monitor-view on:video "Drag the crop over the person on the Source view"}
 3. To be closer on the face, set [Scale %] first.
-4. Open [Zoom] in the inspector and press [Follow face]. {show: follow-face on:video}
+4. Open [Zoom] in the inspector and, in its Face part at the bottom, press [Follow face]. {show: follow-face on:video}
 
 ## Details
 

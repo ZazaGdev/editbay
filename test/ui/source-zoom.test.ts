@@ -182,7 +182,7 @@ describe('zooming the Source view', () => {
     // The crop went where the pointer took it, 20 screen pixels, not somewhere a new zoom put it.
     const { scale } = await mapping()
     expect(Math.abs((await crop()).x - start.x - 20 / scale)).toBeLessThan(4)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await crop()).x, WAIT).toBe(start.x)
   })
 
@@ -199,7 +199,7 @@ describe('zooming the Source view', () => {
     await page.keyboard.up('Alt')
     await expect.poll(async () => (await crop()).x, WAIT).not.toBe(start.x)
     expect((await crop()).x - start.x).toBeCloseTo(40 / scale, -0.5)
-    await press('Control+z')
+    await press('ControlOrMeta+z')
     await expect.poll(async () => (await crop()).x, WAIT).toBe(start.x)
   })
 

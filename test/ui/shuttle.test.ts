@@ -161,7 +161,7 @@ describe('the speed and Loop', () => {
     // The second clip, 120 to 240.
     const clip = (await page.locator('[data-testid="track"][data-track-id="v1"] [data-testid="clip"]').nth(1).boundingBox())!
     await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2)
-    await press('Control+KeyL')
+    await press('ControlOrMeta+KeyL')
     await expect.poll(() => page.getAttribute('[data-testid="loop"]', 'aria-pressed'), WAIT).toBe('true')
     await press('Home')
     await press('Space')
@@ -173,7 +173,7 @@ describe('the speed and Loop', () => {
     expect(at).toBeGreaterThanOrEqual(120)
     expect(at).toBeLessThan(240)
     await press('Space')
-    await press('Control+KeyL')
+    await press('ControlOrMeta+KeyL')
     await expect.poll(() => page.getAttribute('[data-testid="loop"]', 'aria-pressed'), WAIT).toBe('false')
   })
 })

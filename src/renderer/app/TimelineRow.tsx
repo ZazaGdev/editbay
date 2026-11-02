@@ -11,7 +11,7 @@ import { Divider } from '../components/Divider'
 import { SECTION_TYPE } from '../components/section-host'
 import { RAIL_WIDTH } from '../state/useSettings'
 import { accent, ink, radius, type } from '../theme'
-import { SectionDock, SIDE_NAME } from './SectionDock'
+import { SectionDock, SIDE_NAME, rightTucked } from './SectionDock'
 import { TimelinePanel } from './TimelinePanel'
 import { endSectionDrag, useDraggedSection } from './sectionDrag'
 import type { AppState } from './app-state'
@@ -58,7 +58,9 @@ export function TimelineRow({ app }: { app: AppState }): JSX.Element {
     }
   }, [dragged])
 
-  const has = { left: layout.left.length > 0, right: layout.right.length > 0 }
+  // Folded down under the Inspector, the right side's sections are not in this row at all (task 1137).
+  const tucked = rightTucked(app)
+  const has = { left: layout.left.length > 0, right: layout.right.length > 0 && !tucked }
   const room = (side: SectionSide): number => (side === 'left' ? layout.leftWidth : layout.rightWidth) + DIVIDER
   // The right side folds first, then the left, while the timeline would get less than its least.
   let left = width - (has.left ? room('left') : 0) - (has.right ? room('right') : 0)
@@ -107,7 +109,7 @@ export function TimelineRow({ app }: { app: AppState }): JSX.Element {
   }
 
   return (
-    <div ref={row} data-testid="timeline-row" style={{ gridColumn: '1 / -1', display: 'flex', minWidth: 0, minHeight: 0 }}>
+    <div ref={row} data-testid="timeline-row" style={{ gridColumn: tucked ? '1 / 4' : '1 / -1', gridRow: 3, display: 'flex', minWidth: 0, minHeight: 0 }}>
       {dragged && <DropStrip side="left" app={app} />}
       {dock('left')}
       {/* As wide as the room left, whatever is drawn inside it: a cell sized to its content let the tracks run on under a side's divider. */}

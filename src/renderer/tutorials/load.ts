@@ -1,4 +1,4 @@
-import { inOrder, parseTutorial, type Tutorial } from '../../shared/tutorials'
+import { forSystem, inOrder, parseTutorial, type Tutorial } from '../../shared/tutorials'
 
 /**
  * Every tutorial, read at build time.
@@ -31,5 +31,5 @@ function idOf(path: string): string {
 export const TUTORIALS: Tutorial[] = inOrder(
   Object.entries(FILES)
     .filter(([path]) => /\/\d{3}-[^/]+\.md$/.test(path))
-    .map(([path, text]) => parseTutorial(idOf(path), text))
+    .map(([path, text]) => parseTutorial(idOf(path), forSystem(text)))
 )

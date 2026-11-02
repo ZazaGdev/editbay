@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { CAPTION_FONTS } from '../../shared/caption-fonts'
+import { TEXT_FONTS, popularOf } from '../../shared/popular-fonts'
 
 import { DEFAULT_TEXT, cleanTextStyle, TEXT_MAX_SIZE, TEXT_MIN_SIZE, type TextAlign, type TextStyle } from '../../shared/text'
 import { Button } from '../ui/Button'
@@ -13,6 +14,7 @@ import { Field } from '../ui/Field'
 import { Segmented } from '../ui/Segmented'
 import { Select } from '../ui/Select'
 import { HelpTip } from '../ui/HelpTip'
+import { RUNNING_SYSTEM } from '../../shared/system'
 
 /**
  * A text's words and how they look, in the Inspector. Every change draws the
@@ -23,18 +25,20 @@ import { HelpTip } from '../ui/HelpTip'
 const row = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, font: type.meta, color: ink.primary, padding: '3px 0' } as const
 const dim = { color: ink.muted } as const
 
-/** Fonts every Windows machine has, for when the list of installed ones cannot be read. */
-const FALLBACK_FONTS = ['Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS', 'Consolas', 'Georgia', 'Impact', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana']
+/** Fonts every Windows machine, or every Mac, has, for when the list of installed ones cannot be read. */
+const FALLBACK_FONTS =
+  RUNNING_SYSTEM === 'mac'
+    ? ['Arial', 'Arial Black', 'Avenir Next', 'Comic Sans MS', 'Courier New', 'Georgia', 'Helvetica', 'Helvetica Neue', 'Impact', 'Menlo', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana']
+    : ['Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS', 'Consolas', 'Georgia', 'Impact', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana']
 
 let installed: Promise<string[]> | null = null
 
-/** The font families on this PC, read once. Captions offer them too (plan 87). */
+/** The popular font families on this PC, read once (task 1087). Captions offer them too (plan 87). */
 export function installedFonts(): Promise<string[]> {
   installed ??= (async () => {
     try {
       const query = (window as unknown as { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts
-      const fonts = query ? await query() : []
-      const families = [...new Set(fonts.map((f) => f.family))].sort((a, b) => a.localeCompare(b))
+      const families = popularOf((query ? await query() : []).map((f) => f.family))
       return families.length > 0 ? families : FALLBACK_FONTS
     } catch {
       return FALLBACK_FONTS
@@ -185,8 +189,8 @@ export function TextPanel(props: {
   latest.current = style
 
   const set = (change: Partial<TextStyle>, continuing = false): void => props.onChange(cleanTextStyle({ ...latest.current, ...change }), continuing)
-  // The fonts that come with the app first, then the ones on this PC.
-  const bundled = CAPTION_FONTS.map((f) => f.family)
+  // The fonts that come with the app first, then the popular ones on this PC.
+  const bundled = [...CAPTION_FONTS.map((f) => f.family), ...TEXT_FONTS.map((f) => f.family)]
   const fontChoices = [...bundled, ...fonts.filter((f) => !bundled.includes(f))]
   if (!fontChoices.includes(style.font)) fontChoices.unshift(style.font)
 

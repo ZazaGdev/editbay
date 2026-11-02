@@ -13,6 +13,7 @@ import { BinColumn } from './BinColumn'
 import { MonitorArea } from './MonitorArea'
 import { InspectorColumn } from './InspectorColumn'
 import { TimelineRow } from './TimelineRow'
+import { rightTucked } from './SectionDock'
 import type { AppState } from './app-state'
 
 export function PanelGrid({ app }: { app: AppState }): JSX.Element {
@@ -57,7 +58,8 @@ export function PanelGrid({ app }: { app: AppState }): JSX.Element {
 
       <InspectorColumn app={app} />
 
-      <div style={{ gridColumn: '1 / -1', display: 'grid' }}>
+      {/* Beside the Inspector, not under it, while the sections right of the timeline are folded down into its column (task 1137). */}
+      <div style={{ gridColumn: rightTucked(app) ? '1 / 4' : '1 / -1', gridRow: 2, display: 'grid' }}>
       <Divider
         testid="timeline-divider"
         side="below"

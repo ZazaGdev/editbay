@@ -286,6 +286,30 @@ describe('taking stretches out', () => {
     expectGroupsInStep(t)
   })
 
+  it('cuts a voice on a track listened to with the pictures, linked to them or not, so it stays in step', () => {
+    // Audit 2026-10-19: a voice from a separate recorder on its own track,
+    // listened to, was left whole while the pictures were cut, and ran later
+    // than them by every pause taken out.
+    let t = sequence(media('a', 10), media('vo', 10, { hasVideo: false, width: 0, height: 0 }))
+    t = addSource(t, { mediaId: 'a', clipId: 'A', at: 0, onTrack: 'v1' })
+    t = setClipAudio(t, 'A.1', { gain: 1, muted: true })
+    t = addTrack(t, 'audio', 'vo')
+    t = addSource(t, { mediaId: 'vo', clipId: 'VO', at: 0, onTrack: 'vo' })
+    expect(removableStretches(t, [{ from: 60, to: 90 }], ['vo'])).toEqual([{ from: 60, to: 90 }])
+    t = removeStretches(t, [{ from: 60, to: 90 }], ['vo'])
+    const voice = t.audioTracks.find((r) => r.id === 'vo')!.clips
+    expect(voice.map((c) => [c.timelineStart, c.sourceIn, c.sourceOut])).toEqual([
+      [0, 0, 60],
+      [60, 90, 300]
+    ])
+    // The voice says at each frame what was said over the picture there before.
+    expect(v1Clips(t).map((c) => [c.timelineStart, c.sourceIn, c.sourceOut])).toEqual([
+      [0, 0, 60],
+      [60, 90, 300]
+    ])
+    expectTracksWhole(t)
+  })
+
   it('takes a stretch across a cut out of both clips', () => {
     let t = sequence(media('a', 4), media('b', 4))
     t = addSource(t, { mediaId: 'a', clipId: 'A', at: 0, onTrack: 'v1' })

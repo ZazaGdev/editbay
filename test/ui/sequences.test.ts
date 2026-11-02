@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core'
-import { mkdtemp, rm, readdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
@@ -13,7 +13,8 @@ import { answerSaveDialog, chooseExportFolder, closeExport, discardUnsavedWork, 
  */
 
 const fx = fixtureSet('sequences')
-const root = await mkdtemp(join(tmpdir(), 'editbay-sequences-'))
+// By its real path: a Mac's temp folder is reached through a link, and the app keeps its cache under the real one (task 1388).
+const root = await realpath(await mkdtemp(join(tmpdir(), 'editbay-sequences-')))
 let cleanPath: string
 let counter = 0
 const WAIT = { timeout: 15_000 }
@@ -113,7 +114,8 @@ async function waitForPlayhead(page: Page, frame: number): Promise<void> {
 }
 
 async function waitForTitle(page: Page, title: string): Promise<void> {
-  await page.waitForFunction((want) => document.title === want, title, WAIT)
+  // Polled so a failure says which title it had instead.
+  await expect.poll(() => page.title(), WAIT).toBe(title)
 }
 
 /** Width over height of every clip's crop, sequence by sequence, from the document itself. */
@@ -299,7 +301,7 @@ describe('several sequences in one project', () => {
     await expect.poll(() => sequenceNames(page), WAIT).toEqual(['Vertical'])
 
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForTabs(page, ['Vertical', 'YouTube'])
     expect(await activeName(page)).toBe('Vertical')
   })
@@ -335,7 +337,7 @@ describe('sequences across a restart', () => {
     await waitForPlayhead(first.page, 5)
 
     await answerSaveDialog(first.app, join(files, 'two cuts.editbay'))
-    await first.page.keyboard.press('Control+s')
+    await first.page.keyboard.press('ControlOrMeta+s')
     await waitForTitle(first.page, 'two cuts - Editbay')
     await closeAndWait(first.app)
 

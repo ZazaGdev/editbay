@@ -15,6 +15,7 @@ import {
   sourceFrameAt,
   timelineFrameOf,
   toggleKeyEdit,
+  wholeFramesOf,
   withCentre,
   withScale
 } from '../../shared/zoom-edit'
@@ -25,7 +26,7 @@ import { ContextMenu, MenuHeading, MenuSeparator, type MenuAt } from './ContextM
 import { MenuItem } from './DropMenu'
 import { usePlayheadRead, type PlayheadStore } from '../state/playheadStore'
 import { ZOOM_SPEEDS } from '../state/useSettings'
-import { AmountRow, ZoomNumber, callout, type Edit, type PresetEdit, type ZoomTools } from './zoom-parts'
+import { AmountRow, ZoomNumber, ZoomPart, callout, type Edit, type PresetEdit, type ZoomTools } from './zoom-parts'
 import { HelpTip } from '../ui/HelpTip'
 import { Select } from '../ui/Select'
 
@@ -129,6 +130,7 @@ export function KeyframeZoom(props: {
 
   return (
     <>
+      <ZoomPart testid="zoom-part-framing" name="Framing" hint="how close in, and where, at the playhead">
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
         <ZoomNumber
           label="Scale %"
@@ -230,7 +232,9 @@ export function KeyframeZoom(props: {
           />
         </div>
       )}
+      </ZoomPart>
 
+      <ZoomPart testid="zoom-part-presets" name="One-click zooms" hint="from the playhead, then click where to close in">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         <Button
           testid="zoom-punch"
@@ -276,6 +280,7 @@ export function KeyframeZoom(props: {
         </div>
       )}
       {tools && <AmountRow tools={tools} speed />}
+      </ZoomPart>
       <HelpTip text="Keyframes stay on the frames of the recording they were put on. Trimming the clip does not move them." tutorial="217-zoom-with-keyframes" />
     </>
   )
@@ -340,12 +345,15 @@ function KeyStrip(props: {
   useEffect(() => onPicked?.(picked !== null), [picked, onPicked])
   useEffect(() => () => onPicked?.(false), [onPicked])
 
-  const share = (sourceFrame: number): number => (length > 0 ? (sourceFrame - clip.sourceIn + 0.5) / length : 0)
+  // The strip is the clip's frames of the sequence; a keyframe is on its recording's, at the clip's speed (plan 105).
+  const speed = clip.speed ?? 1
+  const share = (sourceFrame: number): number => (length > 0 ? ((sourceFrame - clip.sourceIn) / speed + 0.5) / length : 0)
   const frameAtX = (clientX: number): number => {
     const r = strip.current?.getBoundingClientRect()
-    if (!r || r.width <= 0) return clip.sourceIn
+    if (!r || r.width <= 0) return wholeFramesOf(clip).first
     const along = Math.floor(((clientX - r.left) / r.width) * length)
-    return clip.sourceIn + Math.min(length - 1, Math.max(0, along))
+    const { first, last } = wholeFramesOf(clip)
+    return Math.min(last, Math.max(first, Math.round(clip.sourceIn + Math.min(length - 1, Math.max(0, along)) * speed)))
   }
   const menuKey = menu ? keys.find((k) => k.at === menu.key) : undefined
 
@@ -391,7 +399,7 @@ function KeyStrip(props: {
             data-at={k.at}
             data-ease={k.ease ?? 'smooth'}
             data-picked={picked === k.at ? 'yes' : 'no'}
-            aria-label={`Keyframe at ${((k.at - clip.sourceIn) / props.fps).toFixed(2)} s into the clip`}
+            aria-label={`Keyframe at ${((k.at - clip.sourceIn) / speed / props.fps).toFixed(2)} s into the clip`}
             onPointerDown={(e: ReactPointerEvent<HTMLSpanElement>) => {
               if (e.button !== 0) return
               e.stopPropagation()

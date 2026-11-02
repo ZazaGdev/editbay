@@ -3,7 +3,7 @@
  * the tracks, and the timeline itself with its sequence tabs.
  */
 
-import type { JSX } from 'react'
+import { useMemo, type JSX } from 'react'
 import { sequenceOf, trackCount, trackName, v1Clips } from '../../shared/project'
 import { nextLayoutName } from '../../shared/saved-layouts'
 import { heldTrackHeight, nextTrackSize } from '../../shared/timeline-layout'
@@ -18,12 +18,14 @@ import { SequenceTabs } from '../components/SequenceTabs'
 import { useSteady } from '../state/useSteady'
 import { accent, ink, radius, space, surface } from '../theme'
 import { banner, held, panel } from './styles'
+import { ALT_KEY_NAME } from '../../shared/system'
 import type { AppState } from './app-state'
+import type { TimelineProps } from '../components/timeline/props'
 
 export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
   const { recording, painter, setPainter, silenceOpen, timeline, found, listen, setListenChoice, onSequence, silenceSettings, setWindowSettings,
     pauses, toCut, total, togglePause, setKeptPauses, foundKey, hearPause, removeSilences, closeSilences, project, playing, sequenceId,
-    switchSequence, addSequence, duplicateSequence, proj, removeSequence, chooseShape, shapeSetups, pickSetup, saveSetup, savedLayouts, playhead,
+    switchSequence, addSequence, duplicateSequence, proj, removeSequence, chooseShape, shapeSetups, pickSetup, saveSetup, savedLayouts, playheadStore,
     selectedIds, selectedAlone, gap, missingMedia, rebuildingMedia, revisions, peaks, toggleSelected, alsoSelected, leadSelection, select, selectMany,
     selectGap, selectedCaption, selectCaption, seek, setScrubbing, setMarkerMenu, selectedTransition, setSelectedTransition, setTransitionMenu,
     trackHeights, windowSettings, timelineRoom, timelineTracks, paintOnto, setTrackHeights, transitionDefaults, rememberTransition, renamingMarker,
@@ -52,6 +54,103 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
       )
     )
   })
+  // Every handler and element the timeline is given keeps one identity from
+  // one tick of playback to the next, so the memoised timeline is not drawn
+  // again for a playhead it no longer takes as a frame (audit 2026-10-19, fix first 4).
+  const onSwitchSequence = useSteady((id: string) => switchSequence(id))
+  const onRenameSequence = useSteady((id: string, name: string) => void proj.edit({ kind: 'renameSequence', sequenceId: id, name }))
+  const activeSequenceId = project ? sequenceOf(project, sequenceId).id : null
+  const nextSetupName = nextLayoutName(savedLayouts)
+  const steadyAddSequence = useSteady(addSequence)
+  const steadyDuplicateSequence = useSteady(duplicateSequence)
+  const steadyRemoveSequence = useSteady(removeSequence)
+  const steadyChooseShape = useSteady(chooseShape)
+  const steadyPickSetup = useSteady(pickSetup)
+  const steadySaveSetup = useSteady(saveSetup)
+  const header = useMemo(
+    () =>
+      project && timeline ? (
+        <SequenceTabs
+          sequences={project.sequences}
+          activeId={activeSequenceId!}
+          onSwitch={onSwitchSequence}
+          onAdd={steadyAddSequence}
+          onDuplicate={steadyDuplicateSequence}
+          onRename={onRenameSequence}
+          onRemove={steadyRemoveSequence}
+          presetId={timeline.presetId}
+          onShape={steadyChooseShape}
+          setups={shapeSetups}
+          onPickSetup={steadyPickSetup}
+          onSaveSetup={steadySaveSetup}
+          nextSetupName={nextSetupName}
+        />
+      ) : null,
+    // The handlers are steady; what is drawn changes only with these.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [project?.sequences, activeSequenceId, timeline?.presetId, shapeSetups, nextSetupName]
+  )
+  const onSelect = useSteady((id: string | null, alone: boolean, add?: boolean) =>
+    add === true && id !== null
+      ? toggleSelected(id, alone)
+      : id !== null && alsoSelected.length > 0 && selectedIds.has(id)
+        ? leadSelection(id)
+        : select(id, alone)
+  )
+  const onClickClip = useSteady((id: string) => {
+    // A press kept the selection in case it became a drag. It was
+    // a click, so it is this clip now, as a click always was.
+    // The playhead and the view stay where they are.
+    if (alsoSelected.length > 0) select(id, selectedAlone)
+  })
+  const onMarkerMenu = useSteady((m: { id: string }, at: { x: number; y: number }) => setMarkerMenu({ markerId: m.id, at }))
+  const onSelectTransition = useSteady((at: Parameters<typeof setSelectedTransition>[0]) => {
+    // Clearing the clip selection first, so Delete has one thing
+    // to act on rather than two. `select` clears the transition
+    // too, which is why it comes first.
+    if (at) select(null)
+    setSelectedTransition(at)
+  })
+  const onTransitionMenu = useSteady((...[which, at]: Parameters<NonNullable<TimelineProps['onTransitionMenu']>>) =>
+    setTransitionMenu({ ...which, at })
+  )
+  const onTrackHeight = useSteady((trackId: string, px: number) =>
+    setTrackHeights((was) => {
+      // Zero puts it back to the height its kind gets from the size control.
+      if (px <= 0) {
+        const { [trackId]: _was, ...rest } = was
+        return rest
+      }
+      return { ...was, [trackId]: heldTrackHeight(px) }
+    })
+  )
+  const onTransitionFrames = useSteady((frames: number) => {
+    if (timeline) rememberTransition({ seconds: frames / timeline.fps })
+  })
+  const onRenameDone = useSteady(() => setRenamingMarker(null))
+  const onDropSource = useSteady((mediaId: string, trackId: string, frame: number, how: Parameters<typeof addSource>[3]) =>
+    addSource(mediaId, frame, trackId, how)
+  )
+  const onDropEffect = useSteady((...[path, trackId, frame, how]: Parameters<NonNullable<TimelineProps['onDropEffect']>>) =>
+    void putEffect(path, { trackId, frame, ...how })
+  )
+  const onRemoveSilences = useSteady(() => run('removeSilences'))
+  const onClipMenu = useSteady((clipId: string, at: { x: number; y: number }) => setClipMenu({ clipId, at }))
+  const onGapMenu = useSteady((g: NonNullable<typeof gap>, at: { x: number; y: number }) => setGapMenu({ gap: g, at }))
+  const onSolo = useSteady((trackId: string, on: boolean) =>
+    setSolo((was) => {
+      const next = new Set(was)
+      if (on) next.add(trackId)
+      else next.delete(trackId)
+      return next
+    })
+  )
+  const onTrackSize = useSteady(() => setTrackSize(nextTrackSize(trackSize)))
+  const onOverview = useSteady((overview: boolean) => setWindowSettings({ overview }))
+  const onSnapping = useSteady((snapping: boolean) => setWindowSettings({ snapping }))
+  const addVideoTrackTitle = withKey('Add a video track, above the others', keys.keymap, 'addVideoTrack')
+  const addAudioTrackTitle = withKey('Add an audio track, below the others', keys.keymap, 'addAudioTrack')
+  const addTrackTitles = useMemo(() => ({ video: addVideoTrackTitle, audio: addAudioTrackTitle }), [addVideoTrackTitle, addAudioTrackTitle])
   return (
     <div data-testid="timeline-panel" style={{ gridColumn: '1 / -1', ...panel, position: 'relative', overflowY: 'visible', ...(recording ? held : {}) }}>
       {/*
@@ -132,24 +231,8 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
         <Timeline
           timeline={timeline}
           playing={playing}
-          header={
-            <SequenceTabs
-              sequences={project.sequences}
-              activeId={sequenceOf(project, sequenceId).id}
-              onSwitch={(id) => switchSequence(id)}
-              onAdd={addSequence}
-              onDuplicate={duplicateSequence}
-              onRename={(id, name) => void proj.edit({ kind: 'renameSequence', sequenceId: id, name })}
-              onRemove={removeSequence}
-              presetId={timeline.presetId}
-              onShape={chooseShape}
-              setups={shapeSetups}
-              onPickSetup={pickSetup}
-              onSaveSetup={saveSetup}
-              nextSetupName={nextLayoutName(savedLayouts)}
-            />
-          }
-          playhead={playhead}
+          header={header}
+          playhead={playheadStore}
           selectedIds={selectedIds}
           selectedAlone={selectedAlone}
           selectedGap={gap}
@@ -157,35 +240,18 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
           rebuildingMedia={rebuildingMedia}
           revisions={revisions}
           peaks={peaks}
-          onSelect={(id, alone, add) =>
-            add === true && id !== null
-              ? toggleSelected(id, alone)
-              : id !== null && alsoSelected.length > 0 && selectedIds.has(id)
-                ? leadSelection(id)
-                : select(id, alone)
-          }
+          onSelect={onSelect}
           onSelectMany={selectMany}
-          onClickClip={(id) => {
-            // A press kept the selection in case it became a drag. It was
-            // a click, so it is this clip now, as a click always was.
-            // The playhead and the view stay where they are.
-            if (alsoSelected.length > 0) select(id, selectedAlone)
-          }}
+          onClickClip={onClickClip}
           onSelectGap={selectGap}
           selectedCaptionId={selectedCaption}
           onSelectCaption={selectCaption}
           onSeek={seek}
           onScrubPlayhead={setScrubbing}
-          onMarkerMenu={(m, at) => setMarkerMenu({ markerId: m.id, at })}
+          onMarkerMenu={onMarkerMenu}
           selectedTransition={selectedTransition}
-          onSelectTransition={(at) => {
-            // Clearing the clip selection first, so Delete has one thing
-            // to act on rather than two. `select` clears the transition
-            // too, which is why it comes first.
-            if (at) select(null)
-            setSelectedTransition(at)
-          }}
-          onTransitionMenu={(which, at) => setTransitionMenu({ ...which, at })}
+          onSelectTransition={onSelectTransition}
+          onTransitionMenu={onTransitionMenu}
           trackHeights={trackHeights}
           tracksHeight={windowSettings.timelineHeight}
           tracksRoom={timelineRoom}
@@ -193,29 +259,20 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
           onPaint={painter ? paintOnto : undefined}
           onEffectMark={painter ? undefined : openEffectSection}
           onKeyframeMove={moveKeyframe}
-          onTrackHeight={(trackId, px) =>
-            setTrackHeights((was) => {
-              // Zero puts it back to the height its kind gets from the size control.
-              if (px <= 0) {
-                const { [trackId]: _was, ...rest } = was
-                return rest
-              }
-              return { ...was, [trackId]: heldTrackHeight(px) }
-            })
-          }
+          onTrackHeight={onTrackHeight}
           transitionFrames={Math.max(1, Math.round(transitionDefaults.seconds * timeline.fps))}
           transitionKinds={transitionDefaults}
-          onTransitionFrames={(frames) => rememberTransition({ seconds: frames / timeline.fps })}
+          onTransitionFrames={onTransitionFrames}
           renamingMarkerId={renamingMarker}
-          onRenameDone={() => setRenamingMarker(null)}
+          onRenameDone={onRenameDone}
           onEdit={editClip}
           zoom={zoom}
           onZoom={zoomBy}
           onZoomTo={zoomTo}
-          onDropSource={(mediaId, trackId, frame, how) => addSource(mediaId, frame, trackId, how)}
-          onDropEffect={(path, trackId, frame, how) => void putEffect(path, { trackId, frame, ...how })}
+          onDropSource={onDropSource}
+          onDropEffect={onDropEffect}
           range={range}
-          onRemoveSilences={() => run('removeSilences')}
+          onRemoveSilences={onRemoveSilences}
           canRemoveSilences={v1Clips(timeline).length > 0}
           removeSilencesTitle={withKey(
             'Remove silences: find the pauses in the talking and take them out',
@@ -223,36 +280,26 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
             'removeSilences'
           )}
           solo={solo}
-          onClipMenu={(clipId, at) => setClipMenu({ clipId, at })}
-          onGapMenu={(g, at) => setGapMenu({ gap: g, at })}
+          onClipMenu={onClipMenu}
+          onGapMenu={onGapMenu}
           onSkim={windowSettings.skim ? setLookingAt : undefined}
-          onSolo={(trackId, on) =>
-            setSolo((was) => {
-              const next = new Set(was)
-              if (on) next.add(trackId)
-              else next.delete(trackId)
-              return next
-            })
-          }
+          onSolo={onSolo}
           onFit={fitTimeline}
           trackSize={trackSize}
-          onTrackSize={() => setTrackSize(nextTrackSize(trackSize))}
+          onTrackSize={onTrackSize}
           fitTitle={withKey('Fit the whole edit on screen', keys.keymap, 'fitTimeline')}
-          addTrackTitles={{
-            video: withKey('Add a video track, above the others', keys.keymap, 'addVideoTrack'),
-            audio: withKey('Add an audio track, below the others', keys.keymap, 'addAudioTrack')
-          }}
+          addTrackTitles={addTrackTitles}
           overview={windowSettings.overview}
           picture={picture}
           showClipKeys={windowSettings.clipKeys}
-          onOverview={(overview) => setWindowSettings({ overview })}
+          onOverview={onOverview}
           snapping={windowSettings.snapping}
-          onSnapping={(snapping) => setWindowSettings({ snapping })}
+          onSnapping={onSnapping}
           onAddText={timelineAddText}
           shapes={timelineShapes}
           onAddBlackScreen={timelineAddBlackScreen}
           snapTitle={withKey(
-            windowSettings.snapping ? 'Snapping is on: press to turn it off. Alt frees one drag.' : 'Snapping is off: press to turn it on',
+            windowSettings.snapping ? `Snapping is on: press to turn it off. ${ALT_KEY_NAME} frees one drag.` : 'Snapping is off: press to turn it on',
             keys.keymap,
             'toggleSnapping'
           )}

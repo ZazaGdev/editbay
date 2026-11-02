@@ -59,6 +59,8 @@ export function groupRefusal(p: Timeline, clipIds: readonly string[]): string | 
   if (pictures.length < 2) return 'Select two or more pictures side by side on one track to group them.'
   const tracks = new Set(pictures.map((c) => findClip(p, c.id)!.track.id))
   if (tracks.size > 1) return 'Only clips on one track can be grouped into one clip.'
+  // A group is framed on its pieces' recording frames end to end, which a speed of their own would break (plan 105).
+  if (pictures.some((c) => c.speed !== undefined)) return 'Clips at a speed of their own cannot be grouped. Set them back to 1x first.'
   const sorted = [...pictures].sort((a, b) => a.timelineStart - b.timelineStart)
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i]!.timelineStart !== spanEnd(sorted[i - 1]!)) {
@@ -272,15 +274,23 @@ export function withGroupFrame(p: Timeline, group: string, frame: GroupFrame): T
  * changed.
  */
 export function settleGroups(p: Timeline, before?: Timeline): Timeline {
-  const ids = new Set(p.videoTracks.flatMap((r) => r.clips.flatMap((c) => (c.group === undefined ? [] : [c.group]))))
-  const orphans = allClips(p).some((c) => c.group !== undefined && !ids.has(c.group))
-  if (ids.size === 0 && !orphans) return p
+  const now = piecesByGroup(p)
+  const orphans = allClips(p).some((c) => c.group !== undefined && !now.has(c.group))
+  if (now.size === 0 && !orphans) return p
+  // Worked out once, not asked of the whole sequence once per piece: with an
+  // hour's cut in one group every edit cost tens of milliseconds (audit 2026-10-19).
+  const byLink = new Map<string, string[]>()
+  for (const c of allClips(p)) if (c.link !== undefined) byLink.set(c.link, [...(byLink.get(c.link) ?? []), c.id])
+  const was = before && before.media === p.media ? piecesByGroup(before) : null
   const kept = new Map<string, Clip>()
   const members = new Set<string>()
-  for (const group of ids) {
-    for (const piece of settledGroup(p, group, before)) {
+  for (const [group, pieces] of now) {
+    // A group the edit did not touch is as it was settled, piece for piece.
+    const settled = (was && samePieces(pieces, was.get(group)) ? keptAsTheyAre(pieces) : null) ?? settledGroup(p, pieces, before)
+    for (const piece of settled) {
       kept.set(piece.id, piece)
-      for (const id of linkedIds(p, piece.id)) members.add(id)
+      members.add(piece.id)
+      if (piece.link !== undefined) for (const id of byLink.get(piece.link) ?? []) members.add(id)
     }
   }
   const video = (c: Clip): Clip => {
@@ -301,15 +311,50 @@ export function settleGroups(p: Timeline, before?: Timeline): Timeline {
   return { ...p, videoTracks, audioTracks }
 }
 
+/** A group's pieces where they are, each with the index of its video track, in track order and then in the order of the track's clips. */
+type Placed = { track: number; clip: Clip }
+
+/** Every group's pieces, found in one pass over the video tracks. */
+function piecesByGroup(p: Timeline): Map<string, Placed[]> {
+  const out = new Map<string, Placed[]>()
+  p.videoTracks.forEach((r, track) => {
+    for (const clip of r.clips) {
+      if (clip.group === undefined) continue
+      const was = out.get(clip.group)
+      if (was) was.push({ track, clip })
+      else out.set(clip.group, [{ track, clip }])
+    }
+  })
+  return out
+}
+
+/** Whether a group's pieces are the very same clips on the same tracks as before the edit. */
+function samePieces(now: readonly Placed[], was: readonly Placed[] | undefined): boolean {
+  return was !== undefined && was.length === now.length && now.every((x, i) => x.track === was[i]!.track && x.clip === was[i]!.clip)
+}
+
+/**
+ * The pieces of a group the edit left alone, as they are, when they are one
+ * run of neighbours on one track, as a settled group always is; null when
+ * they are not, and so want settling after all.
+ */
+function keptAsTheyAre(pieces: readonly Placed[]): Clip[] | null {
+  if (pieces.length < 2 || pieces.some((x) => x.track !== pieces[0]!.track)) return null
+  const run = pieces.map((x) => x.clip).sort((a, b) => a.timelineStart - b.timelineStart)
+  return run.every((c, i) => i === 0 || c.timelineStart === spanEnd(run[i - 1]!)) ? run : null
+}
+
 /** The pieces a group keeps, each framed from the group: none when it is no group any more. */
-function settledGroup(p: Timeline, group: string, before?: Timeline): Clip[] {
+function settledGroup(p: Timeline, placed: readonly Placed[], before?: Timeline): Clip[] {
+  const group = placed[0]!.clip.group!
   // The track with most of it, and on that its longest run of neighbours.
   let best: Clip[] = []
-  for (const r of p.videoTracks) {
-    const pieces = r.clips.filter((c) => c.group === group).sort((a, b) => a.timelineStart - b.timelineStart)
+  for (const track of new Set(placed.map((x) => x.track))) {
+    const pieces = placed.filter((x) => x.track === track).map((x) => x.clip).sort((a, b) => a.timelineStart - b.timelineStart)
     let run: Clip[] = []
     for (const c of pieces) {
-      run = run.length > 0 && c.timelineStart === spanEnd(run[run.length - 1]!) ? [...run, c] : [c]
+      if (run.length > 0 && c.timelineStart === spanEnd(run[run.length - 1]!)) run.push(c)
+      else run = [c]
       if (run.length > best.length) best = run
     }
   }
@@ -349,8 +394,24 @@ function settledGroup(p: Timeline, group: string, before?: Timeline): Clip[] {
         ...(keys && keys.length > 0 ? { keys: keys.map((k) => ({ ...k, at: k.at + shift, crop: own(k.crop) })) } : {})
       }
     })
-    return JSON.stringify(next) === JSON.stringify(c) ? c : next
+    return sameClip(next, c) ? c : next
   })
+}
+
+/**
+ * Whether a piece framed again comes out as it was: field by field, and only
+ * a field that is not the same object compared by what it holds. Writing out
+ * the whole clip twice for every piece cost more than the framing itself.
+ */
+function sameClip(a: Clip, b: Clip): boolean {
+  const x = a as unknown as Record<string, unknown>
+  const y = b as unknown as Record<string, unknown>
+  const keys = new Set([...Object.keys(x), ...Object.keys(y)])
+  for (const k of keys) {
+    if (x[k] === y[k]) continue
+    if (typeof x[k] !== 'object' || typeof y[k] !== 'object' || JSON.stringify(x[k]) !== JSON.stringify(y[k])) return false
+  }
+  return true
 }
 
 /** Whether a clip's edge is a cut inside its group, which is not a trim handle. */

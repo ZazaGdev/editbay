@@ -11,7 +11,7 @@ import type { PictureStyle } from './project'
  */
 
 export type PipCorner = 'tl' | 'tr' | 'bl' | 'br'
-export type PipShape = 'square' | 'rounded' | 'circle'
+export type PipShape = 'square' | 'rounded' | 'portrait' | 'circle'
 
 export const PIP_CORNERS: readonly PipCorner[] = ['tl', 'tr', 'bl', 'br']
 
@@ -23,6 +23,27 @@ export const PIP_MAX_MARGIN = 80
 export const PIP_DEFAULT_MARGIN = 24
 /** Rounded, in output pixels: the one radius the section offers. */
 export const PIP_ROUNDED_PX = 24
+
+/**
+ * Portrait (task 2159): a tall card like a phone's screen, 9 by 16, its
+ * corners rounded by a share of its width so they grow with it, and a thin
+ * light edge round it.
+ */
+export const PIP_PORTRAIT_ASPECT = 9 / 16
+export const PIP_PORTRAIT_EDGE_COLOUR = '#d9d9d9'
+const PORTRAIT_RADIUS_SHARE = 0.12
+/** How far from its share a card's radius may be, as a drag or a keyframe leaves it, and still read as one. */
+const PORTRAIT_RADIUS_SLACK = 0.03
+
+/** A portrait card's radius at this width in output pixels, never the plain rounded one. */
+export function portraitRadius(boxW: number): number {
+  return Math.max(PIP_ROUNDED_PX + 2, Math.round(boxW * PORTRAIT_RADIUS_SHARE))
+}
+
+/** A portrait card's edge in output pixels: thin, a 360th of the frame's shorter side. */
+export function portraitEdge(frameW: number, frameH: number): number {
+  return Math.max(2, Math.round(Math.min(frameW, frameH) / 360))
+}
 
 /** How far off, in output pixels, a box still reads as sitting in a corner. */
 const CORNER_SLACK_PX = 1
@@ -55,15 +76,20 @@ export function pipCorner(place: Place, frameW: number, frameH: number): { corne
 
 /**
  * The shape a box and its style draw: a circle when the box is square in
- * output pixels and rounded by at least half its side, rounded when it has
- * any radius, square otherwise.
+ * output pixels and rounded by at least half its side, a portrait card when
+ * it is 9 by 16 and rounded by about a card's share of its width, rounded
+ * when it has any other radius, square otherwise.
  */
 export function pipShape(style: PictureStyle | undefined, place: Place, frameW: number, frameH: number): PipShape {
   const radius = style?.radius ?? 0
   if (radius <= 0) return 'square'
   const w = place.w * frameW
   const h = place.h * frameH
-  return Math.abs(w - h) <= CORNER_SLACK_PX * 2 && radius >= Math.min(w, h) / 2 - CORNER_SLACK_PX ? 'circle' : 'rounded'
+  if (Math.abs(w - h) <= CORNER_SLACK_PX * 2 && radius >= Math.min(w, h) / 2 - CORNER_SLACK_PX) return 'circle'
+  const tall = Math.abs(w / Math.max(1, h) - PIP_PORTRAIT_ASPECT) / PIP_PORTRAIT_ASPECT < 0.02
+  const share = radius / Math.max(1, w)
+  const card = radius !== PIP_ROUNDED_PX && (Math.abs(share - PORTRAIT_RADIUS_SHARE) <= PORTRAIT_RADIUS_SLACK || radius === portraitRadius(w))
+  return tall && card ? 'portrait' : 'rounded'
 }
 
 /**
@@ -125,10 +151,23 @@ export function snapToCorner(place: Place, margin: number, frameW: number, frame
   return best
 }
 
-/** The style for a shape on a box this size in output pixels, keeping its border and shadow. */
-export function styleForShape(style: PictureStyle | undefined, shape: PipShape, boxW: number, boxH: number): PictureStyle | null {
+/**
+ * The style for a shape on a box this size in output pixels, keeping its
+ * border and shadow. A portrait card with no border is given its thin edge,
+ * `edge` output pixels wide.
+ */
+export function styleForShape(style: PictureStyle | undefined, shape: PipShape, boxW: number, boxH: number, edge = 0): PictureStyle | null {
   const { radius: _was, ...rest } = style ?? {}
-  const radius = shape === 'square' ? 0 : shape === 'rounded' ? PIP_ROUNDED_PX : Math.ceil(Math.min(boxW, boxH) / 2)
-  const next: PictureStyle = { ...rest, ...(radius > 0 ? { radius } : {}) }
+  const radius =
+    shape === 'square' ? 0 : shape === 'rounded' ? PIP_ROUNDED_PX : shape === 'portrait' ? portraitRadius(boxW) : Math.ceil(Math.min(boxW, boxH) / 2)
+  const edged = shape === 'portrait' && edge > 0 && (rest.border ?? 0) <= 0 ? { border: edge, borderColour: PIP_PORTRAIT_EDGE_COLOUR } : {}
+  const next: PictureStyle = { ...rest, ...(radius > 0 ? { radius } : {}), ...edged }
   return Object.keys(next).length > 0 ? next : null
+}
+
+/** A style without the edge a portrait card was given, left as it was if its border is one of its own. */
+export function withoutPortraitEdge(style: PictureStyle | undefined, edge: number): PictureStyle | undefined {
+  if (!style || style.border !== edge || style.borderColour !== PIP_PORTRAIT_EDGE_COLOUR) return style
+  const { border: _b, borderColour: _c, ...rest } = style
+  return rest
 }

@@ -320,7 +320,7 @@ describe('a plain V1 clip with its first stream heard at 100%', () => {
     const graph = now.segments[0]!.args[now.segments[0]!.args.indexOf('-filter_complex') + 1]!
     // Today's plain command: its picture's single chain, now with its first
     // frame put at the start, and the sound's single chain from input 0.
-    expect(graph).toMatch(/^\[0:v\]fps=30:start_time=0,crop=/)
+    expect(graph).toMatch(/^\[0:v\]fps=30:start_time=0,setparams=colorspace=bt709,crop=/)
     expect(graph).toContain(';[0:a:0]volume=1,aresample=async=1,apad,pan=stereo|FL=FL+FC|FR=FR+FC,aformat=')
     expect(now.segments[0]!.args.filter((x) => x === '-i')).toHaveLength(1)
 

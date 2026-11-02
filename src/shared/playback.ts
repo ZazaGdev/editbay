@@ -13,7 +13,7 @@ import {
   type Timeline,
   type ProjectMedia
 } from './project'
-import { spanHolds, type Span } from './tracks'
+import { spanHolds, sourceAt, type Span } from './tracks'
 import { framesToSeconds } from './time'
 import type { ClipEdit } from './types'
 
@@ -33,7 +33,7 @@ export function positionIn(p: Timeline, clip: Clip, frame: number): PlayPosition
   const media = p.media.find((m) => m.id === clip.mediaId)
   if (!media) return null
   const into = frame - clip.timelineStart
-  const sourceFrame = clip.sourceIn + into
+  const sourceFrame = sourceAt(clip, frame)
   return {
     clip,
     media,

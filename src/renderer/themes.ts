@@ -49,8 +49,8 @@ export function switchTheme(id: ThemeId): void {
 
 type Changes = Record<string, Record<string, string | number>>
 
-const SANS = 'Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif'
-const MONO = '"JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace'
+const SANS = 'Inter, "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui, sans-serif'
+const MONO = '"JetBrains Mono", "Cascadia Mono", Consolas, Menlo, ui-monospace, monospace'
 
 /** What both Arctic themes share: the surfaces, the borders, the type and the corners. */
 const ARCTIC: Changes = {

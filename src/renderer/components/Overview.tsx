@@ -5,6 +5,27 @@ import { surface, ink, accent, meaning, track as trackColour, space, radius, typ
 import { markColour } from '../../shared/marks'
 import { IconButton } from '../ui/IconButton'
 import { inOrder } from '../../shared/markers'
+import { usePlayheadRead, type PlayheadStore } from '../state/playheadStore'
+
+/** The playhead on the strip, drawn again on its own as it moves. */
+function OverviewPlayhead({ playhead, frames }: { playhead: PlayheadStore; frames: number }): JSX.Element {
+  const left = usePlayheadRead(playhead, (frame) => `${(frame / frames) * 100}%`)
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        left,
+        top: -5,
+        bottom: -5,
+        width: 2,
+        marginLeft: -1,
+        background: meaning.playhead,
+        pointerEvents: 'none'
+      }}
+    />
+  )
+}
 
 /** How tall the strip is, and how tall each of its two rows is. */
 export const OVERVIEW_HEIGHT = 44
@@ -19,7 +40,7 @@ export const OVERVIEW_HEIGHT = 44
  */
 export function Overview(props: {
   timeline: Timeline
-  playhead: number
+  playhead: PlayheadStore
   /** The timeline's scroller, read for the box and moved when the strip is pressed. */
   scroller: {
     element: () => HTMLElement | null
@@ -256,19 +277,7 @@ export function Overview(props: {
             }}
           />
 
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              left: percent(props.playhead),
-              top: -5,
-              bottom: -5,
-              width: 2,
-              marginLeft: -1,
-              background: meaning.playhead,
-              pointerEvents: 'none'
-            }}
-          />
+          <OverviewPlayhead playhead={props.playhead} frames={frames} />
         </div>
       </div>
       {/*

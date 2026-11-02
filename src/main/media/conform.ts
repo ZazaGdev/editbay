@@ -5,6 +5,7 @@ import { runFfmpeg } from '../ffmpeg/run'
 import { scratchPath, commitScratch } from './cache'
 import { toStereo } from '../../shared/sound'
 import { BT601_TO_709, isBt601 } from '../../shared/colour-space'
+import { RECORDING_BT709 } from '../../shared/render-pictures'
 
 const RESOLUTION_CAP = 3840
 const STANDARD_RATES = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60]
@@ -40,6 +41,11 @@ function formatRate(rate: number): string {
   return Number.isInteger(rate) ? String(rate) : rate.toFixed(3)
 }
 
+/** Whether a recording's matrix is BT.709 or not said at all, so its frames may be said to be BT.709. */
+function saysNoOtherMatrix(colorSpace: string | null | undefined): boolean {
+  return colorSpace === null || colorSpace === undefined || ['', 'unknown', 'unspecified', 'reserved', 'bt709'].includes(colorSpace)
+}
+
 /** Whether a recording is HDR, by its transfer: PQ or HLG. */
 function isHdr(probe: ProbeResult): boolean {
   return probe.video.colorTransfer === 'smpte2084' || probe.video.colorTransfer === 'arib-std-b67'
@@ -47,6 +53,12 @@ function isHdr(probe: ProbeResult): boolean {
 
 function videoFilters(probe: ProbeResult, hasZscale: boolean): string {
   const filters: string[] = []
+  // Its frames said to be BT.709 first, as the export says of them, when its
+  // header names no other matrix. `-colorspace bt709` below is not enough for
+  // one that names its primaries and leaves the matrix unspecified: the
+  // header wins, and ffmpeg 9 converted it as BT.601 into the copy the
+  // preview plays, so the shift was never seen (audit 2026-10-19).
+  if (!isHdr(probe) && saysNoOtherMatrix(probe.video.colorSpace)) filters.push(RECORDING_BT709)
   // Pixels made square by widening or narrowing the picture, so its width
   // and height are what it shows; then capped as any picture is.
   const aspect = probe.video.pixelAspect ?? 1

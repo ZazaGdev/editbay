@@ -1,5 +1,5 @@
 import { allClips, asTwoPieces, closeUpStretch, newId, v1Clips, type SoundClip, type Timeline } from './project'
-import { closeUpStarts, spanEnd, type Span } from './tracks'
+import { closeUpStarts, spanEnd, sourceAt, speedOf, type Span } from './tracks'
 import { onV1 as picturesOnV1 } from './remove-clips'
 import { peaksKey } from './sound'
 import type { PeaksData } from './types'
@@ -49,10 +49,11 @@ export function defaultListenTracks(t: Timeline): string[] {
  * silent.
  */
 export function clipPeakAt(data: PeaksData, c: SoundClip, frame: number, fps: number): number {
-  const n = c.sourceIn + (frame - c.timelineStart)
+  // One frame of the sequence plays as many of the recording as the clip's speed (plan 105).
+  const n = sourceAt(c, frame)
   // Worked out from whole numbers, so a frame's edge on a bucket's edge is never a hair out.
   const first = Math.floor((n * data.peaksPerSecond) / fps + 1e-9)
-  const last = Math.max(first + 1, Math.ceil(((n + 1) * data.peaksPerSecond) / fps - 1e-9))
+  const last = Math.max(first + 1, Math.ceil(((n + speedOf(c)) * data.peaksPerSecond) / fps - 1e-9))
   let loudest = 0
   for (let b = first; b < last; b++) {
     const lo = data.peaks[b * 2]
@@ -170,14 +171,20 @@ function usable(t: Timeline, stretches: readonly Stretch[]): Stretch[] {
  * what starts after it moves earlier, what starts inside it moves to its
  * start, and what runs across it, like music under the whole cut, stays whole.
  *
+ * A clip on a track listened to is cut there too, with its linked clips,
+ * whether or not it is linked to V1: it is the sound the pause was found in.
+ * A voice from a separate recorder left whole was out of step with the
+ * pictures from the first pause on (audit 2026-10-19).
+ *
  * Null when it cannot close up cleanly: when a clip left whole across the
  * stretch is in the way of one moving up on the same track, such as a voice
  * over beside a recording's microphone stream. The one moving up would be
  * pushed along past it, out of step with its picture, so the stretch stays.
  */
-function removeStretch(t: Timeline, s: Stretch): Timeline | null {
+function removeStretch(t: Timeline, s: Stretch, listened: ReadonlySet<string>): Timeline | null {
   const group = (c: Span): string => c.link ?? `#${c.id}`
   const onV1 = new Set(v1Clips(t).map(group))
+  for (const r of t.audioTracks) if (listened.has(r.id)) for (const c of r.clips) onV1.add(group(c))
   const all = allClips(t)
   const cutting = new Set(all.filter((c) => onV1.has(group(c)) && c.timelineStart < s.to && spanEnd(c) > s.from).map(group))
   const before = new Map<string, number>()
@@ -197,7 +204,7 @@ function removeStretch(t: Timeline, s: Stretch): Timeline | null {
   const cut = <T extends Span>(c: T): T[] => {
     const g = group(c)
     if (!cutting.has(g)) return [c]
-    const head = c.timelineStart < s.from ? { ...c, sourceOut: Math.min(c.sourceOut, c.sourceIn + (s.from - c.timelineStart)) } : null
+    const head = c.timelineStart < s.from ? { ...c, sourceOut: Math.min(c.sourceOut, sourceAt(c, s.from)) } : null
     let tail: T | null = null
     if (spanEnd(c) > s.to) {
       const start = Math.max(c.timelineStart, s.to)
@@ -207,7 +214,7 @@ function removeStretch(t: Timeline, s: Stretch): Timeline | null {
         ...rest,
         // A clip with nothing left before the stretch keeps its id.
         id: head ? newId() : c.id,
-        sourceIn: c.sourceIn + (start - c.timelineStart),
+        sourceIn: sourceAt(c, start),
         timelineStart: start,
         ...(link !== undefined ? { link } : {})
       } as T
@@ -227,12 +234,13 @@ function removeStretch(t: Timeline, s: Stretch): Timeline | null {
 }
 
 /** Take out the stretches that can be, from the last to the first: the sequence after, and which came out, in order. */
-function apply(t: Timeline, stretches: readonly Stretch[]): { timeline: Timeline; removed: Stretch[] } {
+function apply(t: Timeline, stretches: readonly Stretch[], listened: readonly string[]): { timeline: Timeline; removed: Stretch[] } {
   const kept = usable(t, stretches)
   const removed: Stretch[] = []
+  const tracks = new Set(listened)
   let next = t
   for (let i = kept.length - 1; i >= 0; i--) {
-    const after = removeStretch(next, kept[i]!)
+    const after = removeStretch(next, kept[i]!, tracks)
     if (!after) continue
     next = after
     removed.unshift(kept[i]!)
@@ -243,10 +251,11 @@ function apply(t: Timeline, stretches: readonly Stretch[]): { timeline: Timeline
 /**
  * Of these stretches, the ones `removeStretches` would take out: whole
  * frames under pictures on V1, none overlapping another, and each closing up
- * cleanly once those after it are out.
+ * cleanly once those after it are out. `listened` names the audio tracks the
+ * pauses were found on, whose clips are cut with V1's.
  */
-export function removableStretches(t: Timeline, stretches: readonly Stretch[]): Stretch[] {
-  return apply(t, stretches).removed
+export function removableStretches(t: Timeline, stretches: readonly Stretch[], listened: readonly string[] = []): Stretch[] {
+  return apply(t, stretches, listened).removed
 }
 
 /**
@@ -254,8 +263,8 @@ export function removableStretches(t: Timeline, stretches: readonly Stretch[]): 
  * `removeStretch` does, from the last to the first, so each is taken from
  * where it was found. Those that cannot be taken out are left out.
  */
-export function removeStretches(t: Timeline, stretches: readonly Stretch[]): Timeline {
-  return apply(t, stretches).timeline
+export function removeStretches(t: Timeline, stretches: readonly Stretch[], listened: readonly string[] = []): Timeline {
+  return apply(t, stretches, listened).timeline
 }
 
 /**

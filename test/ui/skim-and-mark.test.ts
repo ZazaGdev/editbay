@@ -186,7 +186,9 @@ describe('looking through a recording before it lands', () => {
       const v = el as HTMLVideoElement
       return { src: v.getAttribute('src'), readyState: v.readyState, networkState: v.networkState }
     })
-    expect(left).toEqual({ src: null, readyState: 0, networkState: 0 })
+    expect({ src: left.src, readyState: left.readyState }).toEqual({ src: null, readyState: 0 })
+    // Empty on Windows; a Mac reports no source, which is as let go.
+    expect([0, 3]).toContain(left.networkState)
   })
 })
 
@@ -236,7 +238,7 @@ describe('looking through a clip already on the timeline', () => {
     await page.mouse.move(box.x + box.width / 2 + 80, y)
     expect(await lookingAt()).toBe(null)
     await page.mouse.up()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     expect(await playhead()).toBe(was)
     await page.mouse.move(10, 10)
   })
@@ -248,7 +250,7 @@ describe('the marks the recording keeps', () => {
     expect(before.markIn).toBeGreaterThan(0)
     const saved = join(root, 'marked.editbay')
     await answerSaveDialog(app, saved)
-    await page.keyboard.press('Control+Shift+s')
+    await page.keyboard.press('ControlOrMeta+Shift+s')
     await page.waitForSelector('[data-testid="project-name"][data-changed="no"]', { timeout: 30_000 })
 
     await app.close()

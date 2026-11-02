@@ -82,6 +82,7 @@ import { PanelGrid } from './app/PanelGrid'
 import { SECTION_TYPE } from './components/section-host'
 import { ExportWindow } from './app/ExportWindow'
 import { ClipMenu } from './app/ClipMenu'
+import { TargetPicker } from './app/TargetPicker'
 import { GapMenu } from './app/GapMenu'
 import { MarkerMenu } from './app/MarkerMenu'
 import { TransitionMenu } from './app/TransitionMenu'
@@ -479,8 +480,13 @@ export function App(): JSX.Element {
     [total]
   )
 
-  // Playback reports its own position; do not stop it by seeking back.
-  const followEngine = useCallback((f: number) => setPlayhead(f), [])
+  // Playback reports its own position; do not stop it by seeking back. While
+  // stopped, a report only echoes the playhead it was sent, and one sent after
+  // an edit lands could come in after a key pressed since and undo its move
+  // (task 1388), so the playhead takes reports only while playing.
+  const followEngine = useCallback((f: number) => {
+    if (stateNow.current.playing) setPlayhead(f)
+  }, [])
   const onEnded = useCallback(() => setPlaying(false), [])
 
   // Captions are made for the document they were asked for. Another one
@@ -764,6 +770,7 @@ export function App(): JSX.Element {
       )}
 
       {paletteOpen && <CommandPalette commands={paletteCommands(app)} onClose={() => setPaletteOpen(false)} />}
+      <TargetPicker app={app} />
 
       {joinAsk && timeline && <JoinAsk app={app} joinAsk={joinAsk} timeline={timeline} />}
       <Dialogs app={app} />

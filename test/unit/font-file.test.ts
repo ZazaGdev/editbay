@@ -19,7 +19,7 @@ describe('reading a font file (plan 87)', () => {
     })
   }
 
-  it('reads a font from this PC', async () => {
+  it.runIf(process.platform === 'win32')('reads a font from this PC', async () => {
     const bytes = new Uint8Array(await readFile(join(process.env.SystemRoot ?? 'C:\Windows', 'Fonts', 'arial.ttf')))
     const read = readFontFigures(bytes)!
     expect(read.family).toBe('Arial')

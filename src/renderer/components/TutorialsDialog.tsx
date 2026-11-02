@@ -15,6 +15,7 @@ import type { Picker } from '../tutorials/show-target'
 import { TutorialEntry, type View } from '../tutorials/TutorialEntry'
 import { accent, ink, radius, space, surface, type } from '../theme'
 import { Modal } from './Modal'
+import { commandKey } from '../../shared/system'
 
 /** Offered when a search finds nothing, rather than an empty panel. */
 const STARTING_POINTS = ['040-your-first-edit', '150-remove-silences', '050-the-keys-worth-learning']
@@ -130,14 +131,14 @@ export function TutorialsDialog(props: {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setChosen((c) => Math.max(c - 1, 0))
-    } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && e.ctrlKey) {
+    } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && commandKey(e)) {
       const at = tabs.indexOf(tab)
       const next = e.key === 'ArrowRight' ? at + 1 : at - 1
       if (next >= 0 && next < tabs.length) {
         e.preventDefault()
         setTab(tabs[next]!)
       }
-    } else if (e.key === 'f' && e.ctrlKey) {
+    } else if (e.key === 'f' && commandKey(e)) {
       e.preventDefault()
       box.current?.focus()
       box.current?.select()

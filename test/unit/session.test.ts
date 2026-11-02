@@ -200,6 +200,7 @@ describe('applyEditTo', () => {
       applyLayout: { kind: 'applyLayout', clipId: 'x', layout: 'pip' },
       swapPictures: { kind: 'swapPictures', clipId: 'y' },
       applyLayoutToSource: { kind: 'applyLayoutToSource', clipId: 'x' },
+      setSpeed: { kind: 'setSpeed', clipId: 'x', speed: 2 },
       setClipAudio: { kind: 'setClipAudio', clipId: 'x.1', gain: 0.5, muted: true },
       applySoundToSource: { kind: 'applySoundToSource', clipId: 'x' },
       setShape: { kind: 'setShape', presetId: 'square' },
@@ -484,7 +485,8 @@ describe('whether the project has unsaved changes', () => {
   })
 })
 
-describe('the project name', () => {
+// Named from Windows paths, which only Windows' path rules read (plan 104).
+describe.runIf(process.platform === 'win32')('the project name', () => {
   it('takes the name of what was written, not of the file it went to', () => {
     session.resetProject()
     expect(session.projectName()).toBe('Untitled')

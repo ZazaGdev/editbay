@@ -3,7 +3,8 @@ import type { Clip, ProjectMedia, SoundClip } from '../../shared/project'
 import { filmstripLayout, tileIndexForTime, tileHeight, tileRect } from '../../shared/filmstrip'
 import { fileUrl } from '../../shared/file-url'
 import { handleWidthFor, MIN_CLIP_WIDTH } from '../../shared/timeline-layout'
-import { snapTrim, snapTrimTo } from '../../shared/tracks'
+import { snapTrim, snapTrimTo, spanLength } from '../../shared/tracks'
+import { speedLabel } from '../../shared/speed'
 import type { PeaksData } from '../../shared/types'
 import { markColour, markName } from '../../shared/marks'
 import { formatTimecode } from '../../shared/time'
@@ -11,6 +12,7 @@ import { Waveform } from './Waveform'
 import { ClipKeyframes } from './ClipKeyframes'
 import { Icon, type IconName } from '../ui/Icon'
 import { marksFit, pictureMarks, soundMarks, type ClipMark, type ClipMarkKind } from '../../shared/clip-marks'
+import { COMMAND_KEY_NAME, commandKey } from '../../shared/system'
 import { surface, ink, accent, meaning, danger, clip as clipColour, radius, type } from '../theme'
 
 /**
@@ -239,7 +241,7 @@ const FADE_HANDLE_PX = 9
  */
 export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Element {
   const c = props.clip
-  const length = c.sourceOut - c.sourceIn
+  const length = spanLength(c)
   const width = Math.max(MIN_CLIP_WIDTH, length * props.pxPerFrame)
   const height = props.height
   const [trim, setTrim] = useState<{
@@ -285,12 +287,14 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
       // Near an edge the timeline scrolls, and the edge goes on with the view.
       props.edgeScroll?.follow(e.clientX, () => move(e))
       const scrolled = (props.edgeScroll?.left() ?? 0) - trim.startScroll
-      const asked = trim.from + Math.round((e.clientX - trim.startX + scrolled) / props.pxPerFrame)
+      // Frames of the timeline dragged over, as frames of the recording at the clip's speed (plan 105).
+      const speed = props.clip.speed ?? 1
+      const asked = trim.from + Math.round((e.clientX - trim.startX + scrolled) / props.pxPerFrame) * speed
       // On V1 the rest of the sequence follows the edge, as I and O do, so a
       // longer clip brings its footage back and a shorter one leaves no gap
       // (plan 82). Ctrl trims it alone, stopping at the next clip. A clip
       // taken on its own trims alone too: closing up would take its group.
-      const closesUp = props.ripples && !e.ctrlKey && !trim.alone
+      const closesUp = props.ripples && !commandKey(e) && !trim.alone
       const frame = e.altKey
         ? asked
         : snapTrim({
@@ -301,7 +305,8 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
             inAt: trim.inAt,
             outAt: trim.outAt,
             targets: props.snap.onScreen(closesUp ? trim.closingTargets : trim.targets),
-            within: props.snap.within
+            within: props.snap.within,
+            speed
           })
       // What it caught, so the timeline can draw a line at it. Snapping is
       // silent today, and an edge that jumps for no visible reason reads as a
@@ -316,11 +321,12 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
             inAt: trim.inAt,
             outAt: trim.outAt,
             targets: props.snap.onScreen(closesUp ? trim.closingTargets : trim.targets),
-            within: props.snap.within
+            within: props.snap.within,
+            speed
           }).caught
       props.onSnap?.(caught)
       props.onClosingUp?.(props.clip.id, closesUp === true, { edge: trim.edge, frame, alone: trim.alone })
-      setTrimAt({ frame, moved: frame - trim.from, closesUp })
+      setTrimAt({ frame, moved: Math.round((frame - trim.from) / speed), closesUp })
       const key = `${frame}:${closesUp}`
       if (key === sent.current || (sent.current === null && frame === trim.from)) return
       props.onTrim(props.clip.id, trim.edge, frame, sent.current !== null, trim.alone, closesUp)
@@ -572,6 +578,12 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
           style={{ width: 6, height: 6, borderRadius: radius.handle, background: mark ?? props.colour, flexShrink: 0 }}
         />
         {c.link !== undefined && <LinkMark />}
+        {c.speed !== undefined && (
+          // Its speed, before its name: a clip played faster or slower looks like any other otherwise (plan 105).
+          <span data-testid="clip-speed" title={`Plays at ${speedLabel(c.speed)}`} style={{ color: accent.bright, flexShrink: 0 }}>
+            {speedLabel(c.speed)}
+          </span>
+        )}
         <EffectMarks
           marks={sound ? soundMarks(sound) : picture ? pictureMarks(picture, props.media.still === true || props.media.text !== undefined) : []}
           width={width}
@@ -646,7 +658,7 @@ export const TrackClip = memo(function TrackClip(props: TrackClipProps): JSX.Ele
           {props.ripples && (
             <span data-testid="edge-mode" style={{ font: type.meta, color: ink.secondary, textAlign: 'center' }}>
               {/* Saying so when something stops the rest following, and the drag trims only (audit 2026-10-01). */}
-              {trimAt.closesUp ? (props.trimBlocked ? `Trim only: ${props.trimBlocked} is in the way` : 'The rest follows. Ctrl: trim only') : 'Trim only'}
+              {trimAt.closesUp ? (props.trimBlocked ? `Trim only: ${props.trimBlocked} is in the way` : `The rest follows. ${COMMAND_KEY_NAME}: trim only`) : 'Trim only'}
             </span>
           )}
           <span style={{ font: type.monoSmall, color: ink.muted, textAlign: 'center' }}>

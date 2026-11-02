@@ -147,7 +147,18 @@ describe('joining and splitting', () => {
   it('writes the current schema version', () => {
     const p = project()
     expect(JSON.parse(joinProjectFile(p, defaultWorkspace())).schemaVersion).toBe(SCHEMA_VERSION)
-    expect(SCHEMA_VERSION).toBe(10)
+    expect(SCHEMA_VERSION).toBe(11)
+  })
+
+  it('is newer than every released app reads, so they say so of a file with a clip at a speed rather than open it wrongly', () => {
+    // 1.0, 1.1 and 1.2 read schema 10 and refuse anything newer with this message (audit 2026-10-19).
+    expect(SCHEMA_VERSION).toBeGreaterThan(10)
+    const raw = JSON.parse(joinProjectFile(project(), defaultWorkspace()))
+    expect(() => splitProjectFile(JSON.stringify({ ...raw, schemaVersion: SCHEMA_VERSION + 1 }))).toThrow(
+      `this project was made by a newer version of the app (schema ${SCHEMA_VERSION + 1})`
+    )
+    // A file this app wrote before the bump still opens.
+    expect(splitProjectFile(JSON.stringify({ ...raw, schemaVersion: 10 })).project.schemaVersion).toBe(SCHEMA_VERSION)
   })
 
   it('keeps where you are in each sequence under workspace.timelines, apart from the rest', () => {

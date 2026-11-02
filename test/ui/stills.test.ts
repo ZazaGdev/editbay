@@ -53,7 +53,7 @@ const black = ([r, g, b]: [number, number, number]): boolean => r < 30 && g < 30
 
 describe('a picture', () => {
   it('comes in as an image, with its size, and has nothing to skim', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate((p) => window.api.importFiles([p]), logoPath)
     await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
     expect(await page.locator('[data-testid="asset-status"]').first().textContent()).toMatch(/^image\s+400x200\s+png$/)
@@ -138,7 +138,7 @@ describe('a picture placed freely', () => {
     // Green at 200 over black, half drawn.
     expect(g).toBeGreaterThan(60)
     expect(g).toBeLessThan(140)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await clipTransform()).opacity, { timeout: 5000 }).toBeUndefined()
   })
   it('pops in and fades out, picked in the Inspector, and the Output view draws it growing', async () => {
@@ -171,14 +171,14 @@ describe('a picture placed freely', () => {
     // None takes it off again.
     await page.selectOption('[data-testid="appear-in"]', 'none')
     await expect.poll(async () => (await clip()).enter, { timeout: 5000 }).toBeUndefined()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await clip()).enter, { timeout: 5000 }).toEqual({ kind: 'pop', length: 30 })
   })
 })
 
 describe('an animated GIF', () => {
   it('plays in the Output view: its first frame where it lands, its second half a second on', async () => {
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.evaluate((p) => window.api.importFiles([p]), await fx.animGif())
     await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
     expect(await page.locator('[data-testid="asset-status"]').first().textContent()).toMatch(/^animation\s+200x100\s+2fps\s+2 frames$/)

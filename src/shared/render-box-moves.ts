@@ -14,12 +14,14 @@ export interface BoxClock {
   keys: BoxKey[]
   first: number
   frames: number
+  /** Frames of the recording a frame of the piece moves on, the clip's speed (plan 105). Absent for 1. */
+  speed?: number
 }
 
 /** The keyframes a piece needs, those inside it and one either side, when they move the box within it. */
-export function boxClock(keys: readonly BoxKey[] | undefined, clock: { first: number; frames: number } | undefined): BoxClock | undefined {
+export function boxClock(keys: readonly BoxKey[] | undefined, clock: { first: number; frames: number; speed?: number } | undefined): BoxClock | undefined {
   if (!keys || !clock || !boxMoves(keys)) return undefined
-  const lastFrame = clock.first + Math.max(1, clock.frames) - 1
+  const lastFrame = clock.first + (Math.max(1, clock.frames) - 1) * (clock.speed ?? 1)
   let lo = 0
   for (let i = 0; i < keys.length; i++) if (keys[i]!.at <= clock.first) lo = i
   let hi = keys.length - 1
@@ -58,7 +60,8 @@ export function movingBox(
   colours: { toRgb: string; toVideo: string }
 ): { before: string; x: string; y: string } {
   // By the frame's time rather than `n`, which `overlay` counts from 1.
-  const f = `(t*${fps}+${m.first})`
+  const step = m.speed ?? 1
+  const f = step === 1 ? `(t*${fps}+${m.first})` : `(t*${fps}*${step}+${m.first})`
   const of = (get: (k: BoxKey) => number): string => `(${keyedValue(f, m.keys, get)})`
   const sizes = m.keys.map((k) => ({ sx: (k.place.w * width) / box.w, sy: (k.place.h * height) / box.h }))
   const scaled = sizes.some((s) => Math.abs(s.sx - 1) * box.w >= 1 || Math.abs(s.sy - 1) * box.h >= 1)
@@ -74,7 +77,7 @@ export function movingBox(
       `pad=w=${most((s) => s.sx, box.w)}:h=${most((s) => s.sy, box.h)}:x=0:y=0:color=black@0:eval=frame`
     )
   }
-  const opacities = Array.from({ length: Math.max(1, m.frames) }, (_, i) => boxAtKeys({ x: 0, y: 0, w: 1, h: 1 }, m.keys, m.first + i).opacity)
+  const opacities = Array.from({ length: Math.max(1, m.frames) }, (_, i) => boxAtKeys({ x: 0, y: 0, w: 1, h: 1 }, m.keys, m.first + i * step).opacity)
   if (opacities.some((o) => o < 1)) {
     // Set just before each frame where it changes, by the same sums the preview draws with.
     const steps: string[] = []

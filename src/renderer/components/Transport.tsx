@@ -15,6 +15,7 @@ import { LevelMeter } from '../ui/LevelMeter'
 import { Segmented } from '../ui/Segmented'
 import { Select } from '../ui/Select'
 import { guidesTurned } from '../state/useSettings'
+import { ALT_KEY_NAME } from '../../shared/system'
 
 /** What the Guides menu sets. */
 export interface GuideSettings {
@@ -508,8 +509,8 @@ export function Transport(props: {
             onClick={() => props.onPlaceSnap?.(props.placeSnap === false)}
             title={
               props.placeSnap === false
-                ? 'Pictures moved on the Output view go exactly where they are put. Press to have them snap; Alt snaps one drag'
-                : 'Pictures moved on the Output view snap to the edges, the middles and each other. Press to turn it off; Alt frees one drag'
+                ? `Pictures moved on the Output view go exactly where they are put. Press to have them snap; ${ALT_KEY_NAME} snaps one drag`
+                : `Pictures moved on the Output view snap to the edges, the middles and each other. Press to turn it off; ${ALT_KEY_NAME} frees one drag`
             }
           >
             Snap

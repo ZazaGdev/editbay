@@ -201,7 +201,7 @@ describe('an OBS recording', () => {
     const was = await page.getAttribute('[data-testid="place-rect"]', 'data-place')
     await dragBy(place.x + place.width / 2, place.y + place.height / 2, 0, -30)
     await page.waitForFunction((b) => document.querySelector('[data-testid="place-rect"]')?.getAttribute('data-place') !== b, was, WAIT)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 
   it('picks a picture and moves it in the one press, when it is dragged straight away', async () => {
@@ -232,7 +232,7 @@ describe('an OBS recording', () => {
       }, { ...WAIT, interval: 250 })
       .toBe(true)
     // One undo for the move.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction((b) => document.querySelector('[data-testid="place-rect"]')?.getAttribute('data-place') === b, was, WAIT)
   })
 
@@ -305,7 +305,7 @@ describe('an OBS recording', () => {
     await expect.poll(() => page.getAttribute(crop, 'data-folded'), WAIT).toBe('no')
 
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForSelector('[data-testid="layout"][data-layout="split"]', WAIT)
   })
 
@@ -335,7 +335,7 @@ describe('an OBS recording', () => {
     await page.waitForSelector(`[data-testid="zoom-group"][data-picture="${secondId}"]`, WAIT)
 
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await project()).layer.simple, WAIT).toBeUndefined()
     await page.locator('[data-testid="picture"]').first().click()
   })
@@ -389,7 +389,7 @@ describe('an OBS recording', () => {
     await page.locator('[data-testid="picture-remove"]').first().click()
     await page.waitForSelector('[data-testid="picture-switch"]', { state: 'detached', ...WAIT })
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForSelector('[data-testid="picture-switch"]', WAIT)
     await pictures.first().click()
     await page.waitForSelector('[data-testid="zoom-group"][data-picture="main"]', WAIT)
@@ -416,8 +416,8 @@ describe('an OBS recording', () => {
 
     // Two drags, two undo steps: not one per movement.
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction((b) => document.querySelector('[data-testid="place-rect"]')?.getAttribute('data-place') === b, before, WAIT)
     expect(await layoutOf()).toBe('split')
   })
@@ -430,7 +430,7 @@ describe('an OBS recording', () => {
     await page.waitForFunction((b) => document.querySelector('[data-testid="crop-rect"]')?.getAttribute('data-crop') !== b, before, WAIT)
 
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction((b) => document.querySelector('[data-testid="crop-rect"]')?.getAttribute('data-crop') === b, before, WAIT)
     // The other picture's crop is drawn too, as an outline.
     expect(await page.locator('[data-testid="crop-other"]').count()).toBe(1)
@@ -478,7 +478,7 @@ describe('an OBS recording', () => {
     await expect.poll(async () => new Set(await places()).size, WAIT).toBe(1)
     expect((await places())[0]).not.toBe(before[0])
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(places, WAIT).toEqual(before)
   })
 
@@ -558,13 +558,13 @@ describe('an OBS recording', () => {
     }
     await page.mouse.up()
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(async () => (await window.api.currentProject()).sequences[0]!.videoTracks[0]!.clips[0]!.layout === 'split', undefined, WAIT)
   })
 
   it('comes back laid out after saving, closing and reopening', async () => {
     await answerSaveDialog(app, join(root, 'layers.editbay'))
-    await page.keyboard.press('Control+s')
+    await page.keyboard.press('ControlOrMeta+s')
     await page.waitForFunction(() => document.title === 'layers - Editbay', undefined, WAIT)
     const closed = app.waitForEvent('close', { timeout: 30_000 })
     await app.evaluate(({ BrowserWindow }) => {

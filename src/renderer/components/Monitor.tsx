@@ -1,6 +1,7 @@
 import type { JSX, ReactNode, CSSProperties } from 'react'
 import { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
 import { MAIN_PICTURE, allClips, findVideoClip, pipOf, targetAspect, zoomOf, startEndOf } from '../../shared/project'
+import { spanEnd } from '../../shared/tracks'
 import { pipCorner, pipShape } from '../../shared/pip'
 import { editedAt, pictureUnder, textAt } from '../../shared/playback'
 import { formatTimecode } from '../../shared/time'
@@ -40,8 +41,8 @@ export function Monitor(props: MonitorProps): JSX.Element {
   // The picture edited: the selected clip when it is a picture under the
   // playhead, on any track, and otherwise the one on the lowest video track
   // there. The nudge keys edit the same one.
-  const under = (c: { timelineStart: number; sourceIn: number; sourceOut: number }): boolean =>
-    props.playhead >= c.timelineStart && props.playhead < c.timelineStart + (c.sourceOut - c.sourceIn)
+  const under = (c: { id: string; mediaId: string; timelineStart: number; sourceIn: number; sourceOut: number; speed?: number }): boolean =>
+    props.playhead >= c.timelineStart && props.playhead < spanEnd(c)
   const at = editedAt(props.framing ?? props.timeline, props.playhead, props.selectedClipId)
   // Anything at all: sound alone shows black, not "no clip".
   const anythingHere = allClips(props.timeline).some(under)
@@ -183,7 +184,7 @@ export function Monitor(props: MonitorProps): JSX.Element {
   const othersOnScreen = framed
     ? props.timeline.videoTracks
         .filter((r) => !r.hidden)
-        .flatMap((r) => r.clips.filter((c) => props.playhead >= c.timelineStart && props.playhead < c.timelineStart + (c.sourceOut - c.sourceIn)))
+        .flatMap((r) => r.clips.filter((c) => props.playhead >= c.timelineStart && props.playhead < spanEnd(c)))
         .flatMap((c) => [
           ...(c.id === editedClipId && editedPicture === MAIN_PICTURE ? [] : [c.transform.place]),
           ...c.layers.filter((l) => !(c.id === editedClipId && l.id === editedPicture)).map((l) => l.place)

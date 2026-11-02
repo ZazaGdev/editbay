@@ -103,7 +103,7 @@ describe('putting a transition on a cut', () => {
     expect(button.x).toBeGreaterThanOrEqual(clip.x)
     await page.locator('[data-testid="seam-add"]').click()
     await expect.poll(async () => Object.keys(await stored()), WAIT).toContain(`${id}:in`)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => Object.keys(await stored()).length, WAIT).toBe(0)
   })
 
@@ -159,7 +159,7 @@ describe('putting a transition on a cut', () => {
     const box = (await page.locator(TRANSITION).first().boundingBox())!
     await dragBy({ x: box.x + 2, y: box.y + box.height / 2 }, -40)
     await expect.poll(async () => Object.values(await stored())[0]?.length ?? 0, WAIT).toBeGreaterThan(was.length)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => Object.values(await stored())[0]?.length ?? 0, WAIT).toBe(was.length)
   })
 
@@ -358,7 +358,7 @@ describe('putting a transition on a cut', () => {
     await expect.poll(async () => Object.keys(await stored()).length, WAIT).toBe(0)
     // Back to the two whole recordings: the removal, the kind, the transition and the split.
     await page.locator('[data-testid="timecode"]').click()
-    for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z')
+    for (let i = 0; i < 4; i++) await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"][data-kind="video"]').length === 2, undefined, WAIT)
     await expect.poll(async () => Object.keys(await stored()).length, WAIT).toBe(0)
   })
@@ -382,7 +382,7 @@ describe('putting a transition on a cut', () => {
     await page.locator('[data-testid="timecode"]').click()
     await page.keyboard.press('Home')
     await expect.poll(() => page.getAttribute('[data-testid="timecode"]', 'data-playhead'), WAIT).toBe('0')
-    await page.keyboard.press('Control+d')
+    await page.keyboard.press('ControlOrMeta+d')
     await expect.poll(async () => Object.keys(await stored()).length, WAIT).toBeGreaterThan(0)
     // At the start of the sequence, where there is nothing on the other side.
     // Read once the timeline has drawn it: the rectangle of the one taken off

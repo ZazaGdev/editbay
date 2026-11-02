@@ -17,6 +17,7 @@ import { accent, ink, type } from '../theme'
 import { held, panel } from './styles'
 import { SectionPicker } from './SectionPicker'
 import { endSectionDrag } from './sectionDrag'
+import { TuckBar, rightTucked } from './SectionDock'
 import { useInspectorProps, useSectionHost } from './useInspectorProps'
 import type { AppState } from './app-state'
 
@@ -53,6 +54,7 @@ export function InspectorColumn({ app }: { app: AppState }): JSX.Element {
           {null}
         </Panel>
       ) : (
+      <Tucked app={app}>
       <div
         ref={inspectorColumn}
         data-testid="inspector-column"
@@ -80,6 +82,7 @@ export function InspectorColumn({ app }: { app: AppState }): JSX.Element {
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
+          flex: 1,
           ...(over ? { outline: `2px dashed ${accent.bright}`, outlineOffset: -4 } : {}),
           ...(recording ? held : {})
         }}
@@ -118,7 +121,22 @@ export function InspectorColumn({ app }: { app: AppState }): JSX.Element {
           )}
         </div>
       </div>
+      </Tucked>
       )}
     </>
+  )
+}
+
+/**
+ * With the sections right of the timeline folded down (task 1137), the
+ * Inspector runs the window's full height, their bar under it.
+ */
+function Tucked({ app, children }: { app: AppState; children: JSX.Element }): JSX.Element {
+  if (!rightTucked(app)) return children
+  return (
+    <div data-testid="inspector-tall" style={{ gridColumn: 5, gridRow: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+      {children}
+      <TuckBar app={app} />
+    </div>
   )
 }

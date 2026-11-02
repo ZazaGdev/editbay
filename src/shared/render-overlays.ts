@@ -6,7 +6,10 @@
 import { POP_ROOM, appearExpressions, type Appear } from './appear'
 import type { BoxKey, Clip, PictureStyle, Rect, ZoomKey } from './project'
 import { freePlaceInPixels, placeInPixels, type Place } from './layout'
-import { isKeyed } from './looks'
+import { colourKeyOf, isKeyed, type Coloured } from './looks'
+
+/** One picture of an overlay: a crop and a place, and a layer's own look (task 1188). */
+type OverlayPicture = { crop: Rect; place: Place; style?: PictureStyle; keys?: ZoomKey[]; boxKeys?: BoxKey[] } & Coloured
 import { framesToSeconds } from './time'
 import { blurSigma } from './picture-style'
 import { cropFilters, layerMove, type Clock, type Move } from './render-moves'
@@ -18,7 +21,8 @@ import {
   lookFilters,
   matrixFilters,
   pictureGraph,
-  rate,
+  timedRate,
+  type Timing,
   stillFilters,
   turnAndFade,
   TO_RGB,
@@ -26,7 +30,7 @@ import {
   type HeadBlur
 } from './render-pictures'
 import type { Wash } from './render-pieces'
-import { ZOOM_OUT_FROM, rgbSplitAt } from './transitions'
+import { ZOOM_OUT_FROM, blurAt, rgbSplitAt } from './transitions'
 import { boxClock, movingBox } from './render-box-moves'
 
 /** A clip on a higher video track laid over a segment: its file, from where, and its pictures. */
@@ -44,9 +48,11 @@ export interface Overlay {
   path: string
   /** Where its own source starts for this segment, as ffmpeg is given it. */
   fromSec: string
+  /** How far into the recording frame at `fromSec` the segment starts: see `seekFrom`. */
+  part?: number
   /** Frames cloned onto its front, where a transition reaches back past the recording's first frame. */
   hold: number
-  pictures: { crop: Rect; place: Place; style?: PictureStyle; keys?: ZoomKey[]; boxKeys?: BoxKey[] }[]
+  pictures: OverlayPicture[]
   /** The bars round its pictures filled with the picture blurred, rather than black. */
   blurFill?: boolean
   /** Its clip's colour, as `colourKey` codes it, on every one of its pictures. */
@@ -71,12 +77,15 @@ export interface Overlay {
   move?: Move
   /** The piece's clock, when a further picture has a move of its own on it. */
   clock?: Clock
+  /** Its speed, when it plays at one of its own (plan 105). */
+  timing?: Timing
   /** The clip it turns into over the whole segment, read as an input of its own. */
   into?: {
     path: string
     still?: boolean
     anim?: Animation
     fromSec: string
+    part?: number
     hold: number
     pictures: { crop: Rect; place: Place; keys?: ZoomKey[]; boxKeys?: BoxKey[] }[]
     look?: string
@@ -85,6 +94,7 @@ export interface Overlay {
     opacity?: number
     move?: Move
     clock?: Clock
+    timing?: Timing
     xfade: string
     /** The kind it is, for what is laid on the `xfade` (plan 95). */
     kind: string
@@ -179,6 +189,16 @@ export function blendFilters(kind: string, at: Partway, fps: number, width: numb
       after: `${TO_RGB},format=${clear ? 'gbrap' : 'gbrp'},sendcmd=c='${steps.join(';')}',rgbashift,${TO_VIDEO},format=${clear ? 'yuva420p' : 'yuv420p'}`
     }
   }
+  if (kind === 'blur') {
+    // `blurAt`, set frame by frame on the mix, both ways at once: a gaussian
+    // told only its sigma blurs across alone (task 1092).
+    const name = `gblur@tblur${clear ? 'o' : 'b'}`
+    const steps = Array.from({ length: frames }, (_, i) => {
+      const s = blurAt(i / frames, width)
+      return `${(i === 0 ? 0 : (i - 0.5) / fps).toFixed(6)} ${name} sigma ${s}, ${name} sigmaV ${s}`
+    })
+    return { after: `sendcmd=c='${steps.join(';')}',${name}=sigma=0` }
+  }
   return {}
 }
 
@@ -237,6 +257,7 @@ export function overlayGraph(
         pictureGraph(fps, asClip(o), width, height, `xo${q}a`, {
           input: at,
           startHold: o.hold,
+          ...(o.part ? { part: o.part } : {}),
           tag: `oa${q}`,
           ...(o.headBlur ? { headBlur: o.headBlur } : {}),
           transparent: true,
@@ -252,6 +273,7 @@ export function overlayGraph(
         pictureGraph(fps, asClip(o.into), width, height, `xo${q}b`, {
           input: o.into.input ?? at + 1,
           startHold: o.into.hold,
+          ...(o.into.part ? { part: o.into.part } : {}),
           tag: `ob${q}`,
           ...(o.into.headBlur ? { headBlur: o.into.headBlur } : {}),
           transparent: true,
@@ -277,9 +299,9 @@ export function overlayGraph(
     // A recording with its background taken out keeps its transparency, as a picture does (plan 90).
     const clearPixels = o.still === true || isKeyed(o.look)
     const head =
-      `[${at}:v]${animationHead(o.anim)}${rate(fps)}${o.hold > 0 ? `,tpad=start_mode=clone:start=${o.hold}` : ''}` +
+      `[${at}:v]${animationHead(o.anim)}${timedRate(fps, o.timing, o.part)}${o.hold > 0 ? `,tpad=start_mode=clone:start=${o.hold}` : ''}` +
       stillFilters(o.still === true, true).map((f) => `,${f}`).join('') +
-      matrixFilters(o.headBlur).map((f) => `,${f}`).join('') +
+      matrixFilters(o.headBlur, o.still !== true && o.anim === undefined).map((f) => `,${f}`).join('') +
       lookFilters(o.look, clearPixels, `xo${q}`).map((f) => `,${f}`).join('') +
       blurFilters(o.headBlur, `xo${q}`, clearPixels).map((f) => `,${f}`).join('')
     const heads = o.pictures.length === 1 ? [`${head},`] : o.pictures.map((_, j) => `[i${q}_${j}]`)
@@ -365,7 +387,7 @@ function appearFilters(
 }
 
 /** An overlay's pictures as `pictureGraph` wants them: a clip is only its pictures to it. */
-function asClip(o: { pictures: { crop: Rect; place: Place; style?: PictureStyle; keys?: ZoomKey[]; boxKeys?: BoxKey[] }[]; look?: string; blurFill?: boolean }): Clip {
+function asClip(o: { pictures: OverlayPicture[]; look?: string; blurFill?: boolean; timing?: Timing }): Clip {
   const [main, ...layers] = o.pictures
   return {
     id: '',
@@ -373,6 +395,8 @@ function asClip(o: { pictures: { crop: Rect; place: Place; style?: PictureStyle;
     sourceIn: 0,
     sourceOut: 0,
     timelineStart: 0,
+    // Its speed, which the head of its chain is timed by (plan 105).
+    ...(o.timing ? { speed: o.timing.speed, ...(o.timing.blend ? {} : { plainFrames: true as const }) } : {}),
     transform: {
       mode: 'crop',
       crop: main!.crop,
@@ -386,7 +410,9 @@ function asClip(o: { pictures: { crop: Rect; place: Place; style?: PictureStyle;
       place: p.place,
       ...(p.style ? { style: p.style } : {}),
       ...(p.keys ? { keys: p.keys } : {}),
-      ...(p.boxKeys ? { boxKeys: p.boxKeys } : {})
+      ...(p.boxKeys ? { boxKeys: p.boxKeys } : {}),
+      // Its own look, carried as its code (task 1188).
+      ...(colourKeyOf(p) ? { look: colourKeyOf(p)! } : {})
     })),
     layout: 'custom',
     ...(o.look ? { look: o.look } : {}),

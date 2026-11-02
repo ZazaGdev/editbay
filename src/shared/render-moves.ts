@@ -75,7 +75,7 @@ function movingFilters(fps: number, keys: readonly ZoomKey[], move: Move, width:
   const detail = Math.max(1, windowW / wide)
   const times = detail.toFixed(6)
 
-  const f = recordingFrame(move.first)
+  const f = recordingFrame(move.first, move.speed)
   return [
     `crop=${seen.w}:${seen.h}:${seen.x}:${seen.y}`,
     `scale=iw*${times}:ih*${times}:flags=bicubic`,
@@ -99,8 +99,10 @@ function movingFilters(fps: number, keys: readonly ZoomKey[], move: Move, width:
  * reaches back past its first frame, starts below it and holds the first
  * keyframe's crop until it gets there.
  */
-export function recordingFrame(first: number): string {
-  return first === 0 ? 'on' : `(on${first > 0 ? '+' : ''}${first})`
+export function recordingFrame(first: number, speed = 1): string {
+  // At a speed of its own each frame of the piece moves that many frames of the recording on (plan 105).
+  const on = speed === 1 ? 'on' : `on*${speed}`
+  return first === 0 ? on : `(${on}${first > 0 ? '+' : ''}${first})`
 }
 
 /** How far through a stretch between keyframes, as `easeOf` has it, for a fraction `t` written as an expression. */
@@ -177,6 +179,8 @@ export interface Move {
   keys: ZoomKey[]
   first: number
   frames: number
+  /** Frames of the recording a frame of the piece moves on, the clip's speed (plan 105). Absent for 1. */
+  speed?: number
 }
 
 /** A zoom's clock alone: the recording's frame a piece starts on, and how many frames it is. */
@@ -192,8 +196,8 @@ export function layerMove(keys: readonly ZoomKey[] | undefined, clock: Clock | u
  * which are all its frames are worked out from. A long clip with twenty
  * zooms writes only the one or two each piece shows.
  */
-export function keysForPiece(keys: readonly ZoomKey[], first: number, frames: number): ZoomKey[] {
-  const lastFrame = first + Math.max(1, frames) - 1
+export function keysForPiece(keys: readonly ZoomKey[], first: number, frames: number, speed = 1): ZoomKey[] {
+  const lastFrame = first + (Math.max(1, frames) - 1) * speed
   let lo = 0
   for (let i = 0; i < keys.length; i++) if (keys[i]!.at <= first) lo = i
   let hi = keys.length - 1
@@ -209,7 +213,7 @@ export function keysForPiece(keys: readonly ZoomKey[], first: number, frames: nu
  */
 export function cropFilters(crop: Rect, move: Move | undefined, fps: number, width: number): string[] {
   if (move) {
-    const keys = keysForPiece(move.keys, move.first, move.frames)
+    const keys = keysForPiece(move.keys, move.first, move.frames, move.speed)
     if (moves(keys)) return movingFilters(fps, keys, move, width)
     crop = keys[0]?.crop ?? crop
   }

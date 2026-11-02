@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, writeFile, utimes, mkdir } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile, utimes, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NEWEST, QUIET_MS, RecordingsWatcher, newestVideos, type Entry } from '../../src/main/obs/recordings'
@@ -36,7 +36,8 @@ beforeEach(() => {
   readable = true
 })
 
-describe('the recordings watcher', () => {
+// Watches a made-up Windows folder, which only Windows' path rules read (plan 104).
+describe.runIf(process.platform === 'win32')('the recordings watcher', () => {
   it('lists what is there, newest first, and never announces it', async () => {
     write('old.mkv', 100, clock - 60_000)
     write('older.mkv', 100, clock - 120_000)
@@ -151,7 +152,8 @@ describe('the recordings watcher', () => {
 describe('newestVideos', () => {
   let dir: string
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'editbay-recordings-'))
+    // Its real path, as the list gives it: a Mac's temp folder is under a link.
+    dir = await realpath(await mkdtemp(join(tmpdir(), 'editbay-recordings-')))
   })
   afterEach(() => rm(dir, { recursive: true, force: true }))
 

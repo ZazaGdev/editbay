@@ -108,9 +108,11 @@ describe('the window', () => {
   })
 
   it('names each key in the top bar tooltips', async () => {
-    expect(await page.getAttribute('[data-testid="save"]', 'title')).toBe('Save (Ctrl+S)')
-    expect(await page.getAttribute('[data-testid="undo"]', 'title')).toBe('Undo (Ctrl+Z)')
-    expect(await page.getAttribute('[data-testid="new-project"]', 'title')).toBe('New project (Ctrl+N)')
+    // A Mac shows Cmd as its sign, with no plus.
+    const k = process.platform === 'darwin' ? '⌘' : 'Ctrl+'
+    expect(await page.getAttribute('[data-testid="save"]', 'title')).toBe(`Save (${k}S)`)
+    expect(await page.getAttribute('[data-testid="undo"]', 'title')).toBe(`Undo (${k}Z)`)
+    expect(await page.getAttribute('[data-testid="new-project"]', 'title')).toBe(`New project (${k}N)`)
   })
 
   it('opens Export as a dialog, which Escape closes', async () => {
@@ -244,8 +246,8 @@ describe('telling you what happened', () => {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 2)
     expect(await page.locator('[data-testid="toast-undo"]').count()).toBe(0)
     // Back to where the suite was: one clip, vertical.
-    await page.keyboard.press('Control+z')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(
       () =>
         document.querySelectorAll('[data-testid="clip"]').length === 1 &&
@@ -273,7 +275,7 @@ describe('keys', () => {
     await page.waitForFunction((v) => (document.querySelector('[data-testid="linked-sound-level"]') as HTMLInputElement).value !== v, before)
     expect(await playhead()).toBe(0)
     await slider.blur()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 
   it('a button clicked with the mouse is not pressed again by Enter', async () => {
@@ -282,7 +284,7 @@ describe('keys', () => {
     await page.keyboard.press('Enter')
     await page.waitForTimeout(400)
     expect(await page.locator('[data-testid="sequence-tab"]').count()).toBe(2)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="sequence-tab"]').length === 0)
   })
 
@@ -327,7 +329,7 @@ describe("an export's result", () => {
     await closeExport(page)
 
     // The first edit after it finished makes it out of date.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 1)
     await openExport(page)
     expect(await page.locator('[data-testid="export-done"]').count()).toBe(0)
@@ -461,7 +463,7 @@ describe('saving automatically', () => {
   it('saves a project that has a file on its own, once changes stop, without being turned on', async () => {
     const target = join(root, 'by-itself.editbay')
     await answerSaveDialog(app, target)
-    await page.keyboard.press('Control+Shift+s')
+    await page.keyboard.press('ControlOrMeta+Shift+s')
     await page.waitForSelector('[data-testid="project-name"]:has-text("by-itself")')
     await page.waitForSelector('[data-testid="project-name"][data-changed="no"]')
     const savedAt = (await stat(target)).mtimeMs

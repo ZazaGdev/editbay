@@ -9,6 +9,8 @@ import { allClips, cropOf, findVideoClip, targetAspect, v1Clips } from '../../sh
 import { showToast } from '../state/toasts'
 import type { AppState } from './app-state'
 import { recentCommands } from './palette-recent'
+import { pickTools } from './pick-tools'
+import { startPicking } from '../state/picking'
 
 /**
  * Everything the command search offers: every action with its key, and
@@ -213,6 +215,15 @@ export function paletteCommands(app: AppState): Command[] {
         setWindowSettings(windowSettings.guides ? { safeZone: c.id } : { guides: true, safeZone: c.id, thirds: false })
         setView('program')
       }
+    })),
+    // Task 116: chosen, the pointer picks the clip or asset it acts on.
+    ...pickTools(app).map((t) => ({
+      id: `pick:${t.id}`,
+      label: t.label,
+      keywords: t.keywords,
+      group: 'Editing',
+      enabled: timeline !== null && allClips(timeline).length > 0,
+      run: () => startPicking(t.id)
     })),
     ...recentCommands(app)
   ]

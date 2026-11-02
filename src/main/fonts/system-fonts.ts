@@ -8,8 +8,16 @@ import { facesOf, familyFromNameTable, nameTableAt, readFontFigures, styleFromNa
  * the window is found here, in the fonts folder of the machine and of the user.
  */
 
-/** Where Windows keeps installed fonts: every user's, and this user's own. */
-export function fontFolders(env: NodeJS.ProcessEnv = process.env): string[] {
+/**
+ * Where installed fonts are kept: every user's, and this user's own. On a Mac
+ * (plan 104) also the system's own, which on Windows are in the one folder.
+ */
+export function fontFolders(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string[] {
+  if (platform === 'darwin') {
+    const folders = ['/System/Library/Fonts', '/System/Library/Fonts/Supplemental', '/Library/Fonts']
+    if (env.HOME) folders.push(join(env.HOME, 'Library', 'Fonts'))
+    return folders
+  }
   const folders = [join(env.SystemRoot ?? 'C:\\Windows', 'Fonts')]
   if (env.LOCALAPPDATA) folders.push(join(env.LOCALAPPDATA, 'Microsoft', 'Windows', 'Fonts'))
   return folders

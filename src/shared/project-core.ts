@@ -16,8 +16,12 @@ import type { Ease, SimpleEase } from './project'
  * sequence markers. 9 put transitions on a clip's edges, and took away the
  * empty `effects` list that was never written to. 10 replaced a clip's one
  * move (`transform.zoom`) by zoom keyframes on the frames of its recording.
+ * 11 gave a clip a speed (plan 105), and with it ends part way between
+ * frames: 1.0 to 1.2 read such a file as their own and opened it out of step
+ * or called it damaged, where at 11 they say it needs a newer app (audit
+ * 2026-10-19).
  */
-export const SCHEMA_VERSION = 10
+export const SCHEMA_VERSION = 11
 
 /**
  * The id of the sequence a project starts with, and the one an older file's

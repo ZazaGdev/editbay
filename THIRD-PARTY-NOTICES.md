@@ -22,6 +22,12 @@ this file says exactly which parts and where their source is.
   https://github.com/FFmpeg/FFmpeg/commit/946fcce07b . Build configuration and scripts:
   https://www.gyan.dev/ffmpeg/builds/ . The build's own record of its version, source commit
   and full configuration ships with the app as `licences/FFmpeg-build-and-source.txt`.
+- **Mac versions:** the same FFmpeg 9.0.2, built for Apple Silicon and Intel Macs by Martin
+  Riedl (https://ffmpeg.martin-riedl.de/, build scripts at
+  https://git.martin-riedl.de/ffmpeg/build-script), `ffmpeg` and `ffprobe` each downloaded by
+  `npm install` on a Mac and checked against its SHA-256. Also GPL-3.0, configured with
+  `--enable-gpl --enable-version3` and libx264, libass and libzimg among others; its record
+  ships as `licences/FFmpeg-build-and-source-mac.txt`.
 
 This build is configured with `--enable-gpl --enable-version3` and includes libx264, libx265,
 libvidstab, librubberband and libvmaf. Those are why the licence is GPL-3.0 rather than LGPL.
@@ -81,6 +87,20 @@ does not allow selling the font on its own, which nothing here does.
 repository, are the other fonts captions can be drawn in, used as Montserrat is: burned in by
 FFmpeg and drawn by the app window from its own copy. Texts can use them too.
 
+### The text fonts
+
+- **Licence:** SIL Open Font License 1.1, each, except Roboto Slab and Permanent Marker, which
+  are under the Apache License 2.0.
+- **Copyright:** each font's own authors, as named in its licence file.
+- **Full text:** one file per font in `resources/licences`, named after it, such as
+  `Inter-OFL.txt` and `RobotoSlab-Apache.txt`, also installed with the app.
+
+Archivo Black, Barlow, DM Sans, Dancing Script, Fira Sans, Inter, JetBrains Mono, Lato, Lobster,
+Merriweather, Noto Sans, Nunito, Open Sans, Oswald, PT Serif, Pacifico, Permanent Marker,
+Playfair Display, Quicksand, Raleway, Roboto, Roboto Slab, Rubik, Source Sans 3, Space Grotesk
+and Work Sans, each its regular face from Google Fonts, in `resources/text-fonts`. The app window
+draws texts in them from its own copy; the export takes the drawn text, not the font.
+
 ### ONNX Runtime
 
 - **Version:** 1.30.0, the `onnxruntime-node` and `onnxruntime-common` npm packages, the
@@ -118,6 +138,9 @@ you never use captions, Editbay never makes a network request at all.
 - **Version:** release `b5130`, the Windows x64 CPU build.
 - **Licence:** MIT.
 - **Source:** https://github.com/ggml-org/whisper.cpp
+- **On a Mac** the program is not downloaded but bundled: `whisper-cli` built from the same tag
+  `b5130` by `scripts/build-whisper-mac.sh`, shipped inside the app as `whisper/whisper-cli`
+  with whisper.cpp's MIT licence beside it as `whisper/LICENSE`. Only the model is downloaded.
 
 ### Whisper speech model
 

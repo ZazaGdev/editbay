@@ -99,6 +99,9 @@ const widthOf = async (selector: string): Promise<number> => (await page.locator
  * their usual width, then these put on each side in order.
  */
 async function arrange(want: { left?: string[]; right?: string[] }): Promise<void> {
+  if ((await page.locator('[data-testid="section-dock-tuck"][data-tucked="yes"]').count()) > 0) {
+    await page.locator('[data-testid="section-dock-tuck"]').click()
+  }
   for (const side of ['left', 'right'] as const) {
     if ((await page.locator(`[data-testid="section-dock-${side}"][data-folded="yes"]`).count()) > 0) {
       await page.locator(`[data-testid="section-dock-${side}-open"]`).click()
@@ -349,6 +352,32 @@ describe('sizes beside the timeline', () => {
     await page.waitForSelector('[data-testid="section-dock-right"][data-folded="no"]')
     await resize(1600, 900)
     await page.waitForSelector('[data-testid="section-dock-right"][data-folded="no"]')
+  })
+})
+
+describe('folding the right side down under the Inspector (task 1137)', () => {
+  it('folds to a bar under the Inspector, which takes the column, and opens again', async () => {
+    await arrange({ right: ['Sound'] })
+    const column = '[data-testid="inspector-column"]'
+    const before = (await page.locator(column).boundingBox())!
+    const dock = (await page.locator('[data-testid="section-dock-right"]').boundingBox())!
+    await page.locator('[data-testid="section-dock-tuck"]').click()
+    await page.waitForSelector('[data-testid="section-dock-tuck"][data-tucked="yes"]')
+    expect(await page.locator('[data-testid="section-dock-right"]').count()).toBe(0)
+    const after = (await page.locator(column).boundingBox())!
+    const bar = (await page.locator('[data-testid="section-dock-tuck"]').boundingBox())!
+    // Taller by most of the dock's height, and the bar thin, under it, at the foot of the window's panels.
+    expect(after.height).toBeGreaterThan(before.height + dock.height - 60)
+    expect(bar.height).toBeLessThan(30)
+    expect(bar.y).toBeGreaterThan(after.y + after.height)
+    expect(Math.abs(bar.y + bar.height - (dock.y + dock.height))).toBeLessThan(4)
+    expect(await page.textContent('[data-testid="section-dock-tuck"]')).toContain('Sound')
+    // The timeline stops short of the Inspector instead of running under it.
+    const timeline = (await page.locator('[data-testid="timeline-row"]').boundingBox())!
+    expect(timeline.x + timeline.width).toBeLessThanOrEqual(after.x)
+    await page.locator('[data-testid="section-dock-tuck"]').click()
+    await page.waitForSelector(inDock('right', 'Sound'))
+    expect(Math.abs((await page.locator(column).boundingBox())!.height - before.height)).toBeLessThan(2)
   })
 })
 

@@ -15,6 +15,7 @@ const api: EditbayApi = {
   ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),
   exportOnGpu: () => ipcRenderer.invoke('export:gpu'),
   lighterCopy: (mediaId) => ipcRenderer.invoke('media:lighterCopy', mediaId),
+  soundPcm: (request) => ipcRenderer.invoke('media:soundPcm', request),
   mediaBackground: (mediaId, from) => ipcRenderer.invoke('media:background', mediaId, from),
   mediaFaces: (mediaId, from, to, fps) => ipcRenderer.invoke('media:faces', mediaId, from, to, fps),
   stopLighterCopies: () => ipcRenderer.invoke('media:stopLighterCopies'),

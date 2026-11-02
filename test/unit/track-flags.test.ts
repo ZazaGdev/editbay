@@ -146,6 +146,27 @@ describe('a track that cannot be changed', () => {
       }
     }
   })
+
+  it('refuses an edit that changes anything about one of its clips, not only where it is (audit 2026-10-19)', () => {
+    // The take's sound on a locked A1, its picture free on V1. Each of these
+    // went through: the lock looked only at where a clip sits in time.
+    const base = cut()
+    const sound = base.audioTracks[0]!.clips[0]!.id
+    const locked = setTrackLocked(base, 'a1', true)
+    const before = locked.audioTracks[0]!.clips
+    const edits: ClipEdit[] = [
+      { kind: 'addTransition', clipId: 'p1', side: 'in', length: 20 },
+      { kind: 'setFade', clipId: sound, side: 'in', length: 20 },
+      { kind: 'setClipAudio', clipId: sound, gain: 0.2, muted: true },
+      { kind: 'unlink', clipId: 'p1' },
+      { kind: 'setClipMark', clipId: 'p1', mark: 'red' },
+      { kind: 'setClipDenoise', clipId: sound, on: true }
+    ]
+    for (const edit of edits) {
+      const after = applyClipEdit(locked, edit)
+      expect(after.audioTracks[0]!.clips, `${edit.kind} changed the locked A1`).toEqual(before)
+    }
+  })
 })
 
 describe('what counts as changing a locked track', () => {

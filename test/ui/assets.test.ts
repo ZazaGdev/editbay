@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
@@ -19,7 +19,8 @@ import { discardUnsavedWork } from './dialogs'
 const fx = fixtureSet('ui-assets')
 const WAIT = { timeout: 15_000 }
 const SAVE = { timeout: 120_000 }
-const root = await mkdtemp(join(tmpdir(), 'editbay-assets-'))
+// Its real path: a Mac's temp folder is under a link, and the app keeps media by the real one.
+const root = await realpath(await mkdtemp(join(tmpdir(), 'editbay-assets-')))
 const assetsDir = join(root, 'My assets')
 let app: ElectronApplication
 let page: Page
@@ -202,7 +203,7 @@ describe('credits for the description', () => {
       await capture(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `sine=frequency=${hz}:sample_rate=48000:duration=1`, file])
     }
     await writeFile(join(assetsDir, 'Audio', 'ZapSplat', 'credit.txt'), `${zapLine}\n`)
-    await page.keyboard.press('Control+n')
+    await page.keyboard.press('ControlOrMeta+n')
     await page.waitForFunction(async () => (await window.api.currentProject()).sequences[0]!.videoTracks.every((t) => t.clips.length === 0))
     for (const file of [zap, free]) {
       const before = (await clips()).length

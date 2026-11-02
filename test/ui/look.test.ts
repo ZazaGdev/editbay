@@ -103,21 +103,20 @@ describe('a control that is off says why', () => {
     })
     expect(wrapped.onButton).not.toBe('')
     expect(wrapped.onWrapper).toBe(wrapped.onButton)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
   })
 })
 
 describe('the toasts', () => {
-  it('sit clear of the timeline, which is where the work is', async () => {
+  it('sit at the top in the middle, under the top bar and clear of the inspector (task 2014)', async () => {
     // An edit that offers an Undo raises one. Changing the shape does.
     await page.selectOption('[data-testid="export-preset"]', 'square')
     await page.waitForSelector('[data-testid="toast"][data-kind="setShape"]')
     const toast = (await page.locator('[data-testid="toast"]').first().boundingBox())!
-    const timeline = (await page.locator('[data-testid="timeline-panel"]').boundingBox())!
-    expect(toast.y + toast.height).toBeLessThanOrEqual(timeline.y)
-    // On the right, not over the middle of the window.
-    const window = page.viewportSize() ?? { width: 0, height: 0 }
-    expect(toast.x).toBeGreaterThan(window.width / 2)
+    const bar = (await page.locator('[data-testid="top-bar"]').boundingBox())!
+    expect(toast.y).toBeGreaterThanOrEqual(bar.y + bar.height)
+    const width = await page.evaluate(() => window.innerWidth)
+    expect(Math.abs(toast.x + toast.width / 2 - width / 2)).toBeLessThanOrEqual(2)
     await page.locator('[data-testid="toast-undo"]').click()
     await page.waitForSelector('[data-testid="toast"]', { state: 'detached' })
   })
@@ -125,7 +124,7 @@ describe('the toasts', () => {
 
 describe('the search of every action', () => {
   it('is a box to type in, with no title bar and no Close button, and Escape closes it', async () => {
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     expect(await page.locator('[data-testid="command-palette-close"]').count()).toBe(0)
     expect(await page.locator('[data-testid="command-palette"] h2').count()).toBe(0)
@@ -134,7 +133,7 @@ describe('the search of every action', () => {
   })
 
   it('groups its actions under headings before anything is typed, and ranks them once something is', async () => {
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     const headings = await page.locator('[data-testid="command-list"] .ui-label').allTextContents()
     expect(headings).toContain('Editing')
@@ -149,13 +148,13 @@ describe('the search of every action', () => {
   })
 
   it('offers what was run last at the top, once something has been run from it', async () => {
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     await page.fill('[data-testid="command-search"]', 'go to start')
     await page.click('[data-testid="command"][data-command="goToStart"]')
     await page.waitForSelector('[data-testid="command-palette"]', { state: 'detached' })
 
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     expect(await page.locator('[data-testid="command-list"] .ui-label').first().textContent()).toBe('Recent')
     expect(await page.getAttribute('[data-testid="command"]', 'data-command')).toBe('goToStart')
@@ -174,7 +173,7 @@ describe('Recent in the search of every action', () => {
   }
 
   it('stays in the order it opened in while switches are flipped, and moves the next time', async () => {
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     await flip('snap', 'snapping')
     await flip('skim', 'skim')
@@ -182,7 +181,7 @@ describe('Recent in the search of every action', () => {
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="command-palette"]', { state: 'detached' })
 
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     const opened = await recentOrder()
     expect(opened.slice(0, 3)).toEqual(['overview', 'skim', 'snapping'])
@@ -198,7 +197,7 @@ describe('Recent in the search of every action', () => {
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="command-palette"]', { state: 'detached' })
 
-    await page.keyboard.press('Control+k')
+    await page.keyboard.press('ControlOrMeta+k')
     await page.waitForSelector('[data-testid="command-palette"]')
     expect((await recentOrder()).slice(0, 3)).toEqual(['snapping', 'skim', 'overview'])
     // Overview back as it was: the others were flipped twice.
@@ -397,7 +396,7 @@ describe('the level meter', () => {
       peak,
       { timeout: 10_000 }
     )
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.keyboard.press('Home')
   })
 })

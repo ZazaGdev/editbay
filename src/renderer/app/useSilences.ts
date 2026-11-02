@@ -48,8 +48,8 @@ export function useSilences({
   // voice over lies beside a recording's microphone stream, are left in and
   // shown as such.
   const toCut = useMemo(
-    () => (found && timeline ? removableStretches(timeline, found.pauses.filter((p) => kept?.has(p.from) !== true)) : []),
-    [found, kept, timeline]
+    () => (found && timeline ? removableStretches(timeline, found.pauses.filter((p) => kept?.has(p.from) !== true), [...listen]) : []),
+    [found, kept, timeline, listen]
   )
   const pauses = useMemo(() => {
     const cutting = new Set(toCut.map((p) => p.from))
@@ -95,9 +95,9 @@ export function useSilences({
 
   const removeSilences = useCallback(() => {
     if (toCut.length === 0 || found?.waiting !== false) return
-    editClip({ kind: 'removeStretches', stretches: toCut })
+    editClip({ kind: 'removeStretches', stretches: toCut, listen: [...listen] })
     closeSilences()
-  }, [toCut, found, editClip, closeSilences])
+  }, [toCut, found, editClip, closeSilences, listen])
 
   return { onSequence, listen, found, foundKey, toCut, pauses, hearPause, closeSilences, togglePause, removeSilences, setListenChoice, setKeptPauses }
 }

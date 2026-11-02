@@ -12,7 +12,7 @@ Python to build or run Editbay.
 
 Needs Pillow. Writes build/icon.ico, which electron-builder picks up from
 buildResources, and build/icon.png for the README and anywhere else a flat
-image is wanted.
+image is wanted, and build/icon.icns for the Mac.
 
 Every measurement below is on a 1024 canvas. The gap is deliberately wide: at
 10% of the canvas it survives down to a legible line at 16 pixels, where a
@@ -132,7 +132,9 @@ def main() -> None:
                     append_images=frames[:-1])
 
     render(1024).save(here + 'icon.png', format='PNG')
-    print('wrote build/icon.ico (' + ', '.join(str(n) for n in sizes) + ') and build/icon.png')
+    # The Mac's icon (plan 104): Pillow writes every size a .icns holds from the 1024 one.
+    render(1024).save(here + 'icon.icns', format='ICNS')
+    print('wrote build/icon.ico (' + ', '.join(str(n) for n in sizes) + '), build/icon.png and build/icon.icns')
 
 
 if __name__ == '__main__':

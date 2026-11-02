@@ -27,6 +27,7 @@ import { EFFECT_TYPE } from './Timeline'
 import { BACKGROUND_COLOURS, type BackgroundColour } from '../../shared/looks'
 import { OPEN_FREE_PACKS } from '../app/palette-recent'
 import { HelpTip } from '../ui/HelpTip'
+import { RUNNING_SYSTEM } from '../../shared/system'
 import { useCopyDrop } from './folder-copy-drop'
 
 /** What a file in the effects folder can do besides being brought in (plan 90). */
@@ -468,7 +469,7 @@ function FolderEntry(props: {
           />
           <MenuItem
             testid="folder-menu-show"
-            label="Show in Explorer"
+            label={RUNNING_SYSTEM === 'mac' ? 'Show in Finder' : 'Show in Explorer'}
             disabled={recordings ? !listing?.folder : !entry.folder}
             onClick={() => {
               setMenu(null)
@@ -639,7 +640,7 @@ function SearchResults(props: { results: FolderSearch | null; imported: Set<stri
 }
 
 /** A file in a folder that is only sound, which takes the sound icon rather than the film. */
-const SOUND_FILE = /\.(wav|mp3|m4a|aac|flac|ogg|opus)$/i
+export const SOUND_FILE = /\.(wav|mp3|m4a|aac|flac|ogg|opus)$/i
 
 /**
  * A file in one of your folders, ready to bring in, or already in the project.
@@ -656,6 +657,7 @@ function FileRow(props: { file: FolderFile; imported: Set<string>; onImport: (pa
     <div
       data-testid="folder-file"
       data-name={f.name}
+      data-path={f.path}
       data-state={inProject ? 'imported' : 'ready'}
       data-effect={fx ? 'yes' : undefined}
       draggable={fx !== undefined}

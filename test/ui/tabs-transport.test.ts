@@ -40,7 +40,7 @@ afterAll(async () => {
 async function fresh(): Promise<void> {
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), cleanPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -238,10 +238,10 @@ describe('the sequence tabs', () => {
     await page.click('[data-testid="sequence-duplicate"]')
     await waitTabs(2)
     await rightClickTab('Vertical 2')
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitTabs(0)
     await page.waitForSelector('[data-testid="sequence-menu"]', { state: 'detached' })
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await waitTabs(2)
     await page.waitForTimeout(300)
     expect(await page.locator('[data-testid="sequence-menu"]').count()).toBe(0)

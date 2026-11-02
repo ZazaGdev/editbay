@@ -69,7 +69,7 @@ afterAll(async () => {
 async function fresh(): Promise<void> {
   // Out of the search box, which keeps keys for itself, as a text box does.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"]').length === 0)
 }
 
@@ -212,12 +212,12 @@ describe('the bin', () => {
     expect(media.some((m) => m.endsWith('a.mp4'))).toBe(true)
 
     // Undone back to before a was placed, and a can go too; undone further, it comes back with its clip.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
     await page.locator(card('a.mp4')).click({ button: 'right' })
     await page.click('[data-testid="asset-menu-remove"]')
     await page.waitForSelector(card('a.mp4'), { state: 'detached' })
-    await page.keyboard.press('Control+Shift+z')
+    await page.keyboard.press('ControlOrMeta+Shift+z')
     await page.waitForSelector('[data-testid="clip"]')
     await page.waitForSelector(card('a.mp4'))
   }, 180_000)
@@ -233,7 +233,7 @@ describe('the bin', () => {
     await page.waitForSelector('[data-testid="clip"]')
     const saved = join(root, `missing-${counter}.editbay`)
     await answerSaveDialog(app, saved)
-    await page.keyboard.press('Control+Shift+s')
+    await page.keyboard.press('ControlOrMeta+Shift+s')
     for (let i = 0; i < 100 && !(await stat(saved).catch(() => null)); i++) await new Promise((r) => setTimeout(r, 100))
 
     // Both files go, and the project is opened again.
@@ -606,7 +606,7 @@ describe('recordings from OBS, and your own folders', () => {
 
   it('jumps to the search with Ctrl+F', async () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await page.keyboard.press('Control+f')
+    await page.keyboard.press('ControlOrMeta+f')
     await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'sources-search')
   })
 })

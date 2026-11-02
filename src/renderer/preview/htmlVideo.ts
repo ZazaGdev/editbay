@@ -1,28 +1,25 @@
-import type { AudioTrack, Timeline, VideoTrack } from '../../shared/project'
-import { blurRegions } from '../../shared/blur'
-import { animationFrame, cleanOverlay, framePath, hasLayout, isAnimated, isOverlay, isStill, playedByPicture, shownTracks, targetAspect, timelineDuration } from '../../shared/project'
-import { spanEnd } from '../../shared/tracks'
-import { FULL_PLACE } from '../../shared/layout'
-import { fitInBox, moves } from '../../shared/crop-geometry'
-import { boxMoves } from '../../shared/box-keys'
-import { mainPicture } from './pictures-at'
-import { previewScale, previewSoundFile, previewVolume } from '../../shared/sound'
+import type { Timeline } from '../../shared/project'
+import { isStill, shownTracks, timelineDuration } from '../../shared/project'
+import { fitInBox } from '../../shared/crop-geometry'
+import { previewScale } from '../../shared/sound'
 import type { WorkspaceView } from '../../shared/workspace'
 import type { MonitorBox, MonitorLayout } from '../../shared/monitor-layout'
 import { zoomedFit, type SourceZoom } from '../../shared/source-zoom'
 import type { PreviewEngine } from './engine'
 import { drawOutput, drawPlan, mixFor } from './compositor'
 import { DrawnClips } from './drawnClips'
-import { SEEK_PATIENCE_MS, audioLane, videoLane, type Lane, type LaneClip, type PictureLaneClip } from './lanes'
+import { SEEK_PATIENCE_MS, audioLane, sequenceTimeOf, videoLane, type Lane, type LaneClip, type PictureLaneClip } from './lanes'
 import { StillLane } from './stills'
 import { isMuted } from '../../shared/tracks'
-import { duckGainAt } from '../../shared/ducking'
 import type { Stretch } from '../../shared/silences'
 import { PreviewLoudness } from './loudness'
-import { blendAt, fadeGainAt, shownSpans, transitionWindows, type TransitionWindow } from '../../shared/transitions'
+import { blendAt, transitionWindows, type TransitionWindow } from '../../shared/transitions'
 import { planPicture } from './planPicture'
-import { SCRUB_BURST_MS, SETTLE_MS, canvasScale, colourOf, cutTo, lowestPlaying, place, type Shown } from './pictureShowing'
+import { SCRUB_BURST_MS, SETTLE_MS, canvasScale, cutTo, lowestPlaying, place, type Shown } from './pictureShowing'
 import { PICTURE_PATIENCE_MS, PictureStart } from './pictureStart'
+import { SoundEngine } from './soundEngine'
+import { soundVoices } from './soundVoices'
+import { soundLaneClips, videoLaneClips, type Listening } from './laneClips'
 
 /**
  * Plays the sequence with two players for every track, one playing the clip
@@ -97,6 +94,18 @@ export class HtmlVideoEngine implements PreviewEngine {
   private stopWatchingScale: (() => void) | null = null
   /** Playing louder than a media element allows, for a clip set above 100%. */
   private readonly loudness = new PreviewLoudness()
+  /**
+   * Plan 106: the sound while playing forwards at normal speed, seamless at
+   * cuts, and the clock while it plays. The players' own sound is silenced
+   * for the clips it plays, which are `soundIds`.
+   */
+  private readonly sound = new SoundEngine((req) => window.api.soundPcm(req))
+  private soundOn = false
+  /** Whether its first sound is set to start: until then the clock stands. */
+  private soundReady = false
+  private soundIds = new Set<string>()
+  /** It could not play once: the players play this time instead. */
+  private soundRefused = false
   /**
    * While the playhead is being dragged: when the burst of sound now playing
    * should stop, and the animation frame watching for that. Zero and 0 when
@@ -497,6 +506,10 @@ export class HtmlVideoEngine implements PreviewEngine {
     // An audio context waits for a gesture before it runs, and pressing play
     // is one: this is where a mix asking to be louder than 100% gets it.
     this.loudness.resume(this.elements())
+    if (this.soundPlays()) {
+      this.playWithSound(t)
+      return
+    }
     this.playing = true
     const now = performance.now()
     this.sec = this.frame / t.fps
@@ -518,12 +531,72 @@ export class HtmlVideoEngine implements PreviewEngine {
     this.raf = requestAnimationFrame(this.tick)
   }
 
+  /** Whether the sound engine plays this time: forwards at normal speed, not recording a voice over. */
+  private soundPlays(): boolean {
+    return !this.wallClock && !this.backwards && this.speed === 1 && !this.soundRefused && this.sound.usable
+  }
+
+  /**
+   * Plan 106: play with the sound engine as the clock. The clock stands until
+   * its first sound is set to start; the pictures are started then, a moment
+   * before it is heard, and held to it from when it is.
+   */
+  private playWithSound(t: Timeline): void {
+    this.soundOn = true
+    this.soundReady = false
+    // The players' own sound silenced for the clips the engine plays.
+    this.syncLanes()
+    this.playing = true
+    const now = performance.now()
+    this.sec = this.frame / t.fps
+    this.clock = { sec: this.sec, at: now }
+    this.startedAt = now
+    this.settled = false
+    const from = this.sec
+    void this.sound.start(from).then((ok) => {
+      if (!this.playing || !this.soundOn) return
+      if (!ok) {
+        // Played on the players instead, as before there was an engine.
+        this.pause()
+        this.soundRefused = true
+        this.play()
+        this.soundRefused = false
+        return
+      }
+      this.soundReady = true
+      for (const lane of this.lanes()) lane.tick(from, false, false, this.speed)
+    })
+    this.raf = requestAnimationFrame(this.tick)
+  }
+
+  /** A frame of playing with the sound engine: the clock is what is being heard, and every player follows it. */
+  private tickWithSound(t: Timeline): void {
+    if (!this.soundReady) {
+      this.raf = requestAnimationFrame(this.tick)
+      return
+    }
+    const now = performance.now()
+    const sec = this.sound.heardSec() ?? this.sec
+    const heard = this.sound.heard()
+    this.clock = { sec, at: now }
+    // What is being heard, where it can be read beside the picture.
+    this.canvas.dataset.heardSec = heard ? sec.toFixed(4) : ''
+    this.canvas.dataset.heardClips = heard ? this.sound.sounding(sec).join(',') : ''
+    if (heard && !this.settled) {
+      this.settled = true
+      this.emitClock(sec, now)
+    }
+    // Held to it once it is heard; until then each is getting going from where Play was pressed.
+    for (const lane of this.lanes()) lane.tick(sec, heard, false, this.speed)
+    this.advance(t, sec, lowestPlaying(this.shown(sec))?.lane)
+  }
+
   /** The picture plays, or was waited on long enough: the clock goes on from where it really is, and every player with it. */
   private pictureStarted(el: HTMLMediaElement): void {
     if (!this.playing) return
     const now = performance.now()
     const lowest = lowestPlaying(this.shown(this.sec))
-    if (lowest && lowest.el === el && el.readyState >= 1) this.sec = lowest.clip.startSec + (el.currentTime - lowest.clip.fileAtStart)
+    if (lowest && lowest.el === el && el.readyState >= 1) this.sec = sequenceTimeOf(lowest.clip, el.currentTime)
     this.clock = { sec: this.sec, at: now }
     this.startedAt = now
     this.source = { clipId: lowest?.clip.id ?? null, since: now }
@@ -579,6 +652,15 @@ export class HtmlVideoEngine implements PreviewEngine {
       this.raf = 0
     }
     for (const lane of this.lanes()) lane.pause()
+    if (this.soundOn) {
+      this.sound.stop()
+      this.soundOn = false
+      this.soundReady = false
+      delete this.canvas.dataset.heardSec
+      delete this.canvas.dataset.heardClips
+      // The players' own sound back, for a drag of the playhead or another speed.
+      this.syncLanes()
+    }
   }
 
   isPlaying(): boolean {
@@ -611,6 +693,7 @@ export class HtmlVideoEngine implements PreviewEngine {
   setMuted(muted: boolean): void {
     this.muted = muted
     for (const lane of this.lanes()) lane.silence(muted)
+    if (this.timeline) this.sound.setMaster(muted ? 0 : 1 / previewScale(this.timeline))
   }
 
   setVoice(stretches: readonly Stretch[]): void {
@@ -683,6 +766,7 @@ export class HtmlVideoEngine implements PreviewEngine {
     this.stillLanes.clear()
     this.stopWatchingScale?.()
     this.loudness.close()
+    this.sound.close()
     if (this.heldDraw !== null) clearTimeout(this.heldDraw)
     this.positionHandlers.clear()
     this.endedHandlers.clear()
@@ -709,6 +793,8 @@ export class HtmlVideoEngine implements PreviewEngine {
   private park(): void {
     for (const lane of this.lanes()) lane.park(this.sec)
     this.stillsAt(this.sec)
+    // The sound at the playhead decoded now, so Play there starts at once.
+    if (!this.playing && this.soundPlays()) this.sound.prepare(this.sec)
   }
 
   /** Every track's animations loaded near `sec`, and let go of far from it. */
@@ -716,129 +802,19 @@ export class HtmlVideoEngine implements PreviewEngine {
     for (const stills of this.stillLanes.values()) stills.setTime(sec)
   }
 
-  /**
-   * A video track's clips as its players and the canvas need them. A clip
-   * whose own first stream is heard, from exactly its own frames, plays it
-   * from its own player, in step by construction, at that sound's volume.
-   */
-  private videoClips(track: VideoTrack): PictureLaneClip[] {
-    const t = this.timeline
-    if (!t) return []
-    const fps = t.fps
-    // The spans the export cuts its segments at: a dip hands the picture over
-    // in the middle of its window, and a blend shows both clips over all of it.
-    const shown = shownSpans(track.clips, 'picture')
-    const framed = targetAspect(t) !== null
-    const scale = previewScale(t)
-    const heard = new Map<string, number>()
-    for (const audio of t.audioTracks) {
-      // A muted track's sound is silent wherever it is played from, including
-      // out of the picture's own player.
-      if (!this.audible(audio.id)) continue
-      for (const s of audio.clips) {
-        const picture = playedByPicture(t, s)
-        if (picture) heard.set(picture.id, s.gain)
-      }
-    }
-    return track.clips.flatMap((c) => {
-      const media = t.media.find((m) => m.id === c.mediaId)
-      if (!media) return []
-      const gain = heard.get(c.id)
-      const from = shown.get(c.id)?.from ?? c.timelineStart
-      return [
-        {
-          id: c.id,
-          path: this.proxies.get(media.id) ?? media.playablePath,
-          startSec: from / fps,
-          endSec: (shown.get(c.id)?.to ?? spanEnd(c)) / fps,
-          // A player counts from 0; ffmpeg, whose frames the export shows, from the file's start.
-          // Where the file is at `startSec`, which a transition reaching back
-          // puts before the clip's own first frame: the footage the cut threw
-          // away. Taken at the clip's first frame instead, the whole clip
-          // played that much early, and the cut after it jumped back.
-          fileAtStart: (c.sourceIn + (from - c.timelineStart)) / fps + (media.startSec ?? 0),
-          firstSec: media.startSec ?? 0,
-          volume: gain === undefined ? 0 : previewVolume(gain, scale, this.monitorVolume),
-          muted: gain === undefined,
-          pictures:
-            framed && hasLayout(c)
-              ? [mainPicture(c), ...c.layers]
-              : [{ crop: c.transform.crop, place: FULL_PLACE, ...(framed && c.transform.style ? { style: c.transform.style } : {}) }],
-          // A picture's own blurred bars; an image keeps its clear ones, as in the export.
-          ...(framed && c.blurFill === true && !isStill(media) ? { blurFill: true } : {}),
-          // Only when it goes somewhere: a clip that stays where it is put
-          // keeps the pictures worked out once, as every clip used to.
-          ...((c.transform.keys && moves(c.transform.keys)) ||
-          c.layers.some((l) => l.keys && moves(l.keys)) ||
-          (framed && hasLayout(c) && (boxMoves(c.transform.boxKeys) || c.layers.some((l) => boxMoves(l.boxKeys))))
-            ? { move: { keys: c.transform.keys ?? [], sourceIn: c.sourceIn, startFrame: c.timelineStart } }
-            : {}),
-          ...colourOf(c),
-          ...(c.blur !== undefined || c.blurBoxes ? { blurs: blurRegions(c, media.width, media.height) } : {}),
-          ...(framed && isOverlay(media) ? { free: cleanOverlay(c.transform) } : {}),
-          ...(framed && isOverlay(media) && (c.enter || c.exit)
-            ? { appear: { start: c.timelineStart, length: c.sourceOut - c.sourceIn, ...(c.enter ? { enter: c.enter } : {}), ...(c.exit ? { exit: c.exit } : {}) } }
-            : {}),
-          ...(isAnimated(media)
-            ? {
-                anim: {
-                  paths: Array.from({ length: media.frames! }, (_, i) => framePath(media, i)),
-                  // The frame of its source at this moment, and the export's own formula for which picture that is.
-                  frameAt: (sec: number): number => animationFrame(media, c.sourceIn + Math.floor(sec * fps + 1e-6) - c.timelineStart, fps)
-                }
-              }
-            : {}),
-          width: media.width,
-          height: media.height
-        }
-      ]
-    })
-  }
-
-  /** An audio track's heard clips as its players need them, leaving out those their picture's player plays. */
-  private soundClips(track: AudioTrack): LaneClip[] {
-    const t = this.timeline
-    if (!t || !this.audible(track.id)) return []
-    const fps = t.fps
-    const scale = previewScale(t)
-    // Both sounds of a crossfade are heard at once, so their spans overlap and
-    // each one's volume follows its own curve while it plays.
-    const shown = shownSpans(track.clips, 'sound')
-    const windows = transitionWindows(track.clips, 'sound')
-    return track.clips.flatMap((c) => {
-      const media = t.media.find((m) => m.id === c.mediaId)
-      const file = media && !c.muted && !playedByPicture(t, c) ? previewSoundFile(media, c.track, c.denoise === true, c.voice) : null
-      if (!file) return []
-      const faded = windows.some((w) => w.fromClipId === c.id || w.toClipId === c.id)
-      // A track that ducks follows the voice, on top of any fade of its own.
-      const ducked = track.duck === true && this.voice.length > 0
-      const voice = this.voice
-      const from = shown.get(c.id)?.from ?? c.timelineStart
-      return [
-        {
-          id: c.id,
-          path: file.path,
-          startSec: from / fps,
-          endSec: (shown.get(c.id)?.to ?? spanEnd(c)) / fps,
-          // Where the file is at `startSec`, as for a picture.
-          fileAtStart: (c.sourceIn + (from - c.timelineStart)) / fps + file.offsetSec,
-          firstSec: file.offsetSec,
-          volume: previewVolume(c.gain, scale, this.monitorVolume),
-          muted: false,
-          ...(faded || ducked
-            ? {
-                fadeAt: (sec: number): number =>
-                  (faded ? fadeGainAt(windows, c.id, Math.floor(sec * fps + 1e-6)) : 1) * (ducked ? duckGainAt(voice, fps, sec) : 1)
-              }
-            : {})
-        }
-      ]
-    })
+  /** How the preview is being listened to, for working out each track's clips (`laneClips.ts`). */
+  private listening(): Listening {
+    return { proxies: this.proxies, monitorVolume: this.monitorVolume, audible: (id) => this.audible(id), voice: this.voice, engine: this.soundIds }
   }
 
   /** A pair of players for every track, told its clips. */
   private syncLanes(): void {
     const t = this.timeline
+    // The sound engine's clips first, so the players know which of theirs to leave silent.
+    const voices = t ? soundVoices(t, (id) => this.audible(id), this.monitorVolume, this.voice) : []
+    this.soundIds = this.soundOn ? new Set(voices.map((v) => v.id)) : new Set()
+    this.sound.setVoices(voices)
+    this.sound.setMaster(this.muted ? 0 : t ? 1 / previewScale(t) : 1)
     const video = t?.videoTracks ?? []
     for (const [id, lane] of this.videoLanes) {
       if (video.some((r) => r.id === id)) continue
@@ -859,7 +835,7 @@ export class HtmlVideoEngine implements PreviewEngine {
         })
         this.stillLanes.set(track.id, stills)
       }
-      const clips = this.videoClips(track)
+      const clips = t ? videoLaneClips(t, track, this.listening()) : []
       const pictures = new Set(
         track.clips.filter((c) => t?.media.some((m) => m.id === c.mediaId && isStill(m))).map((c) => c.id)
       )
@@ -897,7 +873,7 @@ export class HtmlVideoEngine implements PreviewEngine {
         lane.silence(this.muted)
         this.audioLanes.set(track.id, lane)
       }
-      lane.setClips(this.soundClips(track))
+      lane.setClips(t ? soundLaneClips(t, track, this.listening()) : [])
     }
     // Every clip is played at its own loudness divided by the loudest, so it
     // fits what an element takes. This puts the divide back, which is the only
@@ -908,6 +884,10 @@ export class HtmlVideoEngine implements PreviewEngine {
   private tick = (): void => {
     const t = this.timeline
     if (!this.playing || !t) return
+    if (this.soundOn) {
+      this.tickWithSound(t)
+      return
+    }
     const now = performance.now()
     // Waiting for the picture to play, the clock stands where Play was pressed: for so long at most.
     if (this.start.waitingOn && now - this.startedAt < PICTURE_PATIENCE_MS) {
@@ -929,7 +909,7 @@ export class HtmlVideoEngine implements PreviewEngine {
     const steady =
       lowest !== null && el !== null && now - this.source.since > SETTLE_MS && !el.paused && el.readyState >= 3 && !el.seeking
     if (steady && lowest && el && !this.wallClock) {
-      sec = lowest.clip.startSec + (el.currentTime - lowest.clip.fileAtStart)
+      sec = sequenceTimeOf(lowest.clip, el.currentTime)
       this.clock = { sec, at: now }
       if (!this.settled) {
         this.settled = true
@@ -947,6 +927,11 @@ export class HtmlVideoEngine implements PreviewEngine {
       lane.tick(sec, !source && trusted, source, this.speed)
     }
     for (const lane of this.audioLanes.values()) lane.tick(sec, trusted, false, this.speed)
+    this.advance(t, sec, lowest?.lane)
+  }
+
+  /** The rest of a frame of playing, the clock at `sec`: the playhead, the loop, the picture and the end. */
+  private advance(t: Timeline, sec: number, lowest: Lane<PictureLaneClip> | undefined): void {
     this.stillsAt(sec)
     this.sec = sec
 
@@ -979,7 +964,7 @@ export class HtmlVideoEngine implements PreviewEngine {
     if (shownNow !== this.laidOut) this.layoutVideos()
     // Not over the last frame while the picture underneath seeks, as after a
     // loop goes round: its new frame is drawn as it arrives.
-    if (!lowest?.lane.seekingAt(sec)) this.draw()
+    if (!lowest?.seekingAt(sec)) this.draw()
     if (frame >= end) {
       this.finish()
       return

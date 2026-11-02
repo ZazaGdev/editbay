@@ -8,6 +8,7 @@ import { capture } from '../../src/main/ffmpeg/spawn'
 import { SpeechError, downloadFile, engineIntact, engineReady, enginePaths, installEngine, removeEngine, type SpeechFile } from '../../src/main/speech/engine'
 import { listened, mixArgs, mixGraph, parseWhisperProgress, whisperArgs } from '../../src/main/speech/transcribe'
 import { addSource, createTimeline, setClipAudio, type ProjectMedia, type Timeline } from '../../src/shared/project'
+import { setSpeed } from '../../src/shared/speed-edit'
 
 function media(id: string, durationSec: number, overrides: Partial<ProjectMedia> = {}): ProjectMedia {
   return {
@@ -105,6 +106,21 @@ describe('what is listened to', () => {
     expect(listened(t, [t.audioTracks[3]!.id]).map((c) => c.path)).toEqual(['D:\\vo\\take.wav'])
     expect(listened(setClipAudio(t, 'take', { gain: 0, muted: false }), [t.audioTracks[3]!.id])).toEqual([])
   })
+
+  it('hears a clip at a speed as the export plays it: all of its recording, stretched to its time, and not when it is silent', () => {
+    // Audit 2026-10-19: a talking clip at 2x was heard for half its recording, at 1x, so its captions ran late and stopped half way.
+    const t = recorded()
+    const a1 = t.audioTracks[0]!.id
+    const fast = setSpeed(t, 'rec', { speed: 2 })
+    const [heard] = listened(fast, [a1])
+    expect(heard!.lengthSec).toBe(5)
+    const graph = mixGraph([heard!]).graph.split(';\n')
+    // The whole 10 s of recording read, stretched into its 5 s.
+    expect(graph[1]).toBe('[i0_0]atrim=start_sample=0:end_sample=160000,asetpts=PTS-STARTPTS,atempo=2,volume=1[m0]')
+    // At 4x a sound is silent unless kept, and so is not listened to.
+    expect(listened(setSpeed(t, 'rec', { speed: 4 }), [a1])).toEqual([])
+    expect(listened(setSpeed(setSpeed(t, 'rec', { speed: 4 }), 'rec', { keepSound: true }), [a1])).toHaveLength(1)
+  })
 })
 
 describe('the mix', () => {
@@ -145,7 +161,8 @@ describe('the mix', () => {
   })
 })
 
-describe('downloading the engine', () => {
+// Windows only: the program is downloaded and unpacked with Windows' tar there, and comes with the app on a Mac (plan 104).
+describe.runIf(process.platform === 'win32')('downloading the engine', () => {
   let server: Server
   let base = ''
   const files = new Map<string, Buffer>()
@@ -241,7 +258,7 @@ describe('downloading the engine', () => {
   })
 })
 
-describe('the engine before each run (audit 2026-10-01)', () => {
+describe.runIf(process.platform === 'win32')('the engine before each run (audit 2026-10-01)', () => {
   it('runs only while its program and libraries are the ones downloaded, and is taken away when one has changed', async () => {
     const folder = await mkdtemp(join(tmpdir(), 'editbay-engine-'))
     try {

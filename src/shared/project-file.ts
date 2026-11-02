@@ -37,6 +37,7 @@ import { cleanTextStyle } from './text'
 import { cleanColour } from './project'
 import { cleanTransition, type KindSet } from './transitions'
 import { cleanTrackName } from './tracks'
+import { cleanSpeed } from './speed'
 import { cleanCaptionAt, cleanCaptionStyle, emptyCaptions, type CaptionClip, type Captions } from './captions'
 import { cleanMarkers } from './markers'
 import { isVoiceStrength } from './voice'
@@ -364,16 +365,26 @@ function validTracks<T>(raw: unknown, isClip: (c: unknown) => c is T, kinds: Kin
       const outOf = cleanTransition(stored.transitionOut, kinds)
       // `effects` was an empty list nothing ever wrote to, taken out at schema
       // 9. Dropped on the way in, so a file saved again does not carry it on.
-      const { effects: _gone, look: storedLook, lookStrength: storedStrength, adjust: storedAdjust, blur: storedBlurAmount, blurBoxes: storedBoxes, denoise: storedDenoise, voice: storedVoice, blurFill: storedBlur, removeBackground: storedRemoval, ...rest } = c as Record<string, unknown>
+      const { effects: _gone, look: storedLook, lookStrength: storedStrength, adjust: storedAdjust, blur: storedBlurAmount, blurBoxes: storedBoxes, denoise: storedDenoise, voice: storedVoice, channel: storedChannel, blurFill: storedBlur, removeBackground: storedRemoval, ...rest } = c as Record<string, unknown>
       // A blurred background is on or absent, and only a picture has one; a
       // picture's frame is tidied, and dropped where it does nothing.
       const blurFill = kinds === 'picture' && storedBlur === true ? { blurFill: true } : {}
       const layers = Array.isArray(rest.layers)
         ? {
             layers: (rest.layers as Record<string, unknown>[]).map((l) => {
-              const { style: storedStyle, ...plain } = l
+              const { style: storedStyle, look: layerLook, lookStrength: layerStrength, adjust: layerAdjust, ...plain } = l
               const style = cleanPictureStyle(storedStyle)
-              return style ? { ...plain, style } : plain
+              // A layer's own colour (task 1188), tidied as a clip's is.
+              const ownLook = cleanLook(layerLook)
+              const ownStrength = ownLook !== undefined ? cleanStrength(layerStrength) : undefined
+              const ownAdjust = cleanAdjust(layerAdjust)
+              return {
+                ...plain,
+                ...(style ? { style } : {}),
+                ...(ownLook !== undefined ? { look: ownLook } : {}),
+                ...(ownStrength !== undefined ? { lookStrength: ownStrength } : {}),
+                ...(ownAdjust !== undefined ? { adjust: ownAdjust } : {})
+              }
             })
           }
         : {}
@@ -381,6 +392,8 @@ function validTracks<T>(raw: unknown, isClip: (c: unknown) => c is T, kinds: Kin
       const denoise = kinds === 'sound' && storedDenoise === true ? { denoise: true } : {}
       // Enhance voice is one of its strengths or absent, and only a sound has it.
       const voice = kinds === 'sound' && isVoiceStrength(storedVoice) ? { voice: storedVoice } : {}
+      // One side played on both is left or right or absent, and only a sound has it (task 1188).
+      const channel = kinds === 'sound' && (storedChannel === 'left' || storedChannel === 'right') ? { channel: storedChannel } : {}
       // A look the app no longer has is dropped, as a mark is: the clip's
       // picture is still there in its own colour. Only a picture has one.
       const look = kinds === 'picture' ? cleanLook(storedLook) : undefined
@@ -412,16 +425,29 @@ function validTracks<T>(raw: unknown, isClip: (c: unknown) => c is T, kinds: Kin
       const { group: storedGroup, groupFrame: storedFrame } = rest
       delete rest.group
       delete rest.groupFrame
+      // A speed, tidied, and the switches that go with it, each on or absent (plan 105).
+      const { speed: storedSpeed, plainFrames: storedPlain, keepSound: storedKeep } = rest
+      delete rest.speed
+      delete rest.plainFrames
+      delete rest.keepSound
+      const speed = cleanSpeed(storedSpeed)
+      const timing = {
+        ...(speed !== undefined ? { speed } : {}),
+        ...(kinds === 'picture' && storedPlain === true ? { plainFrames: true } : {}),
+        ...(kinds === 'sound' && storedKeep === true ? { keepSound: true } : {})
+      }
       const group = typeof storedGroup === 'string' && storedGroup !== '' ? { group: storedGroup } : {}
       const groupFrame = kinds === 'picture' && typeof storedGroup === 'string' && isGroupFrame(storedFrame) ? { groupFrame: storedFrame } : {}
       return {
         ...group,
         ...groupFrame,
         ...rest,
+        ...timing,
         ...layers,
         ...picture,
         ...denoise,
         ...voice,
+        ...channel,
         ...blurFill,
         mark,
         ...(look === undefined ? {} : { look }),
@@ -826,10 +852,12 @@ function refuseImpossible(p: Project): void {
   for (const s of p.sequences) {
     const ids = new Set<string>()
     for (const track of [...s.videoTracks, ...s.audioTracks]) {
-      for (const c of track.clips as { id: string; mediaId: string; sourceIn: number; sourceOut: number; timelineStart: number }[]) {
+      for (const c of track.clips as { id: string; mediaId: string; sourceIn: number; sourceOut: number; timelineStart: number; speed?: number }[]) {
         const frame = (n: number): boolean => Number.isInteger(n) && n >= 0 && n <= MOST_FRAMES
+        // A clip at a speed of its own may start and end part way between two frames of its recording (plan 105).
+        const sourceFrame = (n: number): boolean => (c.speed === undefined ? frame(n) : Number.isFinite(n) && n >= 0 && n <= MOST_FRAMES)
         if (!sources.has(c.mediaId)) throw new Error('this project has a clip of a source it does not have')
-        if (!frame(c.sourceIn) || !frame(c.sourceOut) || !frame(c.timelineStart) || c.sourceOut <= c.sourceIn) {
+        if (!sourceFrame(c.sourceIn) || !sourceFrame(c.sourceOut) || !frame(c.timelineStart) || c.sourceOut <= c.sourceIn) {
           throw new Error('this project has a clip that ends before it starts, or runs past any recording')
         }
         if (ids.has(c.id)) throw new Error('this project has two clips under one name')

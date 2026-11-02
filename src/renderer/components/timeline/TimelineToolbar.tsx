@@ -13,7 +13,23 @@ import { Button } from '../../ui/Button'
 import { IconButton } from '../../ui/IconButton'
 import { SectionLabel } from '../../ui/SectionLabel'
 import { ShapeMenu } from '../ShapeMenu'
+import { usePlayheadRead, type PlayheadStore } from '../../state/playheadStore'
 import type { TimelineProps } from './props'
+
+/** Where the playhead is and how long the sequence is, drawn again on its own as the playhead moves. */
+function Timecode({ playhead, fps, total }: { playhead: PlayheadStore; fps: number; total: number }): JSX.Element {
+  const frame = usePlayheadRead(playhead, (f) => f)
+  return (
+    <span
+      data-testid="timecode"
+      data-playhead={frame}
+      data-total={total}
+      style={{ font: type.mono, fontVariantNumeric: 'tabular-nums', color: ink.secondary }}
+    >
+      {formatTimecode(frame, fps)} / {formatTimecode(total, fps)}
+    </span>
+  )
+}
 
 /** What a track size is called, for the button that steps through them. */
 function sizeName(size: TrackSize): string {
@@ -45,14 +61,7 @@ export function TimelineToolbar({ props, t, total }: { props: TimelineProps; t: 
           )}
         </span>
       )}
-      <span
-        data-testid="timecode"
-        data-playhead={props.playhead}
-        data-total={total}
-        style={{ font: type.mono, fontVariantNumeric: 'tabular-nums', color: ink.secondary }}
-      >
-        {formatTimecode(props.playhead, t.fps)} / {formatTimecode(total, t.fps)}
-      </span>
+      <Timecode playhead={props.playhead} fps={t.fps} total={total} />
       {props.range && (
         <span
           data-testid="range-length"

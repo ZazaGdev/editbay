@@ -183,7 +183,7 @@ describe('the Source and Output side by side', () => {
     await page.mouse.click(source.x + 6, source.y + source.height - 6)
     await page.waitForSelector(`${SOURCE}[data-focused="yes"]`, WAIT)
     expect(await page.getAttribute('[data-testid="view-source"]', 'aria-pressed')).toBe('true')
-    await press('Control+z')
+    await press('ControlOrMeta+z')
   })
 
   it('shows one view at a time when Side by side is turned off, and both again when it is turned on', async () => {
@@ -204,6 +204,8 @@ describe('the Source and Output side by side', () => {
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="monitor-stage"][data-fullscreen="no"]', WAIT)
     await page.waitForSelector('[data-testid="monitor-stage"][data-both="yes"]', WAIT)
+    // Back to its size: a Mac brings the window back from the whole screen fitted to a small CI screen first (task 1388).
+    await page.waitForFunction(() => window.innerWidth > 1300, undefined, WAIT)
   })
 
   it('shows one view at a time for a frame that is not taller than wide', async () => {

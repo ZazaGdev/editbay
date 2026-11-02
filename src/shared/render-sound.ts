@@ -4,7 +4,8 @@
  */
 
 import { playedCopy, trackFile, type Clip, type SoundClip, type Timeline } from './project'
-import { spanEnd, isMuted } from './tracks'
+import { spanEnd, isMuted, sourceAt, speedOf } from './tracks'
+import { soundHeard } from './speed'
 import { shownSpans, soundKind, transitionWindows, type Shown, type TransitionWindow } from './transitions'
 import { toStereo } from './sound'
 import { framesToSeconds } from './time'
@@ -95,8 +96,12 @@ export interface Heard {
   path: string | null
   /** How many channels its track has in the original, when known: one is spread to both sides at its own level. */
   channels?: number
+  /** One side of it played on both, as its clip asks (task 1188). Absent for both as recorded. */
+  side?: 'left' | 'right'
   /** Where in its file the read starts, in seconds, as ffmpeg counts. Never below zero. */
   fromSec: number
+  /** Its clip's speed, which what is read is stretched to first (plan 105). Absent for 1. */
+  speed?: number
   /** How much is read, in seconds. */
   readSec: number
   /**
@@ -149,7 +154,8 @@ export function heardOver(timeline: Timeline, from: number, to: number, only?: R
     const shown = shownSpans(track.clips, 'sound')
     return track.clips.filter((c) => {
       const at = shown.get(c.id) ?? { from: c.timelineStart, to: spanEnd(c) }
-      if (c.muted || at.from >= to || at.to <= from) return false
+      // A sound too fast or too slow to be heard, unless kept, is silent (plan 105).
+      if (c.muted || !soundHeard(c) || at.from >= to || at.to <= from) return false
       if (only && !only.has(c.id)) return false
       const m = timeline.media.find((x) => x.id === c.mediaId)
       return m !== undefined && trackFile(m, c.track) !== null
@@ -200,14 +206,16 @@ export function heardInputs(
     const start = Math.max(from, span.from)
     const end = Math.min(to, span.to)
     const whole = start === from && end === to
-    const sameFrame = base !== null && base.mediaId === c.mediaId && base.sourceIn - base.timelineStart === c.sourceIn - c.timelineStart
+    // At a speed of its own a sound is always read from its own file, to be stretched to it (plan 105).
+    const speed = speedOf(c)
+    const sameFrame = speed === 1 && base !== null && base.mediaId === c.mediaId && base.speed === undefined && base.sourceIn - base.timelineStart === c.sourceIn - c.timelineStart
     const m = timeline.media.find((x) => x.id === c.mediaId)!
     // Enhanced or cleaned, the copy the preview plays too.
     const cleaned = playedCopy(m, c)
     // Where the source is at `start`, carried past the clip's own edges by the
     // transitions over it. Before the recording begins there is nothing to
     // read, so the read starts at zero and silence fills the rest.
-    const wantedSec = framesToSeconds(c.sourceIn + (start - c.timelineStart), fps)
+    const wantedSec = framesToSeconds(sourceAt(c, start), fps)
     const runsOn = span.from < from
     const runsOff = span.to > to
     // Every fade over this piece, as far back as the earliest one begins: that
@@ -220,8 +228,10 @@ export function heardInputs(
     const headSec = round6(Math.max(framesToSeconds(start - earliest, fps), runsOn ? PRE_ROLL_SEC : 0))
     // The read cannot go back past the start of the recording; what it misses
     // is silence in front of it, so the fades still land where they should.
-    const readFrom = wantedSec - headSec
-    const padSec = round6(Math.max(0, -readFrom))
+    // What is read is stretched to the clip's speed first thing, so all after
+    // it, the silence in front included, is in the piece's own seconds.
+    const readFrom = wantedSec - headSec * speed
+    const padSec = round6(Math.max(0, -readFrom) / speed)
     const fades: Fade[] = over.map((w) => {
       const dir = w.toClipId === c.id ? 'in' : 'out'
       return {
@@ -242,9 +252,11 @@ export function heardInputs(
       // the picture's own recording; and a sound with a fade on it takes the
       // chain that writes fades, which the one read out of the picture has not.
       ...(m.trackChannels?.[c.track] !== undefined ? { channels: m.trackChannels[c.track]! } : {}),
+      ...(c.channel ? { side: c.channel } : {}),
       path: cleaned ?? (c.track === 0 && whole && sameFrame && !runsOn && headSec === 0 && over.length === 0 ? null : trackFile(m, c.track)!.path),
       fromSec: round6(Math.max(0, readFrom)),
-      readSec: round6(lengthSec + headSec - padSec),
+      readSec: round6((lengthSec + headSec - padSec) * speed),
+      ...(speed !== 1 ? { speed } : {}),
       padSec,
       headSec,
       fades,
@@ -286,7 +298,7 @@ export function soundGraph(heard: Heard[], inputOf: (h: Heard) => number): strin
     // is: a recording's sound often stops a little before its picture, and a
     // piece whose sound runs short leaves a hole in the joined file that pulls
     // all the sound after it early.
-    return `[0:a:0]volume=${only.gain},aresample=async=1,apad,${toStereo(only.channels)},${AUDIO_FORMAT}${declick(only)}${ducking(only)}[a]`
+    return `[0:a:0]volume=${only.gain},aresample=async=1,apad,${toStereo(only.channels, only.side)},${AUDIO_FORMAT}${declick(only)}${ducking(only)}[a]`
   }
   const parts = heard.map((h, i) => {
     // The head that is read before the piece and trimmed off again: what was
@@ -294,7 +306,7 @@ export function soundGraph(heard: Heard[], inputOf: (h: Heard) => number): strin
     // not reach that far back.
     const head = Math.round(h.headSec * AUDIO_RATE)
     return (
-      `[${inputOf(h)}:a:0]volume=${level(h.gain)},aresample=${AUDIO_RATE}:async=1:first_pts=0,${toStereo(h.channels)},` +
+      `[${inputOf(h)}:a:0]${h.speed !== undefined ? `${tempoFilters(h.speed)},` : ''}volume=${level(h.gain)},aresample=${AUDIO_RATE}:async=1:first_pts=0,${toStereo(h.channels, h.side)},` +
       `aformat=sample_rates=${AUDIO_RATE}:channel_layouts=stereo` +
       (h.padSec > 0 ? `,adelay=${Math.round(h.padSec * AUDIO_RATE)}S:all=1` : '') +
       // Before the head is trimmed off, because a crossfade split by the
@@ -315,6 +327,22 @@ export function soundGraph(heard: Heard[], inputOf: (h: Heard) => number): strin
   const mixed = heard.length > 1 ? `${labels}amix=inputs=${heard.length}:duration=longest:normalize=0,` : `${labels}`
   parts.push(`${mixed}apad,${AUDIO_FORMAT}[a]`)
   return parts.join(';')
+}
+
+/**
+ * A sound played at `speed` with its pitch kept (plan 105). `atempo` goes no
+ * slower than half speed in one step, so slower is several halvings and the
+ * rest.
+ */
+export function tempoFilters(speed: number): string {
+  const steps: number[] = []
+  let left = speed
+  while (left < 0.5) {
+    steps.push(0.5)
+    left /= 0.5
+  }
+  steps.push(left)
+  return steps.map((s) => `atempo=${round6(s)}`).join(',')
 }
 
 /** A ducked sound's curve under the voice, worked out afresh for every block of samples. */

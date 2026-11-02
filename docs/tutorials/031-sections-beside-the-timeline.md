@@ -1,7 +1,7 @@
 ---
 title: Keep a section beside the timeline
 category: Getting started
-keywords: dock, move a section, beside the timeline, left, right, column, picture in picture, sound, rail, layout
+keywords: dock, move a section, beside the timeline, left, right, column, picture in picture, sound, rail, layout, fold down, taller inspector
 ---
 
 Keep an Inspector section, such as Sound, in reach while you cut.
@@ -22,6 +22,9 @@ a right click. With several on one side, the menu also has [Move up] and [Move d
 Several sections on one side share its height; drag the line between two to give one more room,
 and drag the side's edge to make it wider. Double click either to put it back. When the window is
 too narrow for both a side and the timeline, the side folds to a thin rail; its button opens it.
+
+For a taller Inspector, click [Fold down] at the foot of the sections right of the timeline. They
+fold to a thin bar under the Inspector, which takes their height; click the bar to open them again.
 
 A section you put beside the timeline is unticked in the Inspector, so it is not shown twice; see
 Choose what the Inspector shows. Where you put them is kept for you, the same in every project.

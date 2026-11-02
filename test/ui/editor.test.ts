@@ -109,7 +109,7 @@ async function resetTimeline(): Promise<void> {
   await closeExport(page)
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('Control+n')
+  await page.keyboard.press('ControlOrMeta+n')
   await waitForClips(0)
   await importIntoApp([cleanPath, silentPath])
   await addAssetToTimeline('clean.mp4')
@@ -227,9 +227,9 @@ describe('trimming', () => {
     await page.mouse.click(v1.x + 95 * 0.4, v1.y + v1.height / 2)
     await page.waitForSelector('[data-testid="selected-gap"][data-from="70"][data-to="120"]', { timeout: 5000 })
     // An undo fills it again, and it is not selected any more; nor once the trim is back.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForSelector('[data-testid="selected-gap"]', { state: 'detached', timeout: 5000 })
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await page.waitForFunction(() => document.querySelector('[data-testid="clip"]')?.getAttribute('data-length-frames') === '70', undefined, {
       timeout: 5000
     })
@@ -340,7 +340,7 @@ describe('splitting and deleting', () => {
     // Its sound went with it.
     expect(await page.locator('[data-testid="sound-clip"]').count()).toBe(0)
 
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForClips(2)
     await selectFirstClip()
     await page.keyboard.press('Shift+Delete')
@@ -389,7 +389,7 @@ describe('joining split clips', () => {
     await waitForClips(2)
     expect(await clipLengths()).toEqual([120, 90])
     await expect.poll(soundCount).toBe(sounds)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForClips(3)
     expect(await clipLengths()).toEqual(pieces)
   })
@@ -397,7 +397,7 @@ describe('joining split clips', () => {
   it('joins at the selected clip’s edge nearest the playhead with Ctrl+J', async () => {
     await splitFirstAt(60)
     await selectFirstClip()
-    await page.keyboard.press('Control+j')
+    await page.keyboard.press('ControlOrMeta+j')
     await waitForClips(2)
     expect(await clipLengths()).toEqual([120, 90])
   })
@@ -420,7 +420,7 @@ describe('joining split clips', () => {
     // Ctrl+J asks, saying how much comes back; Cancel changes nothing.
     await selectFirstClip()
     await page.keyboard.press('End')
-    await page.keyboard.press('Control+j')
+    await page.keyboard.press('ControlOrMeta+j')
     await page.waitForSelector('[data-testid="join-ask"]')
     expect(await page.textContent('[data-testid="join-ask"]')).toContain('brings back 1.0 s')
     await page.click('[data-testid="join-ask-cancel"]')
@@ -436,7 +436,7 @@ describe('joining split clips', () => {
     await waitForClips(2)
     // The stretch is back: the first clip is whole again, and the sequence as long as before the cut.
     expect(await clipLengths()).toEqual([120, 90])
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForClips(3)
     expect(await clipLengths()).toEqual(cut)
   })
@@ -475,7 +475,7 @@ describe('grouping pieces into one clip (bugs and notes 2, note 29)', () => {
     await page.keyboard.down('Shift')
     await page.mouse.click(b.x + b.width / 2, b.y + CLIP_BODY_Y)
     await page.keyboard.up('Shift')
-    await page.keyboard.press('Control+g')
+    await page.keyboard.press('ControlOrMeta+g')
     await expect.poll(async () => (await groups()).filter((g) => g !== '').length).toBe(2)
     const [g1, g2, g3] = await groups()
     expect(g1).toBe(g2)
@@ -490,7 +490,7 @@ describe('grouping pieces into one clip (bugs and notes 2, note 29)', () => {
     await page.mouse.click(second.x + second.width / 2, second.y + CLIP_BODY_Y)
     await expect.poll(selectedCount).toBe(2)
     // Ungrouped, the pieces are as they were.
-    await page.keyboard.press('Control+Shift+g')
+    await page.keyboard.press('ControlOrMeta+Shift+g')
     await expect.poll(async () => (await groups()).every((g) => g === '')).toBe(true)
     expect(await clipLengths()).toEqual(lengths)
   })
@@ -544,13 +544,14 @@ describe('dragging an edge on V1 (plan 82)', () => {
     const handle = (await page.locator(CLIP).nth(index).locator('[data-testid="trim-end"]').boundingBox())!
     const x = handle.x + handle.width / 2
     const y = handle.y + handle.height / 2
-    if (ctrl) await page.keyboard.down('Control')
+    // Ctrl on Windows, Cmd on a Mac, as the app reads it there.
+    if (ctrl) await page.keyboard.down('ControlOrMeta')
     await page.mouse.move(x, y)
     await page.mouse.down()
     for (let i = 1; i <= 6; i++) await page.mouse.move(x + (byPx * i) / 6, y)
     // Alt off: no snapping pulling the edge about.
     await page.mouse.up()
-    if (ctrl) await page.keyboard.up('Control')
+    if (ctrl) await page.keyboard.up('ControlOrMeta')
   }
 
   it('brings the footage cut away back and moves the rest later, and one undo puts it back', async () => {
@@ -565,7 +566,7 @@ describe('dragging an edge on V1 (plan 82)', () => {
     expect((await clipStarts())[1]).toBe(starts[1]! + grown)
     expect((await clipLengths()).slice(1)).toEqual(lengths.slice(1))
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(clipLengths).toEqual(lengths)
     expect(await clipStarts()).toEqual(starts)
   })
@@ -587,10 +588,10 @@ describe('undo and redo', () => {
     await page.keyboard.press('Delete')
     await waitForClips(1)
 
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForClips(2)
 
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await waitForClips(1)
   })
 
@@ -647,7 +648,7 @@ describe('undo and redo', () => {
     }
 
     for (const expected of [4, 3, 2]) {
-      await page.keyboard.press('Control+z')
+      await page.keyboard.press('ControlOrMeta+z')
       await waitForClips(expected)
     }
     expect(await clipLengths()).toEqual(start)
@@ -659,19 +660,19 @@ describe('undo and redo', () => {
 
     // Undo is not limited to the current timeline: it walks back through
     // everything done since the project was created, including adding clips.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForClips(1)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await waitForClips(0)
 
     // Undoing past the beginning does nothing rather than breaking.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForTimeout(250)
     expect(await clipCount()).toBe(0)
 
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await waitForClips(1)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await waitForClips(2)
     expect(await clipLengths()).toEqual(start)
   })
@@ -1060,7 +1061,7 @@ describe('the output shape', () => {
     await page.waitForTimeout(300)
     expect(await shapeOf()).toBeCloseTo(1, 1)
 
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForTimeout(300)
     expect(await shapeOf()).toBeCloseTo(before, 2)
     expect(await page.inputValue('[data-testid="export-preset"]')).toBe('vertical')
@@ -1205,7 +1206,7 @@ describe('markers', () => {
     await expect.poll(async () => (await markers())[0]!.frame).toBeGreaterThan(was)
 
     // One drag, one undo.
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await markers())[0]!.frame).toBe(was)
     // And the ruler shows it back there, which is where it is pressed next.
     await expect.poll(() => page.getAttribute('[data-testid="marker"]', 'data-frame')).toBe(String(was))
@@ -1221,9 +1222,9 @@ describe('markers', () => {
     await page.keyboard.press('Home')
     await page.keyboard.press('m')
     await expect.poll(async () => (await markers()).length).toBe(1)
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await markers()).length).toBe(0)
-    await page.keyboard.press('Control+y')
+    await page.keyboard.press('ControlOrMeta+y')
     await expect.poll(async () => (await markers()).length).toBe(1)
   })
 })
@@ -1353,7 +1354,7 @@ describe('custom shortcuts', () => {
   it('opens from its button and from Ctrl+/', async () => {
     await openShortcuts()
     await closeShortcuts()
-    await page.keyboard.press('Control+Slash')
+    await page.keyboard.press('ControlOrMeta+Slash')
     await page.waitForSelector('[data-testid="shortcuts-dialog"]')
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="shortcuts-dialog"]', { state: 'detached' })
@@ -1396,7 +1397,7 @@ describe('custom shortcuts', () => {
     // Three and four key combinations too, and on the same action.
     await page.locator('[data-testid="shortcut-add-playPause"]').click()
     await page.waitForSelector('[data-testid="shortcut-recording"]')
-    await page.keyboard.press('Control+Alt+Shift+KeyQ')
+    await page.keyboard.press('ControlOrMeta+Alt+Shift+KeyQ')
     await waitForCombo('playPause', 'Ctrl+Alt+Shift+KeyQ')
     await closeShortcuts()
 
@@ -1454,7 +1455,7 @@ describe('custom shortcuts', () => {
     await page.waitForSelector('[data-testid="shortcuts-conflict"]')
 
     // A free combination pressed while the question is up is simply taken.
-    await page.keyboard.press('Control+Alt+KeyQ')
+    await page.keyboard.press('ControlOrMeta+Alt+KeyQ')
     await waitForCombo('split', 'Ctrl+Alt+KeyQ')
     expect(await combosOf('split')).toEqual(['KeyS', 'Ctrl+Alt+KeyQ'])
     expect(await combosOf('playPause')).toEqual(['Space'])
@@ -1588,7 +1589,7 @@ describe('custom shortcuts', () => {
     // Escape abandons the rename rather than reaching the editor.
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="sequence-name-input"]', { state: 'detached' })
-    await page.keyboard.press('Control+z')
+    await page.keyboard.press('ControlOrMeta+z')
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="sequence-tab"]').length === 0)
   })
 })

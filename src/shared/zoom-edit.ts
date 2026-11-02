@@ -3,6 +3,7 @@ import { cropInView, viewOf, type Place } from './layout'
 import { MAIN_PICTURE, clipLength, startEndOf, zoomOf, type Clip, type Ease, type Rect, type SimpleEase, type ZoomKey } from './project'
 import type { ClipEdit } from './types'
 import { boxKeysOf } from './box-keys'
+import { sourceAt, timelineAt } from './tracks'
 
 /**
  * Plan 60, stages 2 and 3: what the Zoom group, the crop box, the nudge keys
@@ -11,7 +12,7 @@ import { boxKeysOf } from './box-keys'
  *
  * A keyframe is on a frame of the recording. The playhead is on a frame of
  * the sequence. The frame of the recording under the playhead is
- * `sourceIn + playhead - timelineStart`.
+ * `sourceIn + playhead - timelineStart`, at the clip's speed (`sourceAt`).
  *
  * Plan 73: every picture of a clip has a zoom of its own. Each helper is for
  * the main picture unless a further picture is named, and a Simple zoom's End
@@ -21,10 +22,21 @@ import { boxKeysOf } from './box-keys'
 /** How far in Scale goes: past this the picture is too soft to be worth having. */
 export const MAX_SCALE = 400
 
+/**
+ * The first and last whole frames of the recording a clip shows. The same as
+ * `sourceIn` and `sourceOut - 1` but at a speed of its own, where its ends
+ * may fall part way between two frames (plan 105).
+ */
+export function wholeFramesOf(c: Pick<Clip, 'sourceIn' | 'sourceOut'>): { first: number; last: number } {
+  const whole = (n: number): number => (Number.isInteger(n) ? n : Math.ceil(n - 1e-9))
+  const first = whole(c.sourceIn)
+  return { first, last: Math.max(first, whole(c.sourceOut) - 1) }
+}
+
 /** The frame of the recording under the playhead, held inside the clip when the playhead is outside it. */
 export function sourceFrameAt(c: Clip, playhead: number): number {
-  const last = Math.max(c.sourceIn, c.sourceOut - 1)
-  return Math.min(last, Math.max(c.sourceIn, c.sourceIn + playhead - c.timelineStart))
+  const { first, last } = wholeFramesOf(c)
+  return Math.min(last, Math.max(first, Math.round(sourceAt(c, playhead))))
 }
 
 /** Whether the playhead is on one of the clip's frames. */
@@ -34,7 +46,7 @@ export function playheadInside(c: Clip, playhead: number): boolean {
 
 /** The frame of the sequence a keyframe's frame of the recording is shown on in this clip. */
 export function timelineFrameOf(c: Clip, at: number): number {
-  return c.timelineStart + at - c.sourceIn
+  return timelineAt(c, at)
 }
 
 /** The picture a helper is for: a further picture the clip has, or its main one. */
@@ -241,8 +253,8 @@ export function timelineZoom(c: Clip, picture?: string): { picture: string; fram
   const id = chosen ?? (moving(MAIN_PICTURE) ? MAIN_PICTURE : c.layers.find((l) => moving(l.id))?.id)
   if (id === undefined) return null
   const simple = zoomOf(c, id).simple !== undefined
-  const last = Math.max(c.sourceIn, c.sourceOut - 1)
-  return { picture: id, frames: simple ? [c.sourceIn, last] : keysInClip(c, id).map((k) => k.at), simple }
+  const { first, last } = wholeFramesOf(c)
+  return { picture: id, frames: simple ? [first, last] : keysInClip(c, id).map((k) => k.at), simple }
 }
 
 /**
@@ -266,7 +278,9 @@ export function keyMarks(frames: readonly number[], pxPerFrame: number, reach: n
  * Where a keyframe dragged along a clip on the timeline lands: the frame it
  * started on moved by the pixels dragged, kept on the clip's own frames.
  */
-export function keyDraggedTo(c: Pick<Clip, 'sourceIn' | 'sourceOut'>, from: number, dxPx: number, pxPerFrame: number): number {
-  const moved = pxPerFrame > 0 ? Math.round(dxPx / pxPerFrame) : 0
-  return Math.min(Math.max(c.sourceIn, c.sourceOut - 1), Math.max(c.sourceIn, from + moved))
+export function keyDraggedTo(c: Pick<Clip, 'sourceIn' | 'sourceOut' | 'speed'>, from: number, dxPx: number, pxPerFrame: number): number {
+  // Frames of the sequence dragged over, as frames of the recording at the clip's speed (plan 105).
+  const moved = pxPerFrame > 0 ? Math.round((dxPx / pxPerFrame) * (c.speed ?? 1)) : 0
+  const { first, last } = wholeFramesOf(c)
+  return Math.min(last, Math.max(first, from + moved))
 }

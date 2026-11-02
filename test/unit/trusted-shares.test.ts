@@ -21,8 +21,9 @@ describe('the shares you allowed', () => {
   })
 
   it('says so when the list cannot be written', async () => {
-    // A folder Windows will not make, so writing the list fails.
-    await loadTrustedShares(join(root, 'no<such>folder'))
+    // A folder inside a file, which no system will make, so writing the list fails.
+    await writeFile(join(root, 'a-file'), '')
+    await loadTrustedShares(join(root, 'a-file', 'folder'))
     const told: string[] = []
     onTrustWriteFailed((reason) => told.push(reason))
     await trustShares(['\\nas\footage'])

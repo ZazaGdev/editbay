@@ -11,7 +11,8 @@ import { Inspector } from '../components/Inspector'
 import { SECTION_TYPE, Sections, useSectionMenu } from '../components/section-host'
 import { Panel } from '../ui/Panel'
 import { SectionLabel } from '../ui/SectionLabel'
-import { accent, ink, radius, space, type } from '../theme'
+import { Icon } from '../ui/Icon'
+import { accent, ink, radius, space, surface, type } from '../theme'
 import { held, panel } from './styles'
 import { useInspectorProps, useSectionHost, type InspectorProps } from './useInspectorProps'
 import { useSteady } from '../state/useSteady'
@@ -115,8 +116,67 @@ export function SectionDock(props: {
           </Fragment>
         ))}
         {landing !== null && landing >= names.length && <Landing />}
+        {/* Right of the timeline, under the Inspector's column: folded down, the Inspector takes its height. */}
+        {side === 'right' && !app.inspectorFolded && (
+          <div style={{ marginTop: 'auto', padding: `0 ${space.xs}px` }}>
+            <TuckBar app={app} />
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Whether the sections right of the timeline are folded down to a bar under
+ * the Inspector (task 1137). Only while there are some, and the Inspector is
+ * open to take their height.
+ */
+export function rightTucked(app: AppState): boolean {
+  const { windowSettings, inspectorFolded } = app
+  return windowSettings.rightTucked && windowSettings.sections.right.length > 0 && !inspectorFolded
+}
+
+/**
+ * The thin bar that folds the sections right of the timeline down, so the
+ * Inspector above takes their height, and opens them again. Open, it is the
+ * foot of their dock; folded, it is all of them there is, under the Inspector.
+ */
+export function TuckBar(props: { app: AppState }): JSX.Element {
+  const { windowSettings, setWindowSettings } = props.app
+  const tucked = windowSettings.rightTucked
+  const names = windowSettings.sections.right.join(', ')
+  return (
+    <button
+      type="button"
+      data-testid="section-dock-tuck"
+      data-tucked={tucked ? 'yes' : 'no'}
+      aria-expanded={!tucked}
+      title={tucked ? `Open ${names} again beside the timeline` : `Fold ${names} down, so the Inspector takes the room`}
+      onClick={() => setWindowSettings({ rightTucked: !tucked })}
+      className="ui-tuck-bar"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: space.xs,
+        width: '100%',
+        height: 24,
+        flexShrink: 0,
+        padding: `0 ${space.sm}px`,
+        border: 0,
+        borderRadius: radius.panel,
+        background: tucked ? surface.panel : 'transparent',
+        color: ink.secondary,
+        font: type.meta,
+        cursor: 'pointer',
+        textAlign: 'left'
+      }}
+    >
+      <Icon name={tucked ? 'up' : 'down'} size={14} />
+      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {tucked ? names : 'Fold down'}
+      </span>
+    </button>
   )
 }
 
