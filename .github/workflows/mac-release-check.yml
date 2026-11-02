@@ -25,6 +25,10 @@ on:
         description: Open the small project (off opens Editbay empty)
         type: boolean
         default: true
+      build_run:
+        description: Check the .dmg files a Mac workflow run built, by its run id, instead of the release's
+        type: string
+        default: ''
       audio_probe:
         description: Instead of the release, find which way of making sound asks for the microphone (task 2355)
         type: boolean
@@ -117,12 +121,22 @@ jobs:
       - name: Download and check the .dmg
         run: |
           mkdir dl && cd dl
-          gh release download "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}.dmg"
-          DMG="$(ls Editbay-*-${{ matrix.chip }}.dmg)"
-          HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
-          echo "$DMG $HASH"
-          gh release view "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json body --jq .body | grep -q "$HASH"
-          echo "The hash matches the one in the release notes."
+          if [ -n "${{ inputs.build_run }}" ]; then
+            # A build not yet released: the .dmg a Mac workflow run kept, checked against its own hash.
+            gh run download "${{ inputs.build_run }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}"
+            DMG="$(ls */release/Editbay-*-${{ matrix.chip }}.dmg)"
+            HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+            echo "$DMG $HASH"
+            grep -q "$HASH" "$DMG.sha256"
+            echo "The hash matches the one the build kept."
+          else
+            gh release download "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}.dmg"
+            DMG="$(ls Editbay-*-${{ matrix.chip }}.dmg)"
+            HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+            echo "$DMG $HASH"
+            gh release view "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json body --jq .body | grep -q "$HASH"
+            echo "The hash matches the one in the release notes."
+          fi
           echo "DMG=$PWD/$DMG" >> "$GITHUB_ENV"
 
       - name: Mount it and copy Editbay into Applications
