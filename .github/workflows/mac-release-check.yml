@@ -97,25 +97,34 @@ jobs:
             "$HOME/check/clip.mp4" > "$HOME/check/list.json"
           npm run --silent cli -- build "$HOME/check/list.json" --out "$HOME/check/release-check.editbay"
 
+      # Started from its own program rather than with open, so what Chromium
+      # says about the GPU and the picture lands in a file (tasks 2354, 2355).
       - name: Open Editbay on it
         run: |
-          open -a "$APP" "$HOME/check/release-check.editbay"
+          system_profiler SPDisplaysDataType SPAudioDataType 2>&1 | tee hardware.txt || true
+          "$APP/Contents/MacOS/Editbay" --enable-logging=stderr "$HOME/check/release-check.editbay" > editbay-stderr.txt 2>&1 &
           for i in $(seq 1 60); do
             pgrep -x Editbay > /dev/null && break
             sleep 1
           done
-          # Time to draw the window and import the clip.
-          sleep 25
+          # Pictures as the window draws and the clip comes in, the last after it has had time to settle.
+          sleep 10
+          screencapture -x "screen-${{ matrix.chip }}-10s.png"
+          sleep 15
+          screencapture -x "screen-${{ matrix.chip }}-25s.png"
+          sleep 20
+          screencapture -x "screen-${{ matrix.chip }}.png"
           pgrep -lx Editbay
           osascript -e 'tell application "System Events" to get name of every window of process "Editbay"' 2>&1 | tee windows.txt || true
-          screencapture -x "screen-${{ matrix.chip }}.png"
           pgrep -x Editbay > /dev/null || { echo "Editbay is no longer running"; exit 1; }
 
       - name: Logs
         if: always()
         run: |
           mkdir -p logs
-          cp gatekeeper.txt windows.txt logs/ 2>/dev/null || true
+          cp gatekeeper.txt windows.txt hardware.txt editbay-stderr.txt logs/ 2>/dev/null || true
+          # Which permission each request asked for, and who asked.
+          log show --last 10m --predicate 'subsystem == "com.apple.TCC" OR process == "tccd"' --style compact 2>/dev/null | grep -i -E "editbay|kTCCService" | tail -200 > logs/tcc.txt || true
           cp -R "$HOME/Library/Logs/Editbay" logs/app 2>/dev/null || true
           log show --last 5m --predicate 'process == "Editbay"' --style compact 2>/dev/null | tail -200 > logs/system.txt || true
           ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i editbay && cp ~/Library/Logs/DiagnosticReports/*Editbay* logs/ || true
@@ -126,5 +135,5 @@ jobs:
           name: check-${{ matrix.chip }}
           if-no-files-found: ignore
           path: |
-            screen-${{ matrix.chip }}.png
+            screen-${{ matrix.chip }}*.png
             logs/
