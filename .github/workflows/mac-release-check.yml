@@ -62,7 +62,7 @@ jobs:
       - name: Each way of making sound
         working-directory: probe
         run: |
-          for v in none context-interactive context-playback context-resumed audio-element; do
+          for v in none context-interactive context-playback context-resumed audio-element audio-element-loaded audio-element-loaded-muted; do
             from="$(date '+%Y-%m-%d %H:%M:%S')"
             npx electron . --variant=$v > /dev/null 2>&1 || true
             sleep 2

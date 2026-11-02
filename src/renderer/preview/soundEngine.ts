@@ -81,14 +81,24 @@ export class SoundEngine {
     this.listen(true)
   }
 
+  /** Whether the first click or key press has come. A player loaded unmuted asks the same way, so they wait for it too. */
+  woken = false
+  /** Called once, as it wakes. */
+  onWake: (() => void) | null = null
+
   private readonly wake = (): void => {
     this.listen(false)
+    this.woken = true
     this.open()
+    this.onWake?.()
   }
 
   /** The first click or key press listened for, or no longer. Nothing to listen to outside a window. */
   private listen(on: boolean): void {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      this.woken = true
+      return
+    }
     for (const type of ['pointerdown', 'keydown']) {
       if (on) window.addEventListener(type, this.wake, true)
       else window.removeEventListener(type, this.wake, true)

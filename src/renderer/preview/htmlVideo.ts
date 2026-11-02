@@ -159,6 +159,9 @@ export class HtmlVideoEngine implements PreviewEngine {
     c.style.visibility = 'hidden'
     this.canvas = c
     this.ctx = c.getContext('2d')
+    this.sound.onWake = () => {
+      for (const lane of this.lanes()) lane.silence(this.silent())
+    }
   }
 
   mount(host: HTMLElement): void {
@@ -692,8 +695,17 @@ export class HtmlVideoEngine implements PreviewEngine {
 
   setMuted(muted: boolean): void {
     this.muted = muted
-    for (const lane of this.lanes()) lane.silence(muted)
+    for (const lane of this.lanes()) lane.silence(this.silent())
     if (this.timeline) this.sound.setMaster(muted ? 0 : 1 / previewScale(this.timeline))
+  }
+
+  /**
+   * The players stay muted until the first click or key press as well, since
+   * on a Mac whose sound output is also a microphone one loaded unmuted makes
+   * macOS ask for the microphone (task 2355).
+   */
+  private silent(): boolean {
+    return this.muted || !this.sound.woken
   }
 
   setVoice(stretches: readonly Stretch[]): void {
@@ -855,7 +867,7 @@ export class HtmlVideoEngine implements PreviewEngine {
             })
           }
         }
-        lane.silence(this.muted)
+        lane.silence(this.silent())
         this.videoLanes.set(track.id, lane)
       }
       lane.setClips(clips.filter((c) => !pictures.has(c.id)))
@@ -870,7 +882,7 @@ export class HtmlVideoEngine implements PreviewEngine {
       let lane = this.audioLanes.get(track.id)
       if (!lane) {
         lane = audioLane(this.host, track.id)
-        lane.silence(this.muted)
+        lane.silence(this.silent())
         this.audioLanes.set(track.id, lane)
       }
       lane.setClips(t ? soundLaneClips(t, track, this.listening()) : [])
