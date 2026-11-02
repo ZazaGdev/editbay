@@ -17,6 +17,14 @@ on:
         description: Sound output to switch to first, such as Null Audio Device (empty keeps the runner's own)
         type: string
         default: ''
+      app_args:
+        description: Extra switches for Editbay, such as --disable-features=X
+        type: string
+        default: ''
+      project:
+        description: Open the small project (off opens Editbay empty)
+        type: boolean
+        default: true
 
 jobs:
   check:
@@ -116,7 +124,9 @@ jobs:
       - name: Open Editbay on it
         run: |
           system_profiler SPDisplaysDataType SPAudioDataType 2>&1 | tee hardware.txt || true
-          "$APP/Contents/MacOS/Editbay" --enable-logging=stderr "$HOME/check/release-check.editbay" > editbay-stderr.txt 2>&1 &
+          PROJECT=""
+          if [ "${{ inputs.project }}" != "false" ]; then PROJECT="$HOME/check/release-check.editbay"; fi
+          "$APP/Contents/MacOS/Editbay" --enable-logging=stderr ${{ inputs.app_args }} $PROJECT > editbay-stderr.txt 2>&1 &
           for i in $(seq 1 60); do
             pgrep -x Editbay > /dev/null && break
             sleep 1
