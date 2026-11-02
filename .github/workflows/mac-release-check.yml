@@ -13,6 +13,10 @@ on:
         description: Release tag to check, such as v2.0 (empty for the latest)
         type: string
         default: ''
+      sound_output:
+        description: Sound output to switch to first, such as Null Audio Device (empty keeps the runner's own)
+        type: string
+        default: ''
 
 jobs:
   check:
@@ -97,6 +101,16 @@ jobs:
             "$HOME/check/clip.mp4" > "$HOME/check/list.json"
           npm run --silent cli -- build "$HOME/check/list.json" --out "$HOME/check/release-check.editbay"
 
+      # Task 2355: whether a sound output that is also a microphone is what
+      # makes the app ask for the microphone as its preview starts.
+      - name: Switch the sound output
+        if: inputs.sound_output != ''
+        run: |
+          brew install switchaudio-osx
+          SwitchAudioSource -a -t output
+          SwitchAudioSource -t output -s "${{ inputs.sound_output }}"
+          SwitchAudioSource -c -t output
+
       # Started from its own program rather than with open, so what Chromium
       # says about the GPU and the picture lands in a file (tasks 2354, 2355).
       - name: Open Editbay on it
@@ -125,6 +139,8 @@ jobs:
           cp gatekeeper.txt windows.txt hardware.txt editbay-stderr.txt logs/ 2>/dev/null || true
           # Which permission each request asked for, and who asked.
           log show --last 10m --predicate 'subsystem == "com.apple.TCC" OR process == "tccd"' --style compact 2>/dev/null | grep -i -E "editbay|kTCCService" | tail -200 > logs/tcc.txt || true
+          # The requests that could show a prompt, not the silent checks.
+          grep "preflight=no" logs/tcc.txt | grep -E "kTCCService(Microphone|AudioCapture)" | tee logs/microphone-requests.txt || echo "No microphone requests." | tee logs/microphone-requests.txt
           cp -R "$HOME/Library/Logs/Editbay" logs/app 2>/dev/null || true
           log show --last 5m --predicate 'process == "Editbay"' --style compact 2>/dev/null | tail -200 > logs/system.txt || true
           ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i editbay && cp ~/Library/Logs/DiagnosticReports/*Editbay* logs/ || true
