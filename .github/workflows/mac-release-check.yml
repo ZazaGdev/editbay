@@ -25,9 +25,54 @@ on:
         description: Open the small project (off opens Editbay empty)
         type: boolean
         default: true
+      audio_probe:
+        description: Instead of the release, find which way of making sound asks for the microphone (task 2355)
+        type: boolean
+        default: false
 
 jobs:
+  # Task 2355: plain Electron, at Editbay's version, making sound each way in
+  # turn on a sound output that is also a microphone, each way's microphone
+  # requests counted.
+  audio-probe:
+    if: inputs.audio_probe
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Electron at Editbay's version
+        run: |
+          V="$(node -p "require('./package.json').devDependencies.electron.replace(/^[^0-9]*/, '')")"
+          mkdir probe && cp .github/mac-audio-probe/main.js probe/ && cd probe
+          npm init -y > /dev/null
+          npm install --no-save "electron@$V"
+          npx electron --version
+      - name: A sound output that is also a microphone
+        run: |
+          brew install switchaudio-osx
+          SwitchAudioSource -t output -s "Null Audio Device"
+          SwitchAudioSource -c -t output
+      - name: Each way of making sound
+        working-directory: probe
+        run: |
+          for v in none context-interactive context-playback context-resumed audio-element; do
+            from="$(date '+%Y-%m-%d %H:%M:%S')"
+            npx electron . --variant=$v > /dev/null 2>&1 || true
+            sleep 2
+            n="$(log show --start "$from" --predicate 'subsystem == "com.apple.TCC"' --style compact 2>/dev/null | grep "preflight=no" | grep -c "kTCCServiceMicrophone" || true)"
+            echo "$v: $n microphone requests" | tee -a ../probe.txt
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audio-probe
+          path: probe.txt
+
   check:
+    if: ${{ !inputs.audio_probe }}
     strategy:
       fail-fast: false
       matrix:
