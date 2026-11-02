@@ -19,7 +19,7 @@ Website: [zazag.dev/apps/editbay](https://zazag.dev/apps/editbay/)
 Each release lists the installer's SHA-256, so you can check the download with
 `certutil -hashfile Editbay.Setup.<version>.exe SHA256`.
 
-**Mac.** Being tested now, and on the Releases page from the next release:
+**Mac.** On the Releases page from 2.0:
 `Editbay-<version>-arm64.dmg` for Macs with an M chip (macOS 14 Sonoma or later) and
 `Editbay-<version>-intel.dmg` for Intel Macs (macOS 13.4 Ventura or later).
 

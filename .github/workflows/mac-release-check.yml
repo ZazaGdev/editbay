@@ -1,0 +1,130 @@
+name: Mac release check
+
+# Task 2352: the published Mac downloads, checked the way someone would use
+# them, since nobody working on Editbay has a Mac. Started by hand on a release
+# tag. Each chip runs on its own kind of Mac: the .dmg is downloaded from the
+# release, checked against the SHA-256 in its notes, mounted, copied into
+# Applications, opened on a small project, and a picture of the screen kept.
+# Runs on the public repo, where Mac minutes are free.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check, such as v2.0 (empty for the latest)
+        type: string
+        default: ''
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - chip: arm64
+            runner: macos-15
+            node_arch: arm64
+          - chip: intel
+            runner: macos-15-intel
+            node_arch: x64
+    name: ${{ matrix.chip }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APP: /Applications/Editbay.app
+    steps:
+      - name: The release
+        id: release
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Checking $TAG on $(uname -m), macOS $(sw_vers -productVersion)"
+
+      # The command line from the same release builds the small project.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.node_arch }}
+          cache: npm
+
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run cli:build
+
+      - name: Download and check the .dmg
+        run: |
+          mkdir dl && cd dl
+          gh release download "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}.dmg"
+          DMG="$(ls Editbay-*-${{ matrix.chip }}.dmg)"
+          HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+          echo "$DMG $HASH"
+          gh release view "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json body --jq .body | grep -q "$HASH"
+          echo "The hash matches the one in the release notes."
+          echo "DMG=$PWD/$DMG" >> "$GITHUB_ENV"
+
+      - name: Mount it and copy Editbay into Applications
+        run: |
+          MNT="$(hdiutil attach -nobrowse -readonly "$DMG" | tail -1 | cut -f3-)"
+          ls "$MNT"
+          cp -R "$MNT/Editbay.app" /Applications/
+          hdiutil detach "$MNT"
+          lipo -archs "$APP/Contents/MacOS/Editbay"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" -c "Print :LSMinimumSystemVersion" "$APP/Contents/Info.plist"
+
+      # What a first-time user meets: a download carries the quarantine mark,
+      # and Gatekeeper refuses an app not signed with an Apple certificate.
+      # The README's Terminal line takes the mark off, as Open Anyway does.
+      - name: What Gatekeeper says
+        run: |
+          xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;" "$APP"
+          spctl --assess --type execute -vv "$APP" 2>&1 | tee gatekeeper.txt || true
+          codesign -dv "$APP" 2>&1 | grep -E "Signature|TeamIdentifier" | tee -a gatekeeper.txt
+          xattr -dr com.apple.quarantine "$APP"
+
+      - name: A small project
+        run: |
+          mkdir -p "$HOME/check"
+          "$APP/Contents/Resources/ffmpeg/ffmpeg" -hide_banner -loglevel error -y \
+            -f lavfi -i testsrc2=size=1280x720:rate=30:duration=4 -f lavfi -i sine=frequency=440:duration=4 \
+            -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$HOME/check/clip.mp4"
+          printf '{"version":1,"shape":"landscape","sources":[{"id":"a","path":"%s","offsetSec":0}],"main":"a","sound":"a","cuts":[],"zooms":[],"markers":[]}' \
+            "$HOME/check/clip.mp4" > "$HOME/check/list.json"
+          npm run --silent cli -- build "$HOME/check/list.json" --out "$HOME/check/release-check.editbay"
+
+      - name: Open Editbay on it
+        run: |
+          open -a "$APP" "$HOME/check/release-check.editbay"
+          for i in $(seq 1 60); do
+            pgrep -x Editbay > /dev/null && break
+            sleep 1
+          done
+          # Time to draw the window and import the clip.
+          sleep 25
+          pgrep -lx Editbay
+          osascript -e 'tell application "System Events" to get name of every window of process "Editbay"' 2>&1 | tee windows.txt || true
+          screencapture -x "screen-${{ matrix.chip }}.png"
+          pgrep -x Editbay > /dev/null || { echo "Editbay is no longer running"; exit 1; }
+
+      - name: Logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp gatekeeper.txt windows.txt logs/ 2>/dev/null || true
+          cp -R "$HOME/Library/Logs/Editbay" logs/app 2>/dev/null || true
+          log show --last 5m --predicate 'process == "Editbay"' --style compact 2>/dev/null | tail -200 > logs/system.txt || true
+          ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i editbay && cp ~/Library/Logs/DiagnosticReports/*Editbay* logs/ || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-${{ matrix.chip }}
+          if-no-files-found: ignore
+          path: |
+            screen-${{ matrix.chip }}.png
+            logs/
