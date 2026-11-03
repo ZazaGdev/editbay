@@ -25,8 +25,9 @@ import { openCut, recordPlaying, sampleAt } from './heard'
  * GitHub's Intel Mac runs this through Rosetta on a shared machine with no graphics card, where
  * the recorded sound itself jumps by 3-16 ms at random, with the engine on or off; these
  * measurements cannot be judged there and are left to a real Mac (task 141). Apple Silicon keeps them.
+ * The app's chip, which on that runner is not the test's own (task 2384).
  */
-const ROSETTA_RUNNER = process.platform === 'darwin' && process.arch === 'x64' && !!process.env.CI
+const ROSETTA_RUNNER = process.platform === 'darwin' && (process.env.EDITBAY_TEST_ARCH ?? process.arch) === 'x64' && !!process.env.CI
 
 const TONE_HZ = 30
 /** Clips half a second long with a fifth of a second taken out between each, as a talk cut tight is: every edge on a whole frame. */

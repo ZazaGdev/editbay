@@ -28,10 +28,12 @@ import { wakeSound } from './wake-sound'
 // Mac build's Editbay.app, for checking a fresh build while the usual one is
 // open and cannot be replaced.
 const MAC = process.platform === 'darwin'
+// The chip the app was built for, which on GitHub's Intel Mac is not the test's own (task 2384).
+const ARCH = process.env.EDITBAY_TEST_ARCH ?? process.arch
 const UNPACKED =
   process.env.EDITBAY_PACKAGED_DIR ??
   (MAC
-    ? join(process.cwd(), 'release-test', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app')
+    ? join(process.cwd(), 'release-test', ARCH === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app')
     : join(process.cwd(), 'release-test', 'win-unpacked'))
 // A Mac app keeps its program and its resources inside the bundle (plan 104).
 const EXE = MAC ? join(UNPACKED, 'Contents', 'MacOS', 'Editbay') : join(UNPACKED, 'Editbay.exe')
@@ -84,7 +86,7 @@ describe.skipIf(!built)('the packaged application', () => {
   })
 
   it('ships ONNX Runtime for Follow face beside the archive, CPU only, with the C++ runtime and the face model', async () => {
-    const platform = MAC ? join('darwin', process.arch) : join('win32', 'x64')
+    const platform = MAC ? join('darwin', ARCH) : join('win32', 'x64')
     const bin = join(RESOURCES, 'onnxruntime', 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', platform)
     const files = (await readdir(bin)).map((f) => f.toLowerCase()).sort()
     expect(files).toContain('onnxruntime_binding.node')

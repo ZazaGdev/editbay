@@ -113,8 +113,30 @@ jobs:
       # each release (task 1388). Its report is kept whether it passes or not.
       # A test that misses a timing on these shared machines gets one more go;
       # the log marks each one that needed it, and the audit lists them.
+      # On Intel the suite's own Node is the Mac's, not the x64 one (task 2384):
+      # through Rosetta its test workers crashed up to five times a run. The app
+      # it drives is still the Intel build, and the tests are told so. The
+      # bundlers' native parts for this Node are put beside the x64 ones.
+      - if: always() && matrix.chip == 'intel'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: arm64
+      - if: always() && matrix.chip == 'intel'
+        run: |
+          node -p "process.arch"
+          for d in $(find node_modules -type d \( -name esbuild -o -name rollup \)); do
+            [ "$(basename "$(dirname "$d")")" = node_modules ] && [ -f "$d/package.json" ] || continue
+            v="$(node -p "require('./$d/package.json').version")"
+            case "$(basename "$d")" in esbuild) p=@esbuild/darwin-arm64 ;; rollup) p=@rollup/rollup-darwin-arm64 ;; esac
+            t="$(cd "$RUNNER_TEMP" && npm pack "$p@$v" --silent)"
+            mkdir -p "$(dirname "$d")/$p"
+            tar -xzf "$RUNNER_TEMP/$t" -C "$(dirname "$d")/$p" --strip-components=1
+            echo "$d $v: $p"
+          done
+
       # A test file whose worker crashed, with no test failed, runs once more
-      # (task 2384): the x64 Node under Rosetta has crashed in a worker once.
+      # (task 2384).
       - name: The UI suite
         if: always()
         shell: bash
@@ -137,6 +159,7 @@ jobs:
         env:
           # Tests that take pictures of the app keep them here, kept with the run.
           EDITBAY_SHOTS: ${{ github.workspace }}/shots-${{ matrix.chip }}
+          EDITBAY_TEST_ARCH: ${{ matrix.node_arch }}
 
       - name: SHA-256
         if: always()
