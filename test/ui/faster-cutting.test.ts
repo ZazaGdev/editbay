@@ -94,6 +94,14 @@ const PROGRAM = '[data-testid="monitor-side"][data-side="program"]'
 describe('the Source and Output side by side', () => {
   it('shows the recording on the left and the finished vertical frame on the right, each with its own box to drag', async () => {
     await page.waitForSelector('[data-testid="monitor-stage"][data-both="yes"]', WAIT)
+    // The monitor can still be changing size as the window settles on a slow machine, and the views
+    // follow it a frame later (task 2384), so they are measured once they have.
+    await expect
+      .poll(async () => {
+        const [stage, program] = [await boxOf('[data-testid="monitor-stage"]'), await boxOf(PROGRAM)]
+        return `stage ${stage.height}, Output ${program.height}, off by ${Math.round(Math.abs(program.height - (stage.height - 40)))}`
+      }, WAIT)
+      .toMatch(/off by [01]$/)
     const source = await boxOf(SOURCE)
     const program = await boxOf(PROGRAM)
     expect(source.x + source.width).toBeLessThanOrEqual(program.x)
