@@ -9,6 +9,7 @@ import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { LOOKS } from '../../src/shared/looks'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 85: every look, a strength and each slider, read back from the Output
@@ -30,6 +31,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'landscape' }))
   await page.keyboard.press('ControlOrMeta+n')

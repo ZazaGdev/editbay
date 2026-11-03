@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 36: every preference in one Settings window, and the on or off ones
@@ -24,6 +25,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 
@@ -268,6 +270,7 @@ describe('the Settings window', () => {
     await closeSettings()
     await page.reload()
     await page.waitForSelector('main')
+    await wakeSound(page)
     await discardUnsavedWork(app)
     await openSettings('Timeline')
     expect(await page.locator('[data-testid="setting-overview"]').isChecked()).toBe(false)
@@ -296,15 +299,18 @@ describe('the theme (task 66)', () => {
     await page.locator('[data-testid="setting-theme"]').selectOption('teal')
     await expect.poll(accentNow, { timeout: 15_000 }).toBe('#14BFA6')
     await page.waitForSelector('main')
+    await wakeSound(page)
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--surface-canvas').trim())).toBe('#04060A')
     await openSettings('General')
     await page.locator('[data-testid="setting-theme"]').selectOption('electric')
     await expect.poll(accentNow, { timeout: 15_000 }).toBe('#3370FF')
     await page.waitForSelector('main')
+    await wakeSound(page)
     await openSettings('General')
     await page.locator('[data-testid="setting-theme"]').selectOption('current')
     await expect.poll(accentNow, { timeout: 15_000 }).toBe('#4C8DF5')
     await page.waitForSelector('main')
+    await wakeSound(page)
   })
 })
 
@@ -319,6 +325,7 @@ describe('saved styles (task 54)', () => {
     // The window reads the shapes as it opens: a reload brings in the ones just set.
     await page.reload()
     await page.waitForSelector('main')
+    await wakeSound(page)
     await openSettings('Styles')
     const row = (kind: string, name: string): string => `[data-testid="saved-style"][data-kind="${kind}"][data-name="${name}"]`
     await page.waitForSelector(row('text', 'Title card'))

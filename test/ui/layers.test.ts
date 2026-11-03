@@ -8,6 +8,7 @@ import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { answerSaveDialog, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Pictures over pictures, driven through the real window, on a file shaped
@@ -30,6 +31,7 @@ async function launch(extraArgs: string[] = []): Promise<void> {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`, ...extraArgs], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }
 

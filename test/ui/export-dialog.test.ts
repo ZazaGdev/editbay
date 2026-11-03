@@ -8,6 +8,7 @@ import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath, ffprobePath } from '../../src/main/ffmpeg/locate'
 import { closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 13, step 2: the Export dialog. A folder from the start, the names it
@@ -37,6 +38,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   // Playing or showing a file, or copying text, would reach the desktop and
   // clipboard of whoever is at the machine: recorded instead.

@@ -209,7 +209,8 @@ jobs:
           # Which permission each request asked for, and who asked.
           log show --last 10m --predicate 'subsystem == "com.apple.TCC" OR process == "tccd"' --style compact 2>/dev/null | grep -i -E "editbay|kTCCService" | tail -200 > logs/tcc.txt || true
           # The requests that could show a prompt, not the silent checks.
-          grep "preflight=no" logs/tcc.txt | grep -E "kTCCService(Microphone|AudioCapture)" | tee logs/microphone-requests.txt || echo "No microphone requests." | tee logs/microphone-requests.txt
+          grep "preflight=no" logs/tcc.txt | grep -E "kTCCService(Microphone|AudioCapture)" > logs/microphone-requests.txt || echo "No microphone requests." > logs/microphone-requests.txt
+          cat logs/microphone-requests.txt
           cp -R "$HOME/Library/Logs/Editbay" logs/app 2>/dev/null || true
           log show --last 5m --predicate 'process == "Editbay"' --style compact 2>/dev/null | tail -200 > logs/system.txt || true
           ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i editbay && cp ~/Library/Logs/DiagnosticReports/*Editbay* logs/ || true

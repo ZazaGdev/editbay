@@ -7,6 +7,7 @@ import { fixtureSet } from '../e2e/fixtures'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath, ffprobePath } from '../../src/main/ffmpeg/locate'
 import { chooseExportFolder, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 105: a clip's speed, set in the Inspector, on the timeline and in the
@@ -29,6 +30,7 @@ beforeAll(async () => {
   })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), clip)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

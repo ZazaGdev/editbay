@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { parseTutorial, sections, type ShowMe } from '../../src/shared/tutorials'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 84: every Show me step of every tutorial, pressed in the real app, on
@@ -104,6 +105,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 

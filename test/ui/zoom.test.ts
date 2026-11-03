@@ -8,6 +8,7 @@ import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { chooseExportFolder, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 60, stages 2 and 3: zoom with keyframes from the Inspector's Zoom
@@ -40,6 +41,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await app.evaluate(async ({ dialog }, dir) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] })

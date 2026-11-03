@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { pxPerFrameAt } from '../../src/shared/timeline-layout'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 17 step 2, driven through the real window: Ctrl+wheel zooms the
@@ -29,6 +30,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const [asset] = await page.evaluate((p) => window.api.importFiles(p), [clean])
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 180_000 })

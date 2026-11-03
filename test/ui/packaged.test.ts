@@ -9,6 +9,7 @@ import { fixtureSet } from '../e2e/fixtures'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { chooseExportFolder, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * The packaged application, not the development one.
@@ -55,6 +56,7 @@ beforeAll(async () => {
   app = await electron.launch({ executablePath: EXE, args: [`--user-data-dir=${userData}`], env: { ...process.env, EDITBAY_SPEECH_FAKE: fake } })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 240_000)
 

@@ -10,6 +10,7 @@ import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
 import type { EditList } from '../../src/shared/edit-list'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 139: an edit list's `endDipToBlackSec`. Built by `npm run cli --
@@ -71,6 +72,7 @@ describe('a dip to black at the end, built from an edit list', () => {
     app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`, target], cwd: process.cwd(), env: { ...process.env } as Record<string, string> })
     page = await app.firstWindow()
     await page.waitForSelector('main')
+    await wakeSound(page)
     await page.waitForFunction(
       () => {
         const clips = [...document.querySelectorAll('[data-testid="clip"]')]

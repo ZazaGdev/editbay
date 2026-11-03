@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Closing up that would push a clip out of step is refused, and says why,
@@ -31,6 +32,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const assets = await page.evaluate((p) => window.api.importFiles(p), [clean, obs, beep])
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"][data-status="ready"]').length === 3, undefined, {

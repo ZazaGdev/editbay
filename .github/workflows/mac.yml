@@ -113,13 +113,27 @@ jobs:
       # each release (task 1388). Its report is kept whether it passes or not.
       # A test that misses a timing on these shared machines gets one more go;
       # the log marks each one that needed it, and the audit lists them.
+      # A test file whose worker crashed, with no test failed, runs once more
+      # (task 2384): the x64 Node under Rosetta has crashed in a worker once.
       - name: The UI suite
         if: always()
+        shell: bash
         run: |
           system_profiler SPDisplaysDataType || true
           osascript -e 'tell application "Finder" to get bounds of window of desktop' || true
           mkdir -p "$EDITBAY_SHOTS"
-          npx electron-vite build && npx vitest run --dir test/ui --no-file-parallelism --retry=1 --reporter=verbose --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml
+          npx electron-vite build
+          set +e -o pipefail
+          npx vitest run --dir test/ui --no-file-parallelism --retry=1 --reporter=verbose --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml 2>&1 | tee ui.log
+          code=$?
+          perl -pe 's/\e\[[0-9;]*m//g' ui.log > ui-plain.log
+          crashed="$(grep -o 'Worker exited unexpectedly.*while running test file [^ ]*' ui-plain.log | sed 's/.*while running test file //' | sort -u)"
+          if [ "$code" -ne 0 ] && [ -n "$crashed" ] && ! grep -Eq '^ +(Tests|Test Files) .*failed' ui-plain.log; then
+            echo "::warning::A test worker crashed with no test failed, so these run once more: $crashed"
+            npx vitest run $crashed --no-file-parallelism --retry=1 --reporter=verbose --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}-rerun.xml
+            code=$?
+          fi
+          exit $code
         env:
           # Tests that take pictures of the app keep them here, kept with the run.
           EDITBAY_SHOTS: ${{ github.workspace }}/shots-${{ matrix.chip }}
@@ -140,4 +154,5 @@ jobs:
             release/${{ matrix.name }}.dmg.sha256
             screenshot-${{ matrix.chip }}.png
             ui-${{ matrix.chip }}.xml
+            ui-${{ matrix.chip }}-rerun.xml
             shots-${{ matrix.chip }}/

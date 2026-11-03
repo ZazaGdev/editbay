@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import type { EditList } from '../../src/shared/edit-list'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 1097: what the preview is heard to play, recorded, and when its
@@ -51,6 +52,7 @@ export async function openCut(
   const app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`, target], cwd: process.cwd(), env: { ...process.env } as Record<string, string> })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   // Recorded, never heard: nothing is played unless the window is muted.
   const muted = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every((w) => w.webContents.isAudioMuted()))
   if (!muted) {

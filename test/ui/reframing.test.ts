@@ -7,6 +7,7 @@ import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { closeExport, discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 13, step 4: reframing. Guides and safe zones over the Output view,
@@ -31,6 +32,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 
@@ -230,6 +232,7 @@ describe('guides', () => {
     await closeGuides()
     await page.reload()
     await page.waitForSelector('main')
+    await wakeSound(page)
     await page.click('[data-testid="view-program"]')
     await page.waitForSelector('[data-testid="guides"]')
     expect(await page.getAttribute('[data-testid="guides"]', 'data-safe')).toBe('reels')

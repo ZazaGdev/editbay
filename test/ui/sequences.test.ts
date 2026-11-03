@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { answerSaveDialog, chooseExportFolder, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Several timelines in one project, driven through the real window: making,
@@ -32,6 +33,7 @@ async function launch(userData: string, extraArgs: string[] = []): Promise<{ app
   const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`, ...extraArgs], cwd: process.cwd() })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   return { app, page }
 }

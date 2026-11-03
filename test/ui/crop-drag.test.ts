@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 1096: resizing the crop box in the Source view wobbled, the edge being
@@ -25,6 +26,7 @@ beforeAll(async () => {
   page = await app.firstWindow()
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const [asset] = await page.evaluate((p) => window.api.importFiles(p), [obs])
   await page.waitForSelector(`[data-testid="asset"][data-asset-id="${asset!.id}"][data-status="ready"]`, { timeout: 180_000 })

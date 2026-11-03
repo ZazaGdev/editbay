@@ -9,6 +9,7 @@ import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { discardUnsavedWork } from './dialogs'
 import type { EditList } from '../../src/shared/edit-list'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 1092: a dip to black and a blur on a cut, frame by frame, as the
@@ -84,6 +85,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`, target], cwd: process.cwd(), env: { ...process.env } as Record<string, string> })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await page.waitForFunction(
     () => {
       const clips = [...document.querySelectorAll('[data-testid="clip"]')]

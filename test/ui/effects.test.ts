@@ -7,6 +7,7 @@ import { fixtureSet } from '../e2e/fixtures'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 90, the effects library through the real window: a folder chosen in
@@ -62,6 +63,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), red)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

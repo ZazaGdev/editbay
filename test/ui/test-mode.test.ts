@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CANCEL, DONT_SAVE, answerUnsavedPrompt, promptsAsked } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 18: a run of the tests never leaves a question on the screen for
@@ -26,6 +27,7 @@ async function launch(underTest: boolean): Promise<Page> {
   })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   return page
 }
 
