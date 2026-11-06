@@ -8,7 +8,13 @@ Website: [zazag.dev/apps/editbay](https://zazag.dev/apps/editbay/)
 
 ## How to install
 
-**Windows 11, 64-bit.**
+For Windows 11 x64, and for the Mac from 2.0: Apple Silicon on macOS 14 or later, Intel on
+macOS 13.4 or later. There is no Linux build. Jump to [Windows](#windows) or [Mac](#mac), and
+see [Status and limits](#status-and-limits) for what is not done yet on each.
+
+### Windows
+
+Windows 11, 64-bit.
 
 1. Download `Editbay.Setup.<version>.exe` from the latest [release](../../releases/latest).
 2. Run it. Windows SmartScreen warns about an unrecognised app, because the installer is not
@@ -19,7 +25,9 @@ Website: [zazag.dev/apps/editbay](https://zazag.dev/apps/editbay/)
 Each release lists the installer's SHA-256, so you can check the download with
 `certutil -hashfile Editbay.Setup.<version>.exe SHA256`.
 
-**Mac.** On the Releases page from 2.0:
+### Mac
+
+From 2.0, the latest [release](../../releases/latest) has two Mac downloads:
 `Editbay-<version>-arm64.dmg` for Macs with an M chip (macOS 14 Sonoma or later) and
 `Editbay-<version>-intel.dmg` for Intel Macs (macOS 13.4 Ventura or later).
 
@@ -34,9 +42,15 @@ If you are comfortable with Terminal, this one line does the same as steps 2 and
 `xattr -dr com.apple.quarantine /Applications/Editbay.app`. Check the download against the
 SHA-256 the release lists with `shasum -a 256 Editbay-<version>-arm64.dmg`.
 
+If your Mac's sound goes to a headset or another device that is also a microphone, macOS may ask
+whether Editbay can use the microphone. In 2.0 it asks as Editbay opens; from the next release
+it asks at most once, at your first click in it. That is macOS asking on behalf of the sound the
+preview plays; Editbay only records when you press Record, and either answer is fine for playing
+and editing.
+
 ## TL;DR
 
-- A video editor for Windows: a multi-track timeline, transitions, layers, sound and captions.
+- A video editor for Windows and the Mac: a multi-track timeline, transitions, layers, sound and captions.
 - Free and open source. No account, no subscription, no watermark.
 - Everything stays on your computer. Nothing you open is uploaded, and there is no telemetry.
 - Quick with talking-head videos and screen recordings: it finds and cuts the pauses, writes
@@ -51,7 +65,8 @@ has no account and no subscription, and nothing you open is ever uploaded anywhe
 <!-- DEMO: replace this comment with the capture of a real edit being made -->
 <!-- DEMO 2: a short capture of F1, a word typed, results from another category -->
 
-> **Windows 11 x64**, and Mac versions from the next release. There is no Linux build. See
+> **Windows 11 x64**, and the **Mac** from 2.0 (Apple Silicon on macOS 14 or later, Intel on
+> macOS 13.4 or later). There is no Linux build. See [How to install](#how-to-install) and
 > [Status](#status-and-limits) before you download.
 
 ## What it does
@@ -140,8 +155,9 @@ assets** opens a pack's page in your browser, and Editbay itself fetches nothing
 
 ## Install
 
-See [How to install](#how-to-install) at the top. The installer is not code signed because a
-signing certificate costs money this project does not have, which is why SmartScreen warns.
+See [How to install](#how-to-install) at the top. Neither the Windows installer nor the Mac
+versions are signed, because a signing certificate costs money this project does not have,
+which is why SmartScreen warns and macOS asks you to allow the app once.
 
 ## Build from source
 
@@ -244,16 +260,23 @@ with a plan file.
 
 ## Status and limits
 
-Version 1.0. It works, it is used daily, and it has rough edges.
+Version 2.0. It works, it is used daily, and it has rough edges.
 
-- **Windows 11 x64, and the Mac from the next release.** The Mac versions are built and
-  tested on GitHub's Mac machines, as nobody working on Editbay has a Mac, and they are not
-  signed with an Apple certificate, so macOS asks you to allow them once. Fast export on the
-  graphics card is NVIDIA only, so a Mac exports on the processor. The Intel Mac version keeps
-  working until Apple's own Intel support runs out, then stays at its last release.
+- **Windows 11 x64, and the Mac from 2.0**: Apple Silicon on macOS 14 or later, Intel on
+  macOS 13.4 or later. On the Mac:
+  - It is **not yet tried on a real Mac.** The Mac versions are built and tested on GitHub's
+    Mac machines, as nobody working on Editbay has one.
+  - It is **not signed** with an Apple certificate, so macOS asks you to allow it once. See
+    [Mac](#mac) for the steps.
+  - It **exports on the processor.** Fast export on the graphics card is NVIDIA only.
+  - In 2.0, a Mac whose sound goes to a headset or another device that is also a microphone
+    may **ask for the microphone as Editbay opens**. The next release fixes that; see
+    [Mac](#mac).
+  - The Intel version keeps working until Apple's own Intel support runs out, then stays at
+    its last release.
 - **English captions only.** The bundled model is `medium.en`. Another language will produce
   nothing useful.
-- **The installer is unsigned**, so expect a SmartScreen warning.
+- **The Windows installer is unsigned**, so expect a SmartScreen warning.
 - **The first captions cost 540 MB** of download, once, shared by every project afterwards.
 - **No full grading, LUTs or speed ramps**, by design. See above.
 
