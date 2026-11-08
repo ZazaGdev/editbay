@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { answerSaveDialog, discardUnsavedWork, pressNewProject } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 13, step 5: import and OBS. Every dropped file shown at once, each
@@ -57,6 +58,7 @@ beforeAll(async () => {
   })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 300_000)
 
@@ -69,7 +71,7 @@ afterAll(async () => {
 async function fresh(): Promise<void> {
   // Out of the search box, which keeps keys for itself, as a text box does.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"]').length === 0)
 }
 
@@ -331,6 +333,7 @@ describe('the bin', () => {
     // Kept with the window, across a reload.
     await page.reload()
     await page.waitForSelector('main')
+    await wakeSound(page)
     await page.waitForSelector('[data-testid="asset"][data-view="grid"]', { timeout: 30_000 })
     await page.click('[data-testid="bin-view-cards"]')
     await expect.poll(() => page.locator('[data-testid="asset"][data-view="grid"]').count()).toBe(0)

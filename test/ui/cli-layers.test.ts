@@ -11,6 +11,7 @@ import { fitInBox } from '../../src/shared/crop-geometry'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
 import type { EditList } from '../../src/shared/edit-list'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 137: an edit list's layers. A picture on the left half of the frame
@@ -129,6 +130,7 @@ describe('layers built from an edit list', () => {
     app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`, target], cwd: process.cwd(), env: { ...process.env } as Record<string, string> })
     page = await app.firstWindow()
     await page.waitForSelector('main')
+    await wakeSound(page)
     // The main picture in two pieces and the two layers, every one imported.
     await page.waitForFunction(
       () => {

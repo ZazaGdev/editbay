@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 18 step 1, driven through the real window: one clip at a time, and
@@ -26,6 +27,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const assets = await page.evaluate((p) => window.api.importFiles(p), [red, green])
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"][data-status="ready"]').length === 2, undefined, {

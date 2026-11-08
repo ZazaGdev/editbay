@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path'
 import { registerIpc, settingsRead } from './ipc'
 import { resetProject } from './project/session'
 import { verifyFfmpeg } from './ffmpeg/locate'
-import { forgetLastProject, guardClose, openDocument, startup } from './project/lifecycle'
+import { forgetLastProject, guardClose, openAtStart, openDocument, prepareStart } from './project/lifecycle'
 import { projectPathFromArgs } from './project/launch'
 import { registerFileType, shouldRegisterFileType } from './settings/file-association'
 import { cacheRoot, sweepLeftovers } from './media/cache'
@@ -282,20 +282,18 @@ if (!app.requestSingleInstanceLock()) {
     allowMicrophoneOnly()
     noUnknownShares()
     registerIpc()
-    try {
-      await verifyFfmpeg()
-    } catch (err) {
-      dialog.showErrorBox('ffmpeg is unusable', err instanceof Error ? err.message : String(err))
-      app.quit()
-      return
-    }
+    // Checked beside the window, not before it (audit 2026-11-07): one that hung
+    // kept the app windowless for good while it held the single instance lock.
+    // The window asks for the answer as it opens, and says in a banner when
+    // ffmpeg cannot be used.
+    void verifyFfmpeg().catch(() => undefined)
     let startedWith: string | null = null
     try {
       // The project the app starts with is a new one in the shape you chose last.
       await settingsRead()
       resetProject()
       startedWith = openedBeforeReady
-      await startup(app.getPath('userData'), AUTOSAVE_MS, startedWith ?? projectPathFromArgs(process.argv, process.cwd()))
+      await prepareStart(app.getPath('userData'))
     } catch {
       // Whatever went wrong, a window must open: without one, this process
       // would hold the single instance lock and every later launch would hand
@@ -303,10 +301,14 @@ if (!app.requestSingleInstanceLock()) {
     }
     createWindow()
     ready = true
-    // One handed over while the app was starting, after the start had taken its project.
-    if (openedBeforeReady !== null && openedBeforeReady !== startedWith) {
-      void openDocument(BrowserWindow.getAllWindows()[0] ?? null, openedBeforeReady)
-    }
+    // The project opens once the window is up, which waits for it: a share
+    // that did not answer kept the app off the screen for 21 seconds.
+    void openAtStart(startedWith ?? projectPathFromArgs(process.argv, process.cwd()), AUTOSAVE_MS).then(() => {
+      // One handed over while the app was starting, after the start had taken its project.
+      if (openedBeforeReady !== null && openedBeforeReady !== startedWith) {
+        void openDocument(BrowserWindow.getAllWindows()[0] ?? null, openedBeforeReady)
+      }
+    })
 
     // What a crash left in the temp folder and the cache, cleared in the
     // background: nothing waits on it, and whatever it cannot remove is left

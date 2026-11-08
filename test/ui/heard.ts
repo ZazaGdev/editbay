@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import type { EditList } from '../../src/shared/edit-list'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 1097: what the preview is heard to play, recorded, and when its
@@ -51,16 +52,19 @@ export async function openCut(
   const app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`, target], cwd: process.cwd(), env: { ...process.env } as Record<string, string> })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   // Recorded, never heard: nothing is played unless the window is muted.
   const muted = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every((w) => w.webContents.isAudioMuted()))
   if (!muted) {
     await app.close()
     throw new Error('The window is not muted: the test would play out loud, so it stops here.')
   }
+  // Every clip in the project, and every one drawn ready: a long cut draws only those near the view.
   await page.waitForFunction(
-    (n) => {
+    async (n) => {
       const all = [...document.querySelectorAll('[data-testid="clip"]')]
-      return all.length >= n && all.every((c) => c.getAttribute('data-rebuilding') !== 'yes' && c.getAttribute('data-offline') !== 'yes')
+      const inProject = (await window.api.currentProject()).sequences[0]!.videoTracks[0]!.clips.length
+      return inProject >= n && all.length > 0 && all.every((c) => c.getAttribute('data-rebuilding') !== 'yes' && c.getAttribute('data-offline') !== 'yes')
     },
     clips,
     { timeout: 180_000 }

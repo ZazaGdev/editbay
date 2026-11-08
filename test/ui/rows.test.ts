@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Music on an audio track, driven through the real window: a song dropped
@@ -32,6 +33,7 @@ async function launch(): Promise<void> {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }
 
@@ -247,27 +249,33 @@ describe('a song on an audio track', () => {
         const out: { at: number; drift: number }[] = []
         const from = performance.now()
         const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')!
-        while (performance.now() - from < 5800) {
-          await new Promise((r) => setTimeout(r, 50))
+        // Read the moment the place heard is written, once a frame, and the
+        // picture's place with it: read whenever, the place heard is up to a
+        // frame old against a picture read live, and seemed out by that much.
+        const read = (): void => {
           const video = Array.from(document.querySelectorAll<HTMLVideoElement>('[data-testid="monitor-stage"] video')).find(
             (v) => !v.paused && v.readyState >= 3
           )
           const heard = Number(canvas.dataset.heardSec || NaN)
-          if (!video || !Number.isFinite(heard) || !(canvas.dataset.heardClips ?? '').split(',').includes(songClip)) continue
+          if (!video || !Number.isFinite(heard) || !(canvas.dataset.heardClips ?? '').split(',').includes(songClip)) return
           const src = decodeURIComponent(video.src)
           const clip = clips.find((c) => src.endsWith(c.file))
-          if (!clip) continue
+          if (!clip) return
           // Where the sequence is, from the picture, against where the song being heard is.
           const t = clip.start / fps + (video.currentTime - clip.startSec) - clip.sourceIn / fps
           out.push({ at: performance.now() - from, drift: heard - t })
         }
+        const watch = new MutationObserver(read)
+        watch.observe(canvas, { attributes: true, attributeFilter: ['data-heard-sec'] })
+        await new Promise((r) => setTimeout(r, 5800))
+        watch.disconnect()
         return out
       },
       { clips, fps, songClip }
     )
     await page.keyboard.press('Space')
 
-    const settled = (from: number, to: number): number => {
+    const settled =(from: number, to: number): number => {
       const s = samples
         .filter((d) => d.at >= from && d.at < to)
         .map((d) => Math.abs(d.drift))

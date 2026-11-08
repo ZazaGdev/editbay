@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 49, renderer speed: moving the playhead, which playing does every
@@ -135,11 +136,13 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   // The hook has to be there before React is, so the window is loaded again with it.
   await page.addInitScript(countClipRenders)
   await page.reload()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await page.evaluate((p) => window.api.importFiles([p]), clip)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
   // Three times, so there are several clips on each track to be drawn again.

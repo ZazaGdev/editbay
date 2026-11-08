@@ -431,9 +431,13 @@ function segmentArgs(opts: {
     next += 1
   }
 
+  // Captions dragged down among the video tracks (task 2621) are burned in
+  // part way up the overlays, or not at all under a whole frame.
+  const captionsUnder = subtitles ? piece.captionsUnder : undefined
+  const burnLast = subtitles !== null && captionsUnder === undefined
   // The finished picture comes out as [vt], to be tagged on its way to [v],
   // or as [c] to have the captions drawn over it last.
-  const finished = subtitles ? 'c' : 'vt'
+  const finished = burnLast ? 'c' : 'vt'
   // Or as [p] first, to be sharpened on its way there.
   const pictured = sharpen ? 'p' : finished
   // The picture underneath comes out as that, or as [b] to have more laid over it.
@@ -464,12 +468,23 @@ function segmentArgs(opts: {
     )
   } else filters.push(onePicture(base, washed, { input: 0, ...reach(base) }, ''))
   if (baseWash) filters.push(`[w]${fadePartway(baseWash.dir, baseWash.colour, partway(piece.from, baseWash, fps), baseWash.late)}[${under}]`)
-  if (overlays.length > 0) filters.push(overlayGraph(fps, under, overlays, firstOverlay, width, height, pictured, piece.from))
-  if (sharpen) filters.push(`[p]${SHARPEN}[${finished}]`)
   // Burned in on RGB and turned back into video by BT.709: drawn straight onto
   // video, libass converts its colours by BT.601, and the yellow came out 10
   // levels off the preview's.
-  if (subtitles) filters.push(`[c]${TO_RGB},format=rgb24,ass=filename=${subtitles}:fontsdir=${CAPTION_FONTS_DIR},${TO_VIDEO},format=yuv420p[vt]`)
+  const burn = (from: string, to: string): string =>
+    `[${from}]${TO_RGB},format=rgb24,ass=filename=${subtitles}:fontsdir=${CAPTION_FONTS_DIR},${TO_VIDEO},format=yuv420p[${to}]`
+  if (typeof captionsUnder === 'number' && overlays.length > 0) {
+    // The overlays under the captions, the captions, then the rest over them.
+    const lower = overlays.slice(0, captionsUnder)
+    const upper = overlays.slice(captionsUnder)
+    if (lower.length > 0) filters.push(overlayGraph(fps, under, lower, firstOverlay, width, height, 'cu', piece.from))
+    filters.push(burn(lower.length > 0 ? 'cu' : under, 'co'))
+    const inputs = lower.reduce((n, o) => n + (o.into ? 2 : 1), 0)
+    const labels = lower.reduce((n, o) => n + (o.into ? 1 : o.pictures.length), 0)
+    filters.push(overlayGraph(fps, 'co', upper, firstOverlay + inputs, width, height, pictured, piece.from, labels))
+  } else if (overlays.length > 0) filters.push(overlayGraph(fps, under, overlays, firstOverlay, width, height, pictured, piece.from))
+  if (sharpen) filters.push(`[p]${SHARPEN}[${finished}]`)
+  if (burnLast) filters.push(burn('c', 'vt'))
   // The colours said on every frame, which ffmpeg 9 writes into the file over
   // what the encoder is told: a picture's frames said "unknown" and the file
   // went out with no primaries or transfer (plan 89).

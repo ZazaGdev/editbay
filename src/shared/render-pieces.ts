@@ -16,6 +16,7 @@ import {
   type Timeline
 } from './project'
 import { spanEnd } from './tracks'
+import { tracksUnderCaptions } from './track-edits'
 import { PICTURE_KINDS, pictureKind, shownSpans, transitionWindows, washColour, type Shown } from './transitions'
 import { clipNameFromPath } from './filename'
 import { heardOver } from './render-sound'
@@ -76,6 +77,12 @@ export interface Piece {
   blends: Blend[]
   /** The colours laid over a clip's picture across the whole of this piece. */
   washes: Wash[]
+  /**
+   * Captions dragged down among the video tracks (task 2621): how many of the
+   * overlays are laid before them, or 'covered' under the picture underneath,
+   * a whole frame. Absent while they go over everything.
+   */
+  captionsUnder?: number | 'covered'
 }
 
 /**
@@ -135,6 +142,8 @@ export function spansOf(timeline: Timeline, framed: boolean, range?: { from: num
     }
   }
   const spanOf = (c: Clip): Shown => shown.get(c.id) ?? { from: c.timelineStart, to: spanEnd(c) }
+  const underCaptions = tracksUnderCaptions(timeline)
+  const trackOfClip = new Map(tracks.flatMap((track) => track.clips.map((c) => [c.id, track.id] as const)))
   const points = [...cuts].sort((a, b) => a - b)
   return points.slice(1).map((to, i) => {
     const from = points[i]!
@@ -149,7 +158,10 @@ export function spansOf(timeline: Timeline, framed: boolean, range?: { from: num
     // A picture is laid over black rather than being the picture underneath:
     // only an overlay can put a box partly outside the frame, or turn it.
     const laid = framed && over[0] !== undefined && isStill(mediaOf(timeline, over[0]))
+    const below = over.filter((c) => underCaptions.has(trackOfClip.get(c.id)!)).length
+    const captionsUnder = below === over.length ? undefined : laid || over.length === 0 ? below : below === 0 ? ('covered' as const) : below - 1
     return {
+      ...(captionsUnder !== undefined ? { captionsUnder } : {}),
       from,
       to,
       base: laid ? null : (over[0] ?? null),

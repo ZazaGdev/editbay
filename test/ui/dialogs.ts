@@ -1,5 +1,24 @@
 import type { ElectronApplication, Page } from 'playwright-core'
 
+/**
+ * Press Ctrl+N and wait until the new project has reached the window. An
+ * empty timeline is no sign of it: a sequence just added is empty too, and a
+ * file brought in before the new project arrived went into the old one, so
+ * the new one opened with an empty bin (task 2665).
+ */
+export async function pressNewProject(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __newOpened?: boolean }
+    w.__newOpened = false
+    const off = window.api.onProjectOpened(() => {
+      w.__newOpened = true
+      off()
+    })
+  })
+  await page.keyboard.press('ControlOrMeta+n')
+  await page.waitForFunction(() => (window as unknown as { __newOpened?: boolean }).__newOpened === true)
+}
+
 /** Open the Export dialog from the top bar, unless it is open already. */
 export async function openExport(page: Page): Promise<void> {
   if ((await page.locator('[data-testid="export-panel"]').count()) > 0) return

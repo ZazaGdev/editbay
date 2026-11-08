@@ -17,8 +17,8 @@ const { presetById } = await import('../../src/shared/presets')
 const { runExport } = await import('../../src/main/render/runner')
 const session = await import('../../src/main/project/session')
 const { decodePeaks } = await import('../../src/main/media/waveform')
-const { readFile, writeFile } = await import('node:fs/promises')
-const { mixArgs, mixGraph } = await import('../../src/main/speech/transcribe')
+const { readFile } = await import('node:fs/promises')
+const { mixClips } = await import('../../src/main/speech/transcribe')
 const { S1, clipsOf, firstTimeline } = await import('../project-helpers')
 
 /**
@@ -95,11 +95,8 @@ describe('a recording whose sound starts after its picture', () => {
   it('is heard by Make captions where it is said, so its words are not placed early', async () => {
     const late = await importFile(await fx.lateSoundBeep(), ...quiet())
     // Two seconds from one second in, put at the sequence's start: the beep at 3 s is heard at 2 s.
-    const { inputs, graph } = mixGraph([{ path: late.playablePath, fromSec: 1, lengthSec: 2.5, atSec: 0, gain: 1, label: 'late', copy: false }])
-    const graphPath = join(work, 'speech-graph.txt')
     const heard = join(work, 'speech.wav')
-    await writeFile(graphPath, graph)
-    await capture(ffmpegPath, ['-hide_banner', '-loglevel', 'error', ...mixArgs(inputs, graphPath, heard)])
+    await mixClips([{ path: late.playablePath, fromSec: 1, lengthSec: 2.5, atSec: 0, gain: 1, label: 'late', copy: false }], heard)
     expect(Math.abs((await beepAt(heard)) - 2)).toBeLessThan(0.02)
   })
 })

@@ -71,11 +71,43 @@ export class SoundEngine {
   /** Bumped by every start and stop, so a start overtaken by a stop does nothing. */
   private generation = 0
 
-  constructor(private readonly decode: Decode) {}
+  /**
+   * On a Mac whose sound output is also a microphone, as many headsets are,
+   * opening a context makes macOS ask for the microphone (task 2355). So it is
+   * not opened as the window loads, only at the first click or key press, so
+   * that Play after it still starts at once.
+   */
+  constructor(private readonly decode: Decode) {
+    this.listen(true)
+  }
 
-  /** Whether it can play at all: false once Web Audio has refused. */
+  /** Whether the first click or key press has come. A player loaded unmuted asks the same way, so they wait for it too. */
+  woken = false
+  /** Called once, as it wakes. */
+  onWake: (() => void) | null = null
+
+  private readonly wake = (): void => {
+    this.listen(false)
+    this.woken = true
+    this.open()
+    this.onWake?.()
+  }
+
+  /** The first click or key press listened for, or no longer. Nothing to listen to outside a window. */
+  private listen(on: boolean): void {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      this.woken = true
+      return
+    }
+    for (const type of ['pointerdown', 'keydown']) {
+      if (on) window.addEventListener(type, this.wake, true)
+      else window.removeEventListener(type, this.wake, true)
+    }
+  }
+
+  /** Whether it can play at all: false once Web Audio has refused. Asking does not open the context. */
   get usable(): boolean {
-    return !this.broken && this.open() !== null
+    return !this.broken && typeof AudioContext === 'function'
   }
 
   /** The clips to play. While playing, those left as they were play on untouched. */
@@ -103,9 +135,12 @@ export class SoundEngine {
     if (this.master) this.master.gain.value = this.masterGain
   }
 
-  /** Paused at `sec`: what Play there needs first is decoded now, so it starts at once. */
+  /**
+   * Paused at `sec`: what Play there needs first is decoded now, so it starts
+   * at once. Only once a Play has opened the context, never before it.
+   */
   prepare(sec: number): void {
-    const ctx = this.open()
+    const ctx = this.ctx
     if (!ctx || this.run) return
     const rate = ctx.sampleRate
     const at = Math.round(sec * rate)
@@ -196,6 +231,7 @@ export class SoundEngine {
   }
 
   close(): void {
+    this.listen(false)
     this.stop()
     this.decoded.clear()
     const ctx = this.ctx

@@ -6,6 +6,7 @@
 
 import { CAPTION_FONTS, DEFAULT_CAPTION_FONT, captionFont, type CaptionFont } from './caption-fonts'
 import type { FontFigures } from './font-file'
+import { CAPTION_ANIMATIONS, type CaptionAnimateBy, type CaptionAnimation } from './caption-motion'
 
 /** How a sequence's captions look, one setting for all of them. */
 export interface CaptionStyle {
@@ -52,6 +53,9 @@ export interface CaptionStyle {
   /** The word being said with a box of its own behind it, in this colour. */
   popBox: boolean
   popBoxColour: string
+  /** Plan 107: how captions come in and go out, and whether a line at a time or a word at a time as each is said. */
+  animation: CaptionAnimation
+  animateBy: CaptionAnimateBy
 }
 
 /**
@@ -80,7 +84,9 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   glowColour: '#FFD400',
   popGrow: false,
   popBox: false,
-  popBoxColour: '#7C3AED'
+  popBoxColour: '#7C3AED',
+  animation: 'none',
+  animateBy: 'line'
 }
 
 /** A change to how captions look: `pcFont` null goes back to the bundled font the style names. */
@@ -194,6 +200,8 @@ export function cleanCaptionStyle(raw: unknown): CaptionStyle {
     glowColour: colour(x.glowColour, d.glowColour),
     popGrow: typeof x.popGrow === 'boolean' ? x.popGrow : d.popGrow,
     popBox: typeof x.popBox === 'boolean' ? x.popBox : d.popBox,
-    popBoxColour: colour(x.popBoxColour, d.popBoxColour)
+    popBoxColour: colour(x.popBoxColour, d.popBoxColour),
+    animation: CAPTION_ANIMATIONS.some((a) => a.id === x.animation) ? (x.animation as CaptionAnimation) : d.animation,
+    animateBy: x.animateBy === 'word' || x.animateBy === 'line' ? x.animateBy : d.animateBy
   }
 }

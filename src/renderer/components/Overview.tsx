@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from 'react'
 import { overviewBlocks, overviewFrames, scrollToShow, viewportFrames } from '../../shared/overview'
 import type { Timeline } from '../../shared/project'
 import { surface, ink, accent, meaning, track as trackColour, space, radius, type } from '../theme'
@@ -64,8 +64,38 @@ export function Overview(props: {
   const [box, setBox] = useState<{ from: number; to: number }>({ from: 0, to: 0 })
   /** Whether the pointer is over the box, which is the one part of the strip a press takes hold of. */
   const [overBox, setOverBox] = useState(false)
-  const frames = overviewFrames(props.timeline)
-  const blocks = overviewBlocks(props.timeline)
+  const frames = useMemo(() => overviewFrames(props.timeline), [props.timeline])
+  // Worked out and drawn once for each timeline: the box moves on every scroll,
+  // and drawing a block for every clip with it was a third to a half of what
+  // each movement on a long cut cost (audit 2026-11-07, fix first 3).
+  const blocks = useMemo(() => {
+    const at = (frame: number): string => `${(frame / frames) * 100}%`
+    return overviewBlocks(props.timeline).map((b, i) => {
+      const row = b.kind === 'video' ? { top: 0, height: 13 } : { top: 15, height: 13 }
+      return (
+        <span
+          key={`${b.kind}${b.trackIndex}-${b.from}-${i}`}
+          data-testid="overview-block"
+          data-kind={b.kind}
+          data-mark={b.mark ?? ''}
+          style={{
+            position: 'absolute',
+            left: at(b.from),
+            width: `calc(${at(b.to - b.from)} - 1px)`,
+            top: row.top,
+            height: row.height,
+            minWidth: 1,
+            borderRadius: radius.handle,
+            background: markColour(b.mark) ?? (b.kind === 'video' ? trackColour.picture : trackColour.sound),
+            // Quiet enough that the box and the playhead read over them.
+            // A marked clip is a little stronger: the point of marking one
+            // is to find it again on a strip of two hundred.
+            opacity: b.mark === undefined ? 0.35 : 0.7
+          }}
+        />
+      )
+    })
+  }, [props.timeline, frames])
 
   // The scroller's position is not React state, so the box follows its own
   // scroll and resize rather than a loop: a loop would read layout on every
@@ -167,8 +197,6 @@ export function Overview(props: {
   }
 
   const percent = (frame: number): string => `${(frame / frames) * 100}%`
-  const rowFor = (kind: 'video' | 'audio'): { top: number; height: number } =>
-    kind === 'video' ? { top: 0, height: 13 } : { top: 15, height: 13 }
 
   return (
     <div
@@ -212,31 +240,7 @@ export function Overview(props: {
         style={{ flexGrow: 1, position: 'relative', padding: `7px ${space.sm}px`, boxSizing: 'border-box', cursor: overBox ? 'grab' : 'default', touchAction: 'none' }}
       >
         <div style={{ position: 'relative', height: '100%' }}>
-          {blocks.map((b, i) => {
-            const row = rowFor(b.kind)
-            return (
-              <span
-                key={`${b.kind}${b.trackIndex}-${b.from}-${i}`}
-                data-testid="overview-block"
-                data-kind={b.kind}
-                data-mark={b.mark ?? ''}
-                style={{
-                  position: 'absolute',
-                  left: percent(b.from),
-                  width: `calc(${percent(b.to - b.from)} - 1px)`,
-                  top: row.top,
-                  height: row.height,
-                  minWidth: 1,
-                  borderRadius: radius.handle,
-                  background: markColour(b.mark) ?? (b.kind === 'video' ? trackColour.picture : trackColour.sound),
-                  // Quiet enough that the box and the playhead read over them.
-                  // A marked clip is a little stronger: the point of marking one
-                  // is to find it again on a strip of two hundred.
-                  opacity: b.mark === undefined ? 0.35 : 0.7
-                }}
-              />
-            )
-          })}
+          {blocks}
 
           {/* A tick per marker, so the whole edit says where the notes are.
               Drawn under the box and the playhead, and not a target: the strip

@@ -357,7 +357,9 @@ export function drawOnto(
   ctx: CanvasRenderingContext2D,
   sources: (CanvasImageSource | null)[],
   plan: DrawPlan | null,
-  scale: number
+  scale: number,
+  /** Something drawn in among the pictures, before the first step of `source` or of any above it (task 2621). */
+  between?: { source: number; draw: () => void }
 ): boolean {
   const canvas = ctx.canvas
   ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -374,7 +376,12 @@ export function drawOnto(
   ctx.beginPath()
   ctx.rect(plan.frame.x, plan.frame.y, plan.frame.w, plan.frame.h)
   ctx.clip()
+  let drewBetween = false
   for (const s of plan.steps) {
+    if (between && !drewBetween && s.source >= between.source) {
+      between.draw()
+      drewBetween = true
+    }
     const video = sources[s.source]
     const mix = s.mix
     if (mix?.hidden) continue
@@ -418,6 +425,7 @@ export function drawOnto(
     if (apart && mix) layApart(ctx, c, mix, scale)
   }
   ctx.restore()
+  if (between && !drewBetween) between.draw()
   return true
 }
 
@@ -690,6 +698,11 @@ function layApart(ctx: CanvasRenderingContext2D, c: CanvasRenderingContext2D, mi
 /**
  * The Output view's frame at `frame`: the pictures, and the caption over them
  * as the export burns it in, but never over black while the pictures load.
+ *
+ * Captions dragged down among the video tracks (task 2621) are drawn before
+ * the picture of source `under` and those above it. Under the lowest
+ * recording they are not drawn at all: the export makes that one a whole
+ * frame, its bars black, which covers them.
  */
 export function drawOutput(
   ctx: CanvasRenderingContext2D,
@@ -697,7 +710,14 @@ export function drawOutput(
   frame: number,
   sources: (CanvasImageSource | null)[],
   plan: DrawPlan | null,
-  scale: number
+  scale: number,
+  under?: { source: number; covered: boolean }
 ): void {
-  if (drawOnto(ctx, sources, plan, scale)) drawCaption(ctx, timeline, frame, plan, scale)
+  const caption = (): void => drawCaption(ctx, timeline, frame, plan, scale)
+  if (under?.covered) {
+    drawOnto(ctx, sources, plan, scale)
+    return
+  }
+  if (under) drawOnto(ctx, sources, plan, scale, { source: under.source, draw: caption })
+  else if (drawOnto(ctx, sources, plan, scale)) caption()
 }

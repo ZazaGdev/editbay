@@ -1,6 +1,6 @@
 {
   "name": "editbay",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A free, local video editor: multi-track timeline, layers, sound and captions",
   "author": {
     "name": "Zaza Gejadze",
@@ -29,7 +29,7 @@
     "test:smoke": "vitest run --dir test/smoke",
     "test:all": "vitest run --dir test/unit && vitest run --dir test/e2e && vitest run --dir test/smoke && npm run test:ui",
     "test:ui": "electron-vite build && vitest run --dir test/ui --no-file-parallelism",
-    "dist": "electron-vite build && electron-builder --win --publish never",
+    "dist": "electron-vite build && node scripts/dist-win.mjs --win --publish never",
     "dist:dir": "electron-vite build && electron-builder --win --dir --publish never",
     "dist:test": "electron-vite build && electron-builder --win --dir --publish never --config electron-builder.test.yml",
     "dist:mac": "electron-vite build && electron-builder --mac --publish never",
@@ -44,7 +44,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "electron": "^44.4.3",
+    "electron": "^44.10.2",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "esbuild": "^0.25.12",

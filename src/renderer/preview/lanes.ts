@@ -104,6 +104,13 @@ export function setMediaTime(el: HTMLMediaElement, seconds: number): void {
   }
 }
 
+/**
+ * At a cut, the next piece runs straight on in the footage when the player is
+ * this near its start: more than a player kept in step is out, measured under
+ * 12 ms, and less than one frame taken away at 30 fps.
+ */
+const RUNS_ON_SEC = 0.025
+
 /** Where a player still loading its file is to go once it has. */
 const afterLoad = new WeakMap<HTMLMediaElement, number>()
 
@@ -493,16 +500,21 @@ export class Lane<C extends LaneClip = LaneClip> {
       if (!current.paused) current.pause()
     } else {
       if (this.holds[this.active] !== clip.id) {
-        if (this.holds[1 - this.active] === clip.id) {
-          current.pause()
-          this.active = 1 - this.active
-        } else if (this.playingOn(clip, t)) {
+        const waiting = this.holds[1 - this.active] === clip.id
+        if (this.playingOn(clip, t, waiting ? RUNS_ON_SEC : SEEK_DRIFT_SEC)) {
           // A split, or any edit, made while it plays: the player already
           // plays this very footage, so it carries on. Moved to where it
           // already is, it stalled and played again what was just heard.
+          // The same at a cut that runs straight on in the footage: the
+          // player waiting there was 90 ms late getting going (task 2637).
+          // Only straight on: a few frames cut out are jumped, not eased over.
           this.holds[this.active] = clip.id
+          if (waiting) this.holds[1 - this.active] = null
           heard(current, clip, t)
           current.muted = this.silenced || clip.muted
+        } else if (waiting) {
+          current.pause()
+          this.active = 1 - this.active
         } else {
           this.load(this.active, clip, t)
         }
@@ -512,6 +524,11 @@ export class Lane<C extends LaneClip = LaneClip> {
       // than once when the clips are handed over.
       if (clip.fadeAt) heard(el, clip, t)
       const want = timeIn(clip, t)
+      // A muted player, as every picture is while the sound engine plays the
+      // sound, keeps no pitch: each change of its speed while catching up
+      // after a cut then costs nothing, where keeping pitch stalled it some
+      // 45 ms and left the picture up to 65 ms behind the sound (task 2665).
+      if (el.preservesPitch !== !el.muted) el.preservesPitch = !el.muted
       // A file that failed to load, as an offline one does, is tried again
       // when the clips are next set or the lane parked, not on every frame.
       // One that has played to its end stays there: play() on an ended
@@ -559,12 +576,12 @@ export class Lane<C extends LaneClip = LaneClip> {
   /**
    * Whether the player on screen is playing `clip`'s footage at `t` already:
    * its file, running, and near enough the place that being kept in step
-   * brings it there without a seek.
+   * brings it there without a seek, or `within` that.
    */
-  private playingOn(clip: C, t: number): boolean {
+  private playingOn(clip: C, t: number, within = SEEK_DRIFT_SEC): boolean {
     const el = this.players[this.active]
     if (!el || this.paths[this.active] !== clip.path || el.paused || el.error !== null || el.seeking) return false
-    return !holding(clip, t) && Math.abs(el.currentTime - timeIn(clip, t)) < SEEK_DRIFT_SEC
+    return !holding(clip, t) && Math.abs(el.currentTime - timeIn(clip, t)) < within
   }
 
   pause(): void {

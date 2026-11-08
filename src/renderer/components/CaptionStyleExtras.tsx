@@ -1,8 +1,9 @@
 /** Plan 99: the box behind captions, their glow and the word being said popping, in How captions look. */
 import type { JSX } from 'react'
-import { CAPTION_GLOWS, DEFAULT_CAPTION_STYLE, type CaptionStyle, type CaptionStyleChange } from '../../shared/captions'
+import { CAPTION_ANIMATIONS, CAPTION_GLOWS, DEFAULT_CAPTION_STYLE, type CaptionAnimateBy, type CaptionAnimation, type CaptionStyle, type CaptionStyleChange } from '../../shared/captions'
 import { Check } from '../ui/Check'
 import { Segmented } from '../ui/Segmented'
+import { Select } from '../ui/Select'
 import { Percent, dim, row } from './inspector-parts'
 
 /** A colour to pick, as the other caption colours are picked. */
@@ -63,6 +64,31 @@ export function CaptionStyleExtras(props: { style: CaptionStyle; setStyle: (chan
           {style.popBox && <Swatch testid="caption-pop-box-colour" label="The colour of the box behind the word being said" value={style.popBoxColour ?? d.popBoxColour} onChange={(popBoxColour) => setStyle({ popBoxColour })} />}
         </span>
       </div>
+      {/* Plan 107: how captions come in and go out. */}
+      <div style={{ ...row, alignItems: 'center', marginTop: 4 }}>
+        <span style={dim}>Animation</span>
+        <Select
+          testid="caption-animation"
+          label="How captions come in and go out"
+          value={style.animation ?? d.animation}
+          blurOnChange
+          height={24}
+          onChange={(v) => setStyle({ animation: v as CaptionAnimation })}
+          choices={CAPTION_ANIMATIONS.map((a) => ({ value: a.id, label: a.name, title: a.title }))}
+        />
+      </div>
+      <Segmented
+        testid="caption-animate-by"
+        label="Whether a caption comes in whole or a word at a time as each is said"
+        size="small"
+        stretch
+        chosen={style.animateBy ?? d.animateBy}
+        onChoose={(v) => setStyle({ animateBy: v as CaptionAnimateBy })}
+        choices={[
+          { id: 'line', label: 'Whole line', title: 'The whole caption comes in at once' },
+          { id: 'word', label: 'Word by word', title: 'Each word comes in as it is said' }
+        ]}
+      />
     </>
   )
 }

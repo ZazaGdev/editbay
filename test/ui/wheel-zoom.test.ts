@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
+import { wakeSound } from './wake-sound'
 
 /**
  * Ctrl+wheel over the timeline zooms about the pointer, notch after notch
@@ -31,6 +32,7 @@ beforeAll(async () => {
   page = await app.firstWindow()
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForSelector('main')
+  await wakeSound(page)
   const [asset] = await page.evaluate((p) => window.api.importFiles(p), [long])
   await page.waitForSelector(`[data-testid="asset"][data-asset-id="${asset!.id}"][data-status="ready"]`, { timeout: 180_000 })
   await page.locator(`[data-testid="asset"][data-asset-id="${asset!.id}"] [data-testid="add-to-timeline"]`).click()

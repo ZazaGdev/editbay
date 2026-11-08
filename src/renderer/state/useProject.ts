@@ -21,9 +21,10 @@ export interface ProjectState {
    * Resolves to the document the edit produced, once main has applied it.
    * `continuing` marks the later movements of a drag: they are applied like
    * any edit, but the undo point was recorded by the first, so one undo puts
-   * the whole drag back.
+   * the whole drag back. `madeIn` is the document the edit was worked out in,
+   * for one sent a while later: dropped if another has opened since.
    */
-  edit: (e: ProjectEdit, opts?: { continuing?: boolean; unrecorded?: boolean }) => Promise<Project>
+  edit: (e: ProjectEdit, opts?: { continuing?: boolean; unrecorded?: boolean; madeIn?: number }) => Promise<Project>
   undo: () => void
   redo: () => void
   /**
@@ -31,6 +32,8 @@ export interface ProjectState {
    * only right while this is still the step that edit made.
    */
   step: () => number
+  /** The document open now, read when called rather than when a handler was made. */
+  openDoc: () => number
   newProject: () => void
   open: (path?: string) => void
   /** Resolves to where it was saved, or null if it was not. */
@@ -154,7 +157,10 @@ export function useProject(onOpened: (d: OpenedDocument) => void, onStepped?: (c
   }, [adopt, take])
 
   const edit = useCallback(
-    (e: ProjectEdit, opts: { continuing?: boolean; unrecorded?: boolean } = {}): Promise<Project> => {
+    (e: ProjectEdit, opts: { continuing?: boolean; unrecorded?: boolean; madeIn?: number } = {}): Promise<Project> => {
+      // Worked out in a document no longer open: it would land on the one that
+      // is, on whatever there has the same id, as a reopened project's text (task 2653).
+      if (opts.madeIn !== undefined && opts.madeIn !== doc.current) return Promise.resolve(current.current as Project)
       // Upkeep rather than an edit, as a text drawn again for a picture that
       // went missing: nothing to undo, so no step, and a drag stays open.
       if (opts.unrecorded === true) {
@@ -206,6 +212,7 @@ export function useProject(onOpened: (d: OpenedDocument) => void, onStepped?: (c
   )
 
   const stepOf = useCallback(() => steps.current, [])
+  const openDoc = useCallback(() => doc.current, [])
 
   const undo = useCallback(() => {
     // Nothing to undo, and nothing on its way that could make something.
@@ -273,6 +280,7 @@ export function useProject(onOpened: (d: OpenedDocument) => void, onStepped?: (c
       undo,
       redo,
       step: stepOf,
+      openDoc,
       // Main asks about unsaved changes, and a document that does open arrives
       // through the listener above like any other.
       newProject: () => void window.api.newProject(),
@@ -282,6 +290,6 @@ export function useProject(onOpened: (d: OpenedDocument) => void, onStepped?: (c
         void window.api.relinkMedia(mediaId).then(adopt)
       }
     }),
-    [project, status, docId, canUndo, canRedo, edit, undo, redo, stepOf, adopt]
+    [project, status, docId, canUndo, canRedo, edit, undo, redo, stepOf, openDoc, adopt]
   )
 }

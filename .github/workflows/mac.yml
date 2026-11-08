@@ -1,75 +1,51 @@
 name: Mac
 
-# Plan 104: the Mac versions, built and tested on GitHub's Apple Silicon Macs,
-# since nobody working on Editbay has a Mac. Started by hand, choosing the
-# chips, or by a push to the public repo's mac-dev branch, where Mac work is
-# tried while it is built: GitHub only starts a workflow by hand from the
-# default branch, and the public repo's main moves only at a release. On a
-# private repo each Mac minute counts ten times against the month's free ones,
-# so nothing else starts it.
+# Plan 104: the Mac version, built and tested on GitHub's Apple Silicon Macs,
+# since nobody working on Editbay has a Mac. Started by hand, or by a push to
+# the public repo's mac-dev branch, where Mac work is tried while it is built:
+# GitHub only starts a workflow by hand from the default branch, and the public
+# repo's main moves only at a release. On a private repo each Mac minute counts
+# ten times against the month's free ones, so nothing else starts it.
 #
-# Both chips build on Apple Silicon. The Intel version is built for x64 and
-# tested through Rosetta, with an x64 Node, so it never needs one of GitHub's
-# Intel runners, which are being wound down.
+# One download for every Mac (task 2682): the app carries each program for both
+# Apple Silicon and Intel, and macOS runs the half for its chip. Its packaged
+# test runs twice, on the Apple Silicon half and on the Intel half through
+# Rosetta; the Mac release check then opens the built .dmg on a real Intel Mac.
 on:
   push:
     branches: [mac-dev]
   workflow_dispatch:
-    inputs:
-      chips:
-        description: Which Mac versions to build
-        type: choice
-        options: [both, arm64, intel]
-        default: both
 
 jobs:
-  # The chips asked for, as the list the Mac job runs once for each of.
-  chips:
-    runs-on: ubuntu-latest
-    outputs:
-      list: ${{ steps.pick.outputs.list }}
-    steps:
-      - id: pick
-        run: |
-          ARM='{"chip":"arm64","node_arch":"arm64","builder":"--arm64","whisper":"arm64","app":"mac-arm64","name":"Editbay-2.0-arm64","minimum":"14.0"}'
-          INTEL='{"chip":"intel","node_arch":"x64","builder":"--x64","whisper":"x86_64","app":"mac","name":"Editbay-2.0-intel","minimum":"13.4"}'
-          case "${{ inputs.chips }}" in
-            arm64) echo "list=[$ARM]" >> "$GITHUB_OUTPUT" ;;
-            intel) echo "list=[$INTEL]" >> "$GITHUB_OUTPUT" ;;
-            *) echo "list=[$ARM,$INTEL]" >> "$GITHUB_OUTPUT" ;;
-          esac
-
   mac:
-    needs: chips
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.chips.outputs.list) }}
-    name: ${{ matrix.chip }}
+    name: universal
     runs-on: macos-15
     # The whole UI suite runs here too (task 1388), which takes most of this.
     timeout-minutes: 180
+    env:
+      # The .dmg's name, as mac.artifactName in electron-builder.yml. Change both with the version.
+      NAME: Editbay-2.1-Mac
     steps:
       - uses: actions/checkout@v4
 
-      # GitHub's Apple Silicon images come with Rosetta; asked again in case one does not.
-      - if: matrix.chip == 'intel'
-        run: softwareupdate --install-rosetta --agree-to-license || true
+      # The Intel half is tested through Rosetta. GitHub's Apple Silicon images
+      # come with it; asked again in case one does not.
+      - run: softwareupdate --install-rosetta --agree-to-license || true
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          architecture: ${{ matrix.node_arch }}
           cache: npm
 
       - run: node -p "process.arch"
 
-      # Its postinstall fetches the Mac ffmpeg for this Node's chip.
+      # Its postinstall fetches the Apple Silicon ffmpeg, replaced below by one for both chips.
       - run: npm ci
 
-      # Face follow's engine stopped shipping for Intel Macs after 1.23; its
-      # common package is pinned to the same version, so both are put back.
-      - if: matrix.chip == 'intel'
+      # ONNX Runtime 1.23.2 on both chips: it is the last with an Intel Mac
+      # library, and the one app has one copy of its code. Its common package
+      # is pinned to the same version, so both are put back.
+      - name: ONNX Runtime for both chips
         run: |
           npm install --no-save onnxruntime-node@1.23.2 onnxruntime-common@1.23.2
           # Read as files: onnxruntime-common's exports do not include its package.json.
@@ -78,66 +54,145 @@ jobs:
             echo "$p $v"
             test "$v" = 1.23.2
           done
-          ls node_modules/onnxruntime-node/bin/napi-v6/darwin/x64
+          for c in arm64 x64; do
+            ls -l node_modules/onnxruntime-node/bin/napi-v6/darwin/$c
+            lipo -archs node_modules/onnxruntime-node/bin/napi-v6/darwin/$c/onnxruntime_binding.node
+          done
 
-      - run: vendor/ffmpeg/ffmpeg -hide_banner -buildconf | head -40
+      - name: ffmpeg and ffprobe for both chips
+        run: |
+          EDITBAY_TARGET_ARCH=universal node scripts/fetch-ffmpeg.mjs
+          for f in ffmpeg ffprobe; do echo "$f: $(lipo -archs vendor/ffmpeg/$f)"; done
+          vendor/ffmpeg/ffmpeg -hide_banner -buildconf | head -40
 
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:e2e
 
-      - run: sh scripts/build-whisper-mac.sh ${{ matrix.whisper }}
+      - run: sh scripts/build-whisper-mac.sh universal
 
-      # The copy the packaged test drives, then the .dmg people download.
-      - run: npm run dist:mac:test -- ${{ matrix.builder }} -c.mac.minimumSystemVersion=${{ matrix.minimum }}
-      - run: npm run dist:mac -- ${{ matrix.builder }} -c.mac.minimumSystemVersion=${{ matrix.minimum }} "-c.mac.artifactName=${{ matrix.name }}.\${ext}"
+      # The copy the packaged test drives, then the .dmg people download, both
+      # for both chips. --dir builds for the chips it is told, not the target's.
+      - run: npm run dist:mac:test -- --universal
+      - run: npm run dist:mac -- --universal
 
-      - name: Every program in the app is signed
+      - name: Every program in the app is signed and carries both chips
+        shell: bash
         run: |
-          APP="release/${{ matrix.app }}/Editbay.app"
+          APP="release/mac-universal/Editbay.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
           R="$APP/Contents/Resources"
-          for f in "$R/ffmpeg/ffmpeg" "$R/ffmpeg/ffprobe" "$R/whisper/whisper-cli" "$R"/onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/darwin/*/*; do
+          O="$R/onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/darwin"
+          for f in "$R/ffmpeg/ffmpeg" "$R/ffmpeg/ffprobe" "$R/whisper/whisper-cli" "$O"/*/*; do
             echo "== $f"
             codesign -dv "$f" 2>&1 | grep -E "Identifier|Signature|flags"
           done
-          for f in "$APP/Contents/MacOS/Editbay" "$R/ffmpeg/ffmpeg" "$R/whisper/whisper-cli"; do echo "$f: $(lipo -archs "$f")"; done
-          /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" -c "Print :NSMicrophoneUsageDescription" "$APP/Contents/Info.plist"
+          for f in "$APP/Contents/MacOS/Editbay" "$R/ffmpeg/ffmpeg" "$R/ffmpeg/ffprobe" "$R/whisper/whisper-cli"; do
+            a=" $(lipo -archs "$f") "
+            echo "$f:$a"
+            [[ "$a" == *" arm64 "* ]] || { echo "::error::$f has no Apple Silicon half"; exit 1; }
+            [[ "$a" == *" x86_64 "* ]] || { echo "::error::$f has no Intel half"; exit 1; }
+          done
+          # ONNX Runtime: a folder per chip, the binding picking the one it runs on.
+          for f in "$O"/arm64/*; do echo "$f: $(lipo -archs "$f")"; [[ " $(lipo -archs "$f") " == *" arm64 "* ]]; done
+          for f in "$O"/x64/*; do echo "$f: $(lipo -archs "$f")"; [[ " $(lipo -archs "$f") " == *" x86_64 "* ]]; done
+          /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" -c "Print :LSMinimumSystemVersionByArchitecture" -c "Print :NSMicrophoneUsageDescription" "$APP/Contents/Info.plist"
 
-      - name: The packaged app starts, exports and makes captions
+      - name: Each program runs on each chip
+        shell: bash
+        run: |
+          R="release/mac-universal/Editbay.app/Contents/Resources"
+          for a in arm64 x86_64; do
+            for p in ffmpeg ffprobe; do
+              v="$(arch -$a "$R/ffmpeg/$p" -hide_banner -version)"
+              echo "$a $p: ${v%%$'\n'*}"
+            done
+            arch -$a "$R/whisper/whisper-cli" -h > /dev/null 2>&1
+            echo "$a whisper-cli: runs"
+          done
+
+      - name: The packaged app starts, exports and finds faces, on Apple Silicon
         run: npm run test:packaged
         env:
-          EDITBAY_SCREENSHOT: ${{ github.workspace }}/screenshot-${{ matrix.chip }}.png
+          EDITBAY_SCREENSHOT: ${{ github.workspace }}/screenshot-arm64.png
+
+      # The same app on its Intel half: the test starts it through Rosetta and
+      # checks it runs as x64, so ffmpeg, ffprobe and ONNX Runtime are the Intel ones.
+      - name: The same app on Intel, through Rosetta
+        if: always()
+        run: npm run test:packaged
+        env:
+          EDITBAY_TEST_ARCH: x64
+          EDITBAY_SCREENSHOT: ${{ github.workspace }}/screenshot-intel.png
+
+      # Apple Silicon Macs from macOS 14 and Intel ones from 13.4, as the app's
+      # Info.plist says: no program's half may ask for a newer macOS.
+      - name: Each half needs no newer macOS than the app asks for
+        if: always()
+        shell: bash
+        run: |
+          APP="release/mac-universal/Editbay.app"
+          bad=0
+          while IFS= read -r f; do
+            file -b "$f" | grep -q '^Mach-O' || continue
+            for a in $(lipo -archs "$f"); do
+              case "$a" in arm64) max=14.0 ;; x86_64) max=13.4 ;; *) continue ;; esac
+              m="$(vtool -arch "$a" -show-build "$f" 2>/dev/null | awk '$1 == "minos" {print $2; exit}')"
+              [ -n "$m" ] || continue
+              top="$(printf '%s\n%s\n' "$m" "$max" | sort -V | tail -1)"
+              if [ "$top" != "$max" ]; then echo "::error::${f#$APP/} ($a) needs macOS $m, after $max"; bad=1; fi
+            done
+          done < <(find "$APP" -type f)
+          echo "Checked every program's halves against macOS 14.0 (arm64) and 13.4 (x86_64)."
+          exit $bad
 
       # Every app test against the development build, as run on Windows before
-      # each release (task 1388). Its report is kept whether it passes or not.
-      # A test that misses a timing on these shared machines gets one more go;
-      # the log marks each one that needed it, and the audit lists them.
+      # each release (task 1388), on the Apple Silicon half. Its report is kept
+      # whether it passes or not. A test that misses a timing on these shared
+      # machines gets one more go; the log marks each one that needed it.
+      # A test file whose worker crashed, with no test failed, runs once more
+      # (task 2384).
       - name: The UI suite
         if: always()
+        shell: bash
         run: |
           system_profiler SPDisplaysDataType || true
           osascript -e 'tell application "Finder" to get bounds of window of desktop' || true
           mkdir -p "$EDITBAY_SHOTS"
-          npx electron-vite build && npx vitest run --dir test/ui --no-file-parallelism --retry=1 --reporter=verbose --reporter=junit --outputFile.junit=ui-${{ matrix.chip }}.xml
+          npx electron-vite build
+          set +e -o pipefail
+          npx vitest run --dir test/ui --no-file-parallelism --retry=1 --reporter=verbose --reporter=junit --outputFile.junit=ui-universal.xml 2>&1 | tee ui.log
+          code=$?
+          perl -pe 's/\e\[[0-9;]*m//g' ui.log > ui-plain.log
+          crashed="$(grep -o 'Worker exited unexpectedly.*while running test file [^ ]*' ui-plain.log | sed 's/.*while running test file //' | sort -u)"
+          if [ "$code" -ne 0 ] && [ -n "$crashed" ] && ! grep -Eq '^ +(Tests|Test Files) .*failed' ui-plain.log; then
+            echo "::warning::A test worker crashed with no test failed, so these run once more: $crashed"
+            npx vitest run $crashed --no-file-parallelism --retry=1 --reporter=verbose --reporter=junit --outputFile.junit=ui-universal-rerun.xml
+            code=$?
+          fi
+          exit $code
         env:
           # Tests that take pictures of the app keep them here, kept with the run.
-          EDITBAY_SHOTS: ${{ github.workspace }}/shots-${{ matrix.chip }}
+          EDITBAY_SHOTS: ${{ github.workspace }}/shots-universal
 
-      - name: SHA-256
+      - name: SHA-256 and sizes
         if: always()
         run: |
           cd release
-          shasum -a 256 ${{ matrix.name }}.dmg | tee ${{ matrix.name }}.dmg.sha256
+          shasum -a 256 $NAME.dmg | tee $NAME.dmg.sha256
+          echo "Download: $(stat -f %z $NAME.dmg) bytes"
+          echo "Installed: $(du -sk mac-universal/Editbay.app | cut -f1) KB"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ matrix.name }}
+          name: ${{ env.NAME }}
           if-no-files-found: ignore
           path: |
-            release/${{ matrix.name }}.dmg
-            release/${{ matrix.name }}.dmg.sha256
-            screenshot-${{ matrix.chip }}.png
-            ui-${{ matrix.chip }}.xml
-            shots-${{ matrix.chip }}/
+            release/${{ env.NAME }}.dmg
+            release/${{ env.NAME }}.dmg.sha256
+            screenshot-arm64.png
+            screenshot-intel.png
+            ui-universal.xml
+            ui-universal-rerun.xml
+            shots-universal/

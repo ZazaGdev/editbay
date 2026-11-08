@@ -10,6 +10,7 @@ import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Making captions in the real app, with a stand-in for whisper-cli that says
@@ -36,6 +37,7 @@ beforeAll(async () => {
   })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), clean)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 180_000 })
@@ -640,6 +642,34 @@ describe('editing captions', () => {
       await expect.poll(async () => (await style())[field], WAIT).toBe(was)
     }
     await expect.poll(() => outputPixels(blue), WAIT).toBe(0)
+  })
+
+  // Plan 107.
+  it('animates captions in and out, a line or a word at a time, each choice its own undo', async () => {
+    const style = (): Promise<Record<string, unknown>> =>
+      page.evaluate(async () => (await window.api.currentProject()).sequences[0]!.captions.style as unknown as Record<string, unknown>)
+    await page.locator('[data-testid="view-program"]').click()
+    await page.waitForSelector('[data-testid="monitor-stage"][data-view="program"]', WAIT)
+    await page.locator('[data-testid="caption"]').first().click()
+    await page.waitForSelector('[data-testid="caption-style"]', WAIT)
+    const start = Number(await page.locator('[data-testid="caption"]').first().getAttribute('data-start'))
+    await playheadTo(start + 1)
+    const white = (r: number, g: number, b: number): boolean => r > 230 && g > 230 && b > 230
+    const whole = await outputPixels(white)
+    expect(whole).toBeGreaterThan(200)
+
+    await page.locator('[data-testid="caption-animation"]').selectOption('pop')
+    await expect.poll(async () => (await style()).animation, WAIT).toBe('pop')
+    // Word by word: on its first word's frames, the words not said yet are not drawn.
+    await page.locator('[data-testid="caption-animate-by-word"]').click()
+    await expect.poll(async () => (await style()).animateBy, WAIT).toBe('word')
+    await expect.poll(() => outputPixels(white), WAIT).toBeLessThan(whole / 2)
+
+    for (const [field, was] of [['animateBy', 'line'], ['animation', 'none']] as const) {
+      await page.locator('[data-testid="timecode"]').click()
+      await page.keyboard.press('ControlOrMeta+z')
+      await expect.poll(async () => (await style())[field], WAIT).toBe(was)
+    }
   })
 
   it('saves the caption look under a name and puts it back in one click and one undo, apart from text styles', async () => {

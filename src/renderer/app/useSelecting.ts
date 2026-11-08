@@ -4,9 +4,9 @@
  * change to the leading clip's picture is also made on.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ClipEdit } from '../../shared/types'
-import { findClip, findVideoClip, trackOf, type Gap, type Timeline as TimelineData } from '../../shared/project'
+import { findClip, findVideoClip, linkedIds, trackOf, type Gap, type Timeline as TimelineData } from '../../shared/project'
 import { playheadInto } from '../../shared/playback'
 import { captionAt } from '../../shared/captions'
 import { gapAt } from '../../shared/tracks'
@@ -187,6 +187,24 @@ export function useSelecting({
     setSelectedCaption(id)
   }, [])
 
+  /**
+   * A track whose header was clicked, which the Inspector shows (task 2612):
+   * a track's id, or 'captions' for the caption track. Anything else selected
+   * lets it go, and so does the track being taken away.
+   */
+  const [selectedTrack, setSelectedTrack] = useState<string | null>(null)
+  const selectTrack = useCallback((trackId: string) => {
+    select(null)
+    setSelectedTrack(trackId)
+  }, [select])
+  useEffect(() => {
+    if (selected !== null || selectedCaption !== null || gap !== null) setSelectedTrack(null)
+  }, [selected, selectedCaption, gap])
+  useEffect(() => {
+    if (!selectedTrack || !timeline) return
+    if (selectedTrack === 'captions' ? timeline.captions.clips.length === 0 : !trackOf(timeline, selectedTrack)) setSelectedTrack(null)
+  }, [timeline, selectedTrack])
+
   /** Where the selected caption started, to find it again once grouping the words again has renamed every caption. */
   const captionFrom = useRef<number | null>(null)
   // A caption an edit or an undo has taken away is not selected any more,
@@ -211,8 +229,20 @@ export function useSelecting({
   const selectedIds = useMemo(() => {
     if (!timeline || !selected) return new Set<string>()
     const ids = [selected, ...alsoSelected]
-    // A piece of a group is the whole group, as one clip is (plan 80).
-    return new Set(selectedAlone ? ids : ids.flatMap((id) => groupedIds(timeline, id)))
+    // A piece of a group is the whole group, as one clip is (plan 80), worked out once a group.
+    if (selectedAlone) return new Set(ids)
+    const out = new Set<string>()
+    const groups = new Set<string>()
+    for (const id of ids) {
+      const group = findClip(timeline, id)?.clip.group
+      if (group !== undefined && groups.has(group)) {
+        for (const x of linkedIds(timeline, id)) out.add(x)
+        continue
+      }
+      if (group !== undefined) groups.add(group)
+      for (const x of groupedIds(timeline, id)) out.add(x)
+    }
+    return out
   }, [timeline, selected, alsoSelected, selectedAlone])
 
   /**
@@ -224,7 +254,19 @@ export function useSelecting({
     const ids = [selected, ...alsoSelected].filter((id) => findClip(timeline, id))
     if (selectedAlone) return ids
     const out = [...ids]
-    for (const id of ids) for (const c of groupPieces(timeline, id)) if (!out.includes(c.id)) out.push(c.id)
+    const has = new Set(ids)
+    // A group is worked out once, however many of its pieces are selected (audit 2026-11-07, fix first 2).
+    const groups = new Set<string>()
+    for (const id of ids) {
+      const group = findClip(timeline, id)?.clip.group
+      if (group === undefined || groups.has(group)) continue
+      groups.add(group)
+      for (const c of groupPieces(timeline, id)) {
+        if (has.has(c.id)) continue
+        has.add(c.id)
+        out.push(c.id)
+      }
+    }
     return out
   }, [timeline, selected, alsoSelected, selectedAlone])
 
@@ -265,5 +307,5 @@ export function useSelecting({
     return groups.size > 1
   }
 
-  return { select, showClip, frameSelected, leadSelection, toggleSelected, selectMany, selectGap, selectCaption, selectedIds, selectedClips, framing, alsoChanged, onSelection, canLink }
+  return { select, showClip, frameSelected, leadSelection, toggleSelected, selectMany, selectGap, selectCaption, selectedTrack, selectTrack, selectedIds, selectedClips, framing, alsoChanged, onSelection, canLink }
 }

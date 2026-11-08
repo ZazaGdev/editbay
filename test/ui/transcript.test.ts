@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { SOURCES } from '../../src/main/speech/engine'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * A transcript with no captions made, in the real app: the export, or Save
@@ -33,6 +34,7 @@ beforeAll(async () => {
   })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), clean)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 180_000 })

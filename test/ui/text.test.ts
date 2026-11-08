@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 44: text over the video. Added with T at the playhead, above V1, typed
@@ -21,6 +22,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 300_000)
 
@@ -90,6 +92,8 @@ describe('text', () => {
 
   it('is drawn again as it is typed, one undo step for the whole of it', async () => {
     const before = (await texts())[0]!
+    const drawnWidth = async (): Promise<number> => Math.round((await page.locator('[data-testid="place-rect"]').boundingBox())!.width)
+    const shortBox = await drawnWidth()
     await page.fill('[data-testid="text-words"]', 'A much longer line of words')
     await expect.poll(async () => (await texts())[0]!.text!.text, { timeout: 5000 }).toBe('A much longer line of words')
     const after = (await texts())[0]!
@@ -101,6 +105,9 @@ describe('text', () => {
     await page.locator('[data-testid="text-words"]').blur()
     await page.keyboard.press('ControlOrMeta+z')
     await expect.poll(async () => (await texts())[0]!.text!.text, { timeout: 5000 }).toBe('Your text')
+    // The undo is in the project a moment before the Output view draws it: until then the box
+    // is the long line's, and the next test pressed a corner that was no longer there.
+    await expect.poll(drawnWidth, { timeout: 5000 }).toBe(shortBox)
   })
 
   it('grows from a corner, and is drawn again sharp at the size it was dragged to', async () => {

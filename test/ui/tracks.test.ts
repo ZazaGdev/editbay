@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * A recording's own streams on audio tracks of their own, driven through the
@@ -108,6 +109,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), recording)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 180_000 })
@@ -132,23 +134,28 @@ afterAll(async () => {
  * all. The picture starts a few tens of milliseconds out, at the start and at
  * every cut, and is eased into step over the next second or so.
  */
-async function drift(ms: number, settledAfter: number): Promise<{ settled: number; worst: number }> {
+async function drift(ms: number, settledAfter: number): Promise<{ settled: number; worst: number; worstFrom: (ms: number) => number }> {
   const startSec = await page.evaluate(async () => (await window.api.currentProject()).media[0]!.startSec ?? 0)
   const drifts = await page.evaluate(
     async ({ ms, startSec }) => {
       const out: { at: number; drift: number }[] = []
       const from = performance.now()
-      const until = from + ms
-      while (performance.now() < until) {
-        await new Promise((r) => setTimeout(r, 50))
+      // The streams are played by the sound engine (plan 106): where in the
+      // sequence is being heard, which the monitor shows beside the picture.
+      const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')!
+      // Read the moment that place is written, once a frame, with the picture's
+      // place beside it: read whenever, it is up to a frame old against a
+      // picture read live, and seemed out by that much (task 2623).
+      const read = (): void => {
         const video = Array.from(document.querySelectorAll<HTMLVideoElement>('[data-testid="monitor-stage"] video')).find((v) => !v.paused)
-        // The streams are played by the sound engine (plan 106): where in the
-        // sequence is being heard, which the monitor shows beside the picture.
-        const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-testid="program-canvas"]')
-        const heard = Number(canvas?.dataset.heardSec || NaN)
-        if (!video || !Number.isFinite(heard) || video.readyState < 3) continue
+        const heard = Number(canvas.dataset.heardSec || NaN)
+        if (!video || !Number.isFinite(heard) || video.readyState < 3) return
         out.push({ at: performance.now() - from, drift: heard - (video.currentTime - startSec) })
       }
+      const watch = new MutationObserver(read)
+      watch.observe(canvas, { attributes: true, attributeFilter: ['data-heard-sec'] })
+      await new Promise((r) => setTimeout(r, ms))
+      watch.disconnect()
       return out
     },
     { ms, startSec }
@@ -159,7 +166,11 @@ async function drift(ms: number, settledAfter: number): Promise<{ settled: numbe
     .sort((a, b) => a - b)
   if (settled.length <= 5) console.log(drifts.map((d) => `${Math.round(d.at)}:${(d.drift * 1000).toFixed(0)}`).join(' '))
   expect(settled.length).toBeGreaterThan(5)
-  return { settled: settled[Math.floor(settled.length / 2)]!, worst: Math.max(...drifts.map((d) => Math.abs(d.drift))) }
+  return {
+    settled: settled[Math.floor(settled.length / 2)]!,
+    worst: Math.max(...drifts.map((d) => Math.abs(d.drift))),
+    worstFrom: (ms) => Math.max(...drifts.filter((d) => d.at >= ms).map((d) => Math.abs(d.drift)))
+  }
 }
 
 describe('a recording with three streams, dropped on V1', () => {
@@ -304,6 +315,11 @@ describe('a recording with three streams, dropped on V1', () => {
     const d = await drift(2800, 2100)
     expect(d.settled).toBeLessThan(0.012)
     expect(d.worst).toBeLessThan(0.1)
+    // From just before the cut on, never as far out as a picture behind its
+    // sound starts to show, 45 ms: the second piece's picture was handed to a
+    // player waiting on its first frame, which started 90 ms late and took a
+    // second to catch up (task 2637).
+    expect(d.worstFrom(800)).toBeLessThan(0.045)
     await page.keyboard.press('Space')
   })
 

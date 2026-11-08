@@ -16,20 +16,20 @@ see [Status and limits](#status-and-limits) for what is not done yet on each.
 
 Windows 11, 64-bit.
 
-1. Download `Editbay.Setup.<version>.exe` from the latest [release](../../releases/latest).
+1. Download `Editbay-<version>-Windows-Setup.exe` from the latest [release](../../releases/latest).
 2. Run it. Windows SmartScreen warns about an unrecognised app, because the installer is not
    code signed: click **More info**, then **Run anyway**.
 3. Choose where it goes, or keep the folder it offers, and finish. Editbay is then in the
    Start menu and on the desktop.
 
 Each release lists the installer's SHA-256, so you can check the download with
-`certutil -hashfile Editbay.Setup.<version>.exe SHA256`.
+`certutil -hashfile Editbay-<version>-Windows-Setup.exe SHA256`.
 
 ### Mac
 
-From 2.0, the latest [release](../../releases/latest) has two Mac downloads:
-`Editbay-<version>-arm64.dmg` for Macs with an M chip (macOS 14 Sonoma or later) and
-`Editbay-<version>-intel.dmg` for Intel Macs (macOS 13.4 Ventura or later).
+Download `Editbay-<version>-Mac.dmg` from the latest [release](../../releases/latest). From
+2.1 it is one download for every Mac: it runs on Apple Silicon (M1 or later) on macOS 14 Sonoma
+or later, and on Intel on macOS 13.4 Ventura or later.
 
 1. Open the `.dmg` and drag Editbay into Applications.
 2. Double-click Editbay. macOS says it could not verify it, because the app is not signed with
@@ -40,11 +40,11 @@ From 2.0, the latest [release](../../releases/latest) has two Mac downloads:
 
 If you are comfortable with Terminal, this one line does the same as steps 2 and 3:
 `xattr -dr com.apple.quarantine /Applications/Editbay.app`. Check the download against the
-SHA-256 the release lists with `shasum -a 256 Editbay-<version>-arm64.dmg`.
+SHA-256 the release lists with `shasum -a 256 Editbay-<version>-Mac.dmg`.
 
 If your Mac's sound goes to a headset or another device that is also a microphone, macOS may ask
-whether Editbay can use the microphone. In 2.0 it asks as Editbay opens; from the next release
-it asks at most once, at your first click in it. That is macOS asking on behalf of the sound the
+whether Editbay can use the microphone. From 2.1 it asks at most once, at your first click in
+it; 2.0 asked as Editbay opened. That is macOS asking on behalf of the sound the
 preview plays; Editbay only records when you press Record, and either answer is fine for playing
 and editing.
 
@@ -260,7 +260,7 @@ with a plan file.
 
 ## Status and limits
 
-Version 2.0. It works, it is used daily, and it has rough edges.
+Version 2.1. It works, it is used daily, and it has rough edges.
 
 - **Windows 11 x64, and the Mac from 2.0**: Apple Silicon on macOS 14 or later, Intel on
   macOS 13.4 or later. On the Mac:
@@ -269,8 +269,8 @@ Version 2.0. It works, it is used daily, and it has rough edges.
   - It is **not signed** with an Apple certificate, so macOS asks you to allow it once. See
     [Mac](#mac) for the steps.
   - It **exports on the processor.** Fast export on the graphics card is NVIDIA only.
-  - In 2.0, a Mac whose sound goes to a headset or another device that is also a microphone
-    may **ask for the microphone as Editbay opens**. The next release fixes that; see
+  - A Mac whose sound goes to a headset or another device that is also a microphone may
+    **ask for the microphone once**, at the first click in Editbay (in 2.0, as it opened); see
     [Mac](#mac).
   - The Intel version keeps working until Apple's own Intel support runs out, then stays at
     its last release.

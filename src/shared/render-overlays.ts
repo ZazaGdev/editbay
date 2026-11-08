@@ -234,14 +234,16 @@ export function overlayGraph(
   width: number,
   height: number,
   last = 'v',
-  pieceFrom = 0
+  pieceFrom = 0,
+  /** Where its labels start counting, past those of a chain laid before it in the same graph (task 2621). */
+  firstLabel = 0
 ): string {
   const parts: string[] = []
   // A clip being blended into another is laid over in one step, whatever its
   // pictures: the two sides are composed on their own first.
-  const total = overlays.reduce((n, o) => n + (o.into ? 1 : o.pictures.length), 0)
+  const total = firstLabel + overlays.reduce((n, o) => n + (o.into ? 1 : o.pictures.length), 0)
   let below = under
-  let q = 0
+  let q = firstLabel
   let input = firstInput
   for (const o of overlays) {
     const at = input

@@ -222,6 +222,61 @@ describe('joining and splitting', () => {
     expect(() => splitProjectFile(JSON.stringify(oldBroken))).toThrow(/damaged clip/)
   })
 
+  it('refuses a clip whose crop is not four numbers, which the export would write into its filter graph as text (audit 2026-11-07)', () => {
+    const p = project(media('a', 'D:\\footage\\a.mp4'))
+    const withCrop = (side: string, value: unknown): unknown => ({
+      ...p,
+      sequences: p.sequences.map((s) => ({
+        ...s,
+        videoTracks: s.videoTracks.map((t) => ({
+          ...t,
+          clips: t.clips.map((c) => ({ ...c, transform: { ...c.transform, crop: { ...c.transform.crop, [side]: value } } }))
+        }))
+      }))
+    })
+    for (const side of ['x', 'y', 'w', 'h']) {
+      expect(() => splitProjectFile(JSON.stringify(withCrop(side, '0,drawbox'))), side).toThrow(/damaged/)
+      expect(() => splitProjectFile(JSON.stringify(withCrop(side, undefined))), `${side} missing`).toThrow(/damaged/)
+    }
+    // A file from before schema 6 has its clips checked on their own.
+    const old = v5(p.media, {
+      clips: oldClips(p, { gain: 1, muted: false }).map((c) => ({
+        ...c,
+        transform: { ...(c.transform as object), crop: { x: 656, y: '0,drawbox', w: 608, h: 1080 } }
+      }))
+    })
+    expect(() => splitProjectFile(old)).toThrow(/damaged clip/)
+  })
+
+  it('refuses a source whose numbers no import writes, which the window counts up to before it draws (audit 2026-11-07)', () => {
+    const ok = media('a', 'D:\\footage\\a.mp4')
+    const p = project(ok)
+    // The clip stays as it was, so nothing but the source is wrong.
+    const withSource = (more: Record<string, unknown>): string => JSON.stringify({ ...p, media: [{ ...ok, ...more }] })
+    const impossible: Record<string, unknown>[] = [
+      { audioTracks: 1e12 },
+      { audioTracks: 65 },
+      { audioTracks: -1 },
+      { audioTracks: '1e12' },
+      { still: true, frames: 1e9, frameRate: 10 },
+      { still: true, frames: 10, frameRate: -1 },
+      { durationSec: 1e308 },
+      { durationSec: -5 },
+      { width: -5 },
+      { height: '1080' },
+      { fps: -1 }
+    ]
+    for (const more of impossible) expect(() => splitProjectFile(withSource(more)), JSON.stringify(more)).toThrow(/damaged source/)
+    // What imports write opens: a sound file, a picture, an animation at the unpacking cap, a six-track OBS recording.
+    const written: Record<string, unknown>[] = [
+      { hasVideo: false, width: 0, height: 0, fps: 0, audioTracks: 1 },
+      { still: true, hasAudio: false, audioTracks: 0, durationSec: 6 * 60 * 60, fps: 0 },
+      { still: true, hasAudio: false, audioTracks: 0, frames: 600, frameRate: 50, fps: 50 },
+      { audioTracks: 6 }
+    ]
+    for (const more of written) expect(() => splitProjectFile(withSource(more)), JSON.stringify(more)).not.toThrow()
+  })
+
   it('keeps the relative path out of the project in memory', () => {
     const p = project(media('a', 'D:\\proj\\footage\\a.mp4'))
     const text = joinProjectFile(p, defaultWorkspace(), { path, projectPath: 'D:\\proj\\holiday.editbay' })

@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { discardUnsavedWork } from './dialogs'
+import { discardUnsavedWork, pressNewProject } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 96, the assets folder through the real window: with none chosen,
@@ -46,6 +47,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), red)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -203,7 +205,7 @@ describe('credits for the description', () => {
       await capture(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `sine=frequency=${hz}:sample_rate=48000:duration=1`, file])
     }
     await writeFile(join(assetsDir, 'Audio', 'ZapSplat', 'credit.txt'), `${zapLine}\n`)
-    await page.keyboard.press('ControlOrMeta+n')
+    await pressNewProject(page)
     await page.waitForFunction(async () => (await window.api.currentProject()).sequences[0]!.videoTracks.every((t) => t.clips.length === 0))
     for (const file of [zap, free]) {
       const before = (await clips()).length

@@ -3,6 +3,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { wakeSound } from './wake-sound'
 
 /**
  * Shortcuts you change must still be there after the app is closed and opened
@@ -19,6 +20,7 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   return { app, page }
 }
 

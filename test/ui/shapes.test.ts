@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 83: shapes over the picture. Picked from the Shape menu beside Add
@@ -21,6 +22,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 300_000)
 

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { discardUnsavedWork } from './dialogs'
+import { discardUnsavedWork, pressNewProject } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 100: Follow face. A 1280 x 720 recording with a portrait (Neil
@@ -54,6 +55,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 
@@ -66,7 +68,7 @@ afterAll(async () => {
 async function fresh(path: string): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), path)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

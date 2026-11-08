@@ -582,9 +582,11 @@ async function openCommand(argv: string[]): Promise<unknown> {
   // Beside this tool, which is built into out/cli of the repository.
   const flag = args.flags.get('app')
   const release = join(__dirname, '..', '..', 'release')
+  // A Mac build is the one download for both chips (task 2682), or an older one for this chip.
+  const macApp = (dir: string): string => join(release, dir, 'Editbay.app', 'Contents', 'MacOS', 'Editbay')
   const built =
     process.platform === 'darwin'
-      ? join(release, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app', 'Contents', 'MacOS', 'Editbay')
+      ? [macApp('mac-universal'), macApp(process.arch === 'arm64' ? 'mac-arm64' : 'mac')].find((p) => existsSync(p)) ?? macApp('mac-universal')
       : join(release, 'win-unpacked', 'Editbay.exe')
   const app = flag !== undefined ? given(flag) : built
   if (!existsSync(app)) throw new Refusal(`Editbay is not at ${app}: build it with npm run dist:dir, or give --app <Editbay.exe>`)

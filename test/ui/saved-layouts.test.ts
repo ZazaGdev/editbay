@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 68: a clip's framing saved under a name, applied to another clip in
@@ -23,6 +24,7 @@ async function launch(): Promise<void> {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }
 

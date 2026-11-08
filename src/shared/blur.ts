@@ -1,4 +1,5 @@
 import type { Rect } from './project'
+import { cropFilter } from './crop-filter'
 
 /**
  * Plan 85: blur on a picture clip, the whole picture or boxes on it.
@@ -130,7 +131,7 @@ export function blurFfmpeg(c: Blurred, width: number, height: number, tag: strin
     const y1 = Math.min(height, r.y + r.h + m)
     const [a, k, z] = [`bx${tag}a${i}`, `bx${tag}k${i}`, `bx${tag}z${i}`]
     out.push(
-      `split=2[${a}][${k}];[${k}]crop=${x1 - x0}:${y1 - y0}:${x0}:${y0},${full},gblur=sigma=${sigma.toFixed(2)},crop=${r.w}:${r.h}:${r.x - x0}:${r.y - y0},${back}[${z}];` +
+      `split=2[${a}][${k}];[${k}]${cropFilter(x1 - x0, y1 - y0, x0, y0)},${full},gblur=sigma=${sigma.toFixed(2)},${cropFilter(r.w, r.h, r.x - x0, r.y - y0)},${back}[${z}];` +
         `[${a}][${z}]overlay=${r.x}:${r.y}${keepAlpha ? ':format=auto' : ''}`
     )
   })

@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState, type JSX, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import { MAX_TRACK_NAME } from '../../shared/tracks'
 import { surface, ink, accent, space, radius, type } from '../theme'
 import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { DropMenu, MenuItem } from './DropMenu'
+
+/** What in a header does its own job when pressed, rather than selecting or moving the track. */
+const ON_ITS_OWN = 'button, input, .ui-menu, [data-testid="track-resize"]'
 
 /** How wide a track's header is. Wide enough for its name, what it carries, and its controls. */
 export const HEADER_WIDTH = 132
@@ -54,6 +57,17 @@ export function TrackHeader(props: {
   onName?: ((name: string) => void) | undefined
   /** What it is called now, empty when it has only its number. */
   nameGiven?: string | undefined
+  /** Showing in the Inspector, after a click on the header (task 2612). */
+  selected?: boolean | undefined
+  /** A click on the header anywhere but its buttons, which do their own jobs. */
+  onSelect?: (() => void) | undefined
+  /**
+   * The header dragged up or down to move its track (task 2613): told where
+   * the pointer is as it moves, then once more with `end` when it is let go.
+   * Null where it is, with `end`, for a drag Escape called off. Absent for a
+   * track that does not move, as the captions do not.
+   */
+  onDrag?: ((clientY: number | null, end: boolean) => void) | undefined
   /** Anything else the header carries, such as the captions style button. */
   children?: ReactNode | undefined
 }): JSX.Element {
@@ -82,12 +96,81 @@ export function TrackHeader(props: {
     }
   }, [sizing, onHeight])
 
+  /**
+   * A press on the header, away from its buttons: a click until it has moved
+   * a few pixels, a drag of the track after that. How far it has moved, and
+   * whether it has become a drag.
+   */
+  const [moving, setMoving] = useState<{ by: number; dragging: boolean } | null>(null)
+  /** Where the press began. */
+  const pressedAt = useRef(0)
+  /** A drag just let go, whose click is not a click on the header. */
+  const dropped = useRef(false)
+  // Read through a ref: the column hands a new one each render, and listening
+  // again mid-drag would forget the drag had begun.
+  const dragTo = useRef(props.onDrag)
+  dragTo.current = props.onDrag
+  const pressed = moving !== null
+  useEffect(() => {
+    if (!pressed) return
+    const onDrag = (clientY: number | null, end: boolean): void => dragTo.current?.(clientY, end)
+    let now = { by: 0, dragging: false }
+    const move = (e: globalThis.PointerEvent): void => {
+      const by = e.clientY - pressedAt.current
+      now = { by, dragging: now.dragging || Math.abs(by) > 4 }
+      setMoving(now)
+      if (now.dragging) onDrag(e.clientY, false)
+    }
+    const up = (e: globalThis.PointerEvent): void => {
+      if (now.dragging) {
+        dropped.current = true
+        onDrag(e.clientY, true)
+      }
+      setMoving(null)
+    }
+    const escape = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || !now.dragging) return
+      e.stopPropagation()
+      onDrag(null, true)
+      setMoving(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('keydown', escape, true)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('keydown', escape, true)
+    }
+  }, [pressed])
+  const dragging = moving?.dragging === true
+
   return (
     <div
       data-testid="track-header"
       data-track-id={props.trackId}
       data-track={props.name}
+      data-selected={props.selected === true ? 'yes' : 'no'}
+      data-dragging={dragging ? 'yes' : undefined}
+      onPointerDown={(e) => {
+        if (!props.onDrag || e.button !== 0 || typing !== null) return
+        if ((e.target as Element).closest(ON_ITS_OWN)) return
+        pressedAt.current = e.clientY
+        setMoving({ by: 0, dragging: false })
+      }}
+      onClick={(e) => {
+        if (dropped.current) {
+          dropped.current = false
+          return
+        }
+        if (!props.onSelect || typing !== null) return
+        if ((e.target as Element).closest(ON_ITS_OWN)) return
+        props.onSelect()
+      }}
       style={{
+        cursor: dragging ? 'grabbing' : props.onSelect ? 'pointer' : undefined,
+        ...(dragging ? { transform: `translateY(${moving.by}px)`, zIndex: 5, opacity: 0.85 } : {}),
+        boxShadow: props.selected === true ? `inset 0 0 0 1px ${accent.base}` : undefined,
         height: props.height,
         boxSizing: 'border-box',
         borderTop: `1px solid ${surface.line}`,

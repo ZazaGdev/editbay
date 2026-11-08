@@ -46,6 +46,7 @@ import {
   type RecentState
 } from '../settings/recent-store'
 import { describe, messageBox, notify, send } from './windows'
+import { silentShares, withinReach } from './share-patience'
 import { exclusive } from './one-at-a-time'
 import { fileHolds, inOrder, setRecoveryAside, versionsFolder } from './kept-copies'
 import { sendAsset, sendProgress, settle, useDifferent, whileOpen } from './missing-sources'
@@ -674,6 +675,10 @@ export async function openPath(target: string): Promise<boolean> {
   const project = { ...loaded.project, name: session.nameOnOpen(loaded.project.name, target) }
   const check = await checkSources(project)
   adopt(project, target, loaded.workspace, true, check, loaded.withheld)
+  const away = loaded.unreachable
+  if (away.length > 0) {
+    notify(`${away.join(', ')} did not answer, so the files there show as missing for now. Open the project again once ${away.length === 1 ? 'that computer is' : 'those computers are'} on.`, 'waits')
+  }
   // You opened it, so the share it is on, if it is on one, is one you use.
   await trustSharesOf([target])
   // A file an older version wrote is not rewritten behind your back: the
@@ -758,8 +763,31 @@ export function autosave(): Promise<void> {
   })
 }
 
+/** Settles once the project the app starts with is open, or given up on: the window's first asks wait for it. */
+let openingAtStart: Promise<void> = Promise.resolve()
+
+export function openedAtStart(): Promise<void> {
+  return openingAtStart
+}
+
+/** Get going at launch: `prepareStart` before the window, `openAtStart` after it. */
+export async function startup(settingsDir: string, autosaveMs: number, launchPath: string | null): Promise<void> {
+  await prepareStart(settingsDir)
+  await openAtStart(launchPath, autosaveMs)
+}
+
+/** What launch reads before the window exists: the recent list and the shares you allowed, all on this computer. */
+export async function prepareStart(settingsDir: string): Promise<void> {
+  recentFile = recentPath(settingsDir)
+  recent = await loadRecent(recentFile)
+  await loadTrustedShares(settingsDir)
+  onTrustWriteFailed((reason) => notify(`The list of network folders you allowed could not be saved (${reason}). A project there may ask again next time.`, 'fades'))
+  recoveryFolder = recoveryDir(settingsDir)
+}
+
 /**
- * Get going at launch, before the window exists.
+ * What launch does once the window is up, which waits for it rather than
+ * showing nothing until a share answers (audit 2026-11-07).
  *
  * A recovery copy still on disk means the app did not close cleanly last
  * time. The newest worth having is set aside and offered, and meanwhile the
@@ -767,19 +795,23 @@ export function autosave(): Promise<void> {
  * later save made pointless are removed. Then the autosave starts.
  *
  * Each step stands alone: one that fails is skipped rather than stopping the
- * app from opening a window.
+ * app from opening its project.
  */
-export async function startup(settingsDir: string, autosaveMs: number, launchPath: string | null): Promise<void> {
-  recentFile = recentPath(settingsDir)
-  recent = await loadRecent(recentFile)
-  await loadTrustedShares(settingsDir)
-  onTrustWriteFailed((reason) => notify(`The list of network folders you allowed could not be saved (${reason}). A project there may ask again next time.`, 'fades'))
-  recoveryFolder = recoveryDir(settingsDir)
+export function openAtStart(launchPath: string | null, autosaveMs: number): Promise<void> {
+  openingAtStart = openingStart(launchPath, autosaveMs).catch(() => undefined)
+  return openingAtStart
+}
 
+async function openingStart(launchPath: string | null, autosaveMs: number): Promise<void> {
   try {
-    const copies = await listRecovery(recoveryFolder)
+    const copies = recoveryFolder ? await listRecovery(recoveryFolder) : []
+    // A copy of a project on a computer that does not answer is offered rather than compared with it.
+    const away = new Set(await silentShares([...new Set(copies.map((c) => (c.recoveryOf ? shareOf(c.recoveryOf) : null)).filter((s) => s !== null))]))
     const holds = new Set<string>()
-    for (const c of copies) if (await fileHolds(c)) holds.add(c.file)
+    for (const c of copies) {
+      const share = c.recoveryOf ? shareOf(c.recoveryOf) : null
+      if ((share === null || !away.has(share)) && (await fileHolds(c))) holds.add(c.file)
+    }
     const choice = chooseRecovery(copies, (c) => holds.has(c.file))
     for (const c of choice.stale) await setRecoveryAside(c).catch(() => undefined)
     const offer = choice.offer
@@ -804,10 +836,14 @@ export async function startup(settingsDir: string, autosaveMs: number, launchPat
       if (launchPath) {
         await openPath(launchPath)
       } else if (offered) {
-        if (offered.recoveryOf && (await exists(offered.recoveryOf))) await openPath(offered.recoveryOf)
+        const was = offered.recoveryOf
+        if (was && (await withinReach(was)) && (await exists(was))) await openPath(was)
       } else if (recent.last) {
         const last = recent.last
-        if (await exists(last)) {
+        if (!(await withinReach(last))) {
+          // Not forgotten: it opens again at the next start that finds that computer on.
+          notify(`${shareOf(last)} did not answer, so Editbay started with a new project rather than ${basename(last)}. Open it again once that computer is on.`, 'waits')
+        } else if (await exists(last)) {
           await openPath(last)
         } else {
           notify(`${basename(last)} is no longer at ${last}, so Editbay started with a new project.`, 'fades')

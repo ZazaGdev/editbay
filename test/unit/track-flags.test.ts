@@ -10,9 +10,19 @@ import {
   setTrackMuted,
   setTrackName,
   trackLabel,
+  moveTrack,
+  removeTrack,
+  captionsAbove,
+  createProject,
+  withTimeline,
+  CAPTION_TRACK_ID,
+  FIRST_SEQUENCE_ID,
   type ProjectMedia,
   type Timeline
 } from '../../src/shared/project'
+import { setCaptions } from '../../src/shared/timeline-captions'
+import { joinProjectFile, splitProjectFile } from '../../src/shared/project-file'
+import { defaultWorkspace } from '../../src/shared/workspace'
 import { MAX_TRACK_NAME, cleanTrackName, isHidden, isLocked, isMuted, lockedTrackChanged } from '../../src/shared/tracks'
 import { applyClipEdit } from '../../src/main/project/session'
 import type { ClipEdit } from '../../src/shared/types'
@@ -268,5 +278,102 @@ describe('a picture track that is not drawn', () => {
   it('does nothing at all for a track that is not there', () => {
     const t = cut()
     expect(setTrackHidden(t, 'gone', true)).toEqual(t)
+  })
+})
+
+describe('a track moved among the tracks of its kind (task 2613)', () => {
+  /** V1 to V3, each with a clip of its own, and the top one named. */
+  function stacked(): Timeline {
+    let t = addTrack(addTrack(cut(), 'video', 'v2'), 'video', 'v3')
+    t = setTrackName(t, 'v3', 'Facecam')
+    t = addSource(t, { mediaId: 'talk', clipId: 'on2', at: 0, onTrack: 'v2' })
+    return addSource(t, { mediaId: 'talk', clipId: 'on3', at: 0, onTrack: 'v3' })
+  }
+
+  it('takes its clips with it, and the tracks between close up', () => {
+    const t = moveTrack(stacked(), 'v3', 0)
+    expect(t.videoTracks.map((r) => r.id)).toEqual(['v3', 'v1', 'v2'])
+    expect(trackOfClip(t, 'on3')).toBe('v3')
+    expect(trackOfClip(t, 'on2')).toBe('v2')
+  })
+
+  it('keeps a name, and a track without one takes the number of its new place', () => {
+    const t = moveTrack(stacked(), 'v1', 2)
+    expect(t.videoTracks.map((r) => trackLabel(t, r.id))).toEqual(['V1', 'Facecam', 'V3'])
+    expect(t.videoTracks.map((r) => r.id)).toEqual(['v2', 'v3', 'v1'])
+  })
+
+  it('stays among its own kind, and a place past either end is the end', () => {
+    const t = addTrack(cut(), 'audio', 'a3')
+    const [a1, a2] = t.audioTracks.map((r) => r.id)
+    const moved = moveTrack(t, 'a3', -4)
+    expect(moved.audioTracks.map((r) => r.id)).toEqual(['a3', a1, a2])
+    expect(moved.videoTracks).toBe(t.videoTracks)
+    expect(moveTrack(t, a1!, 99).audioTracks.map((r) => r.id)).toEqual([a2, 'a3', a1])
+  })
+
+  it('changes nothing when it lands where it was, or the track is not there', () => {
+    const t = stacked()
+    expect(moveTrack(t, 'v2', 1)).toBe(t)
+    expect(moveTrack(t, 'gone', 0)).toBe(t)
+  })
+
+  it('moves a locked track, whose clips stay as they were', () => {
+    const t = setTrackLocked(stacked(), 'v3', true)
+    expect(applyClipEdit(t, { kind: 'moveTrack', trackId: 'v3', to: 0 }).videoTracks[0]!.id).toBe('v3')
+  })
+})
+
+describe('the caption track among the video tracks (task 2621)', () => {
+  /** V1, V2 and V3 with a clip on each of the upper two, and a caption. */
+  function captioned(): Timeline {
+    let t = addTrack(addTrack(cut(), 'video', 'v2'), 'video', 'v3')
+    t = addSource(t, { mediaId: 'talk', clipId: 'on2', at: 0, onTrack: 'v2' })
+    t = addSource(t, { mediaId: 'talk', clipId: 'on3', at: 0, onTrack: 'v3' })
+    return setCaptions(t, [{ text: 'hello', start: 0, length: 10 }], [])
+  }
+  /** The video tracks from V1 up with the captions at their place among them. */
+  const order = (t: Timeline): string[] => {
+    const ids = t.videoTracks.map((r) => r.id)
+    ids.splice(captionsAbove(t), 0, CAPTION_TRACK_ID)
+    return ids
+  }
+
+  it('starts over every video track, with nothing saved for it', () => {
+    const t = captioned()
+    expect(order(t)).toEqual(['v1', 'v2', 'v3', CAPTION_TRACK_ID])
+    expect('above' in t.captions).toBe(false)
+  })
+
+  it('moves down among the video tracks, which keep their order, and back to the top', () => {
+    const start = captioned()
+    const t = applyClipEdit(start, { kind: 'moveTrack', trackId: CAPTION_TRACK_ID, to: 1 })
+    expect(order(t)).toEqual(['v1', CAPTION_TRACK_ID, 'v2', 'v3'])
+    expect(t.captions.clips).toBe(start.captions.clips)
+    const back = moveTrack(t, CAPTION_TRACK_ID, 99)
+    expect(order(back)).toEqual(['v1', 'v2', 'v3', CAPTION_TRACK_ID])
+    expect('above' in back.captions).toBe(false)
+  })
+
+  it('counts its place when a video track is dragged past it', () => {
+    const t = moveTrack(captioned(), CAPTION_TRACK_ID, 1)
+    // V3 dragged to the bottom: the captions are now over V3 and V1.
+    expect(order(moveTrack(t, 'v3', 0))).toEqual(['v3', 'v1', CAPTION_TRACK_ID, 'v2'])
+    // V1 dragged to the top, over the captions and both others.
+    expect(order(moveTrack(t, 'v1', 3))).toEqual([CAPTION_TRACK_ID, 'v2', 'v3', 'v1'])
+  })
+
+  it('is over one fewer when an empty track under it is taken away', () => {
+    let t = addTrack(captioned(), 'video', 'v4')
+    t = moveTrack(t, 'v4', 1)
+    t = moveTrack(t, CAPTION_TRACK_ID, 3)
+    expect(order(t)).toEqual(['v1', 'v4', 'v2', CAPTION_TRACK_ID, 'v3'])
+    expect(order(removeTrack(t, 'v4'))).toEqual(['v1', 'v2', CAPTION_TRACK_ID, 'v3'])
+  })
+
+  it('is saved with the project and read back', () => {
+    const t = moveTrack(captioned(), CAPTION_TRACK_ID, 1)
+    const p = withTimeline({ ...createProject('p', 30, { width: 1080, height: 1920 }), media: t.media }, FIRST_SEQUENCE_ID, t)
+    expect(splitProjectFile(joinProjectFile(p, defaultWorkspace())).project.sequences[0]!.captions.above).toBe(1)
   })
 })

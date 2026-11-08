@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 1099: Ctrl+wheel zoom about the pointer on a cut like the owner's demo,
@@ -37,6 +38,7 @@ beforeAll(async () => {
   page = await app.firstWindow()
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const [asset] = await page.evaluate((p) => window.api.importFiles(p), [long])
   await page.waitForSelector(`[data-testid="asset"][data-asset-id="${asset!.id}"][data-status="ready"]`, { timeout: 180_000 })

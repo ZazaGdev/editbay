@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { SpeechError, downloadFile, engineIntact, engineReady, enginePaths, installEngine, removeEngine, type SpeechFile } from '../../src/main/speech/engine'
-import { listened, mixArgs, mixGraph, parseWhisperProgress, whisperArgs } from '../../src/main/speech/transcribe'
+import { decodeArgs, laidOut, Layer, listened, parseWhisperProgress, whisperArgs } from '../../src/main/speech/transcribe'
 import { addSource, createTimeline, setClipAudio, type ProjectMedia, type Timeline } from '../../src/shared/project'
 import { setSpeed } from '../../src/shared/speed-edit'
 
@@ -114,9 +114,8 @@ describe('what is listened to', () => {
     const fast = setSpeed(t, 'rec', { speed: 2 })
     const [heard] = listened(fast, [a1])
     expect(heard!.lengthSec).toBe(5)
-    const graph = mixGraph([heard!]).graph.split(';\n')
-    // The whole 10 s of recording read, stretched into its 5 s.
-    expect(graph[1]).toBe('[i0_0]atrim=start_sample=0:end_sample=160000,asetpts=PTS-STARTPTS,atempo=2,volume=1[m0]')
+    // The whole 10 s of recording read, to be stretched into its 5 s.
+    expect(laidOut(heard!)).toEqual({ from: 0, to: 160000, at: 0, gain: 1, speed: 2 })
     // At 4x a sound is silent unless kept, and so is not listened to.
     expect(listened(setSpeed(t, 'rec', { speed: 4 }), [a1])).toEqual([])
     expect(listened(setSpeed(setSpeed(t, 'rec', { speed: 4 }), 'rec', { keepSound: true }), [a1])).toHaveLength(1)
@@ -126,38 +125,39 @@ describe('what is listened to', () => {
 describe('the mix', () => {
   const clip = (path: string, fromSec: number, lengthSec: number, atSec: number, gain = 1) => ({ path, fromSec, lengthSec, atSec, gain, label: path, copy: false })
 
-  it('reads each file once however many clips are cut from it, each clip its stretch in samples, delayed to where it starts, summed', () => {
-    const { inputs, graph } = mixGraph([clip('a.mkv', 0, 2, 0), clip('a.mkv', 5, 1.5, 2), clip('vo.wav', 0, 1, 1, 0.5)])
-    expect(inputs).toEqual(['a.mkv', 'vo.wav'])
-    expect(graph.split(';\n')).toEqual([
-      '[0:a:0]aresample=16000:async=1:first_pts=0,aformat=sample_fmts=fltp:channel_layouts=mono,asplit=2[i0_0][i0_1]',
-      '[1:a:0]aresample=16000:async=1:first_pts=0,aformat=sample_fmts=fltp:channel_layouts=mono,anull[i1_0]',
-      '[i0_0]atrim=start_sample=0:end_sample=32000,asetpts=PTS-STARTPTS,volume=1[m0]',
-      '[i0_1]atrim=start_sample=80000:end_sample=104000,asetpts=PTS-STARTPTS,volume=1,adelay=32000S:all=1[m1]',
-      '[i1_0]atrim=start_sample=0:end_sample=16000,asetpts=PTS-STARTPTS,volume=0.5,adelay=16000S:all=1[m2]',
-      '[m0][m1][m2]amix=inputs=3:duration=longest:normalize=0[sum]',
-      // Levelled last, so whisper hears a quiet voice under game sound.
-      '[sum]speechnorm=e=12.5:r=0.0001:l=1[out]'
+  it('lays each clip its stretch in samples, where it starts, at its level', () => {
+    expect([clip('a.mkv', 0, 2, 0), clip('a.mkv', 5, 1.5, 2), clip('vo.wav', 0, 1, 1, 0.5)].map(laidOut)).toEqual([
+      { from: 0, to: 32000, at: 0, gain: 1, speed: 1 },
+      { from: 80000, to: 104000, at: 32000, gain: 1, speed: 1 },
+      { from: 0, to: 16000, at: 16000, gain: 0.5, speed: 1 }
     ])
   })
 
-  it('needs no mixing for one clip, and levels it all the same', () => {
-    const parts = mixGraph([clip('a.mkv', 0, 2, 0)]).graph.split(';\n')
-    expect(parts.at(-2)).toBe('[m0]anull[sum]')
-    expect(parts.at(-1)).toBe('[sum]speechnorm=e=12.5:r=0.0001:l=1[out]')
+  it('reads a file once, its first sound at whisper rate in one channel, only as far as a clip wants it', () => {
+    expect(decodeArgs('a.mkv', 104000)).toEqual([
+      '-i', 'a.mkv', '-map', '0:a:0',
+      '-af', 'aresample=16000:async=1:first_pts=0,aformat=sample_fmts=flt:channel_layouts=mono,atrim=end_sample=104000',
+      '-f', 'f32le', '-'
+    ])
   })
 
-  it('is written as one channel of 16-bit samples at 16 kHz, its graph read from a file', () => {
-    expect(mixArgs(['a.mkv', 'vo.wav'], 'C:\\t\\mix.txt', 'C:\\t\\mix.wav')).toEqual([
-      '-i', 'a.mkv',
-      '-i', 'vo.wav',
-      '-/filter_complex', 'C:\\t\\mix.txt',
-      '-map', '[out]',
-      '-c:a', 'pcm_s16le',
-      '-ar', '16000',
-      '-ac', '1',
-      '-y', 'C:\\t\\mix.wav'
-    ])
+  it('sums the clips as the file streams in, however it is cut, and keeps a clip at a speed aside', () => {
+    // Clips from samples 2-5 at 0 and 6-8 at 10, and a sped one from 1-4, the file in stretches of 3.
+    const mix = new Float32Array(16)
+    const layer = new Layer(
+      [
+        { from: 6, to: 8, at: 10, gain: 0.5, speed: 1 },
+        { from: 2, to: 5, at: 0, gain: 1, speed: 1 },
+        { from: 1, to: 4, at: 3, gain: 1, speed: 2 }
+      ],
+      mix
+    )
+    const file = Float32Array.from({ length: 9 }, (_, i) => i + 1)
+    for (let s = 0; s < 9; s += 3) layer.add(file.subarray(s, s + 3), s)
+    expect([...mix]).toEqual([3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 3.5, 4, 0, 0, 0, 0])
+    expect(layer.end).toBe(12)
+    const [kept] = layer.kept()
+    expect([...kept!.samples]).toEqual([2, 3, 4])
   })
 })
 

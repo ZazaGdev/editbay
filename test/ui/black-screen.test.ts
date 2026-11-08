@@ -4,7 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
-import { discardUnsavedWork } from './dialogs'
+import { discardUnsavedWork, pressNewProject } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Item 24: a black screen for an end card, from Shift+B, the button next to
@@ -43,7 +44,7 @@ async function pictures(): Promise<Placed[]> {
 
 async function fresh(copies: number): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), clipPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -58,6 +59,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 
@@ -123,7 +125,9 @@ describe('a black screen', () => {
     await page.click('[data-testid="clip-menu-delete"]')
     await expect.poll(async () => (await pictures()).length, WAIT).toBe(1)
     const [second] = await pictures()
-    const row = (await page.locator('[data-testid="track"][data-kind="video"][data-index="0"]').boundingBox())!
+    // And gone from the timeline as drawn, before the gap beside it is measured there.
+    await expect.poll(() => page.locator('[data-testid="track"][data-kind="video"][data-index="0"] [data-testid="clip"]').count(), WAIT).toBe(1)
+    const row =(await page.locator('[data-testid="track"][data-kind="video"][data-index="0"]').boundingBox())!
     const clip = (await page.locator('[data-testid="track"][data-kind="video"][data-index="0"] [data-testid="clip"]').first().boundingBox())!
     await page.mouse.click((row.x + clip.x) / 2, row.y + row.height / 2, { button: 'right' })
     await page.waitForSelector('[data-testid="gap-menu"]', WAIT)

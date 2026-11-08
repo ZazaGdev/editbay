@@ -8,6 +8,7 @@ import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 16, driven through the real window: the Source and Output views side
@@ -32,6 +33,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const assets = await page.evaluate((p) => window.api.importFiles(p), [red, green])
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"][data-status="ready"]').length === 2, undefined, {
@@ -92,6 +94,14 @@ const PROGRAM = '[data-testid="monitor-side"][data-side="program"]'
 describe('the Source and Output side by side', () => {
   it('shows the recording on the left and the finished vertical frame on the right, each with its own box to drag', async () => {
     await page.waitForSelector('[data-testid="monitor-stage"][data-both="yes"]', WAIT)
+    // The monitor can still be changing size as the window settles on a slow machine, and the views
+    // follow it a frame later (task 2384), so they are measured once they have.
+    await expect
+      .poll(async () => {
+        const [stage, program] = [await boxOf('[data-testid="monitor-stage"]'), await boxOf(PROGRAM)]
+        return `stage ${stage.height}, Output ${program.height}, off by ${Math.round(Math.abs(program.height - (stage.height - 40)))}`
+      }, WAIT)
+      .toMatch(/off by [01]$/)
     const source = await boxOf(SOURCE)
     const program = await boxOf(PROGRAM)
     expect(source.x + source.width).toBeLessThanOrEqual(program.x)

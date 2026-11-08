@@ -2,19 +2,19 @@ import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runExport, withCardDecoding } from '../../src/main/render/runner'
+import { runExport, segmentsAtOnce, withCardDecoding } from '../../src/main/render/runner'
 import type { RenderPlan } from '../../src/shared/render-plan'
 import { runFfmpeg } from '../../src/main/ffmpeg/run'
 
 /** Whether the next renames onto a finished file's name fail as a player holding it makes them. */
-const lock = vi.hoisted(() => ({ times: 0 }))
+const lock = vi.hoisted(() => ({ times: 0, file: '.mp4' }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const real = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...real,
     rename: async (from: string, to: string): Promise<void> => {
-      if (lock.times > 0 && to.endsWith('.mp4')) {
+      if (lock.times > 0 && to.endsWith(lock.file)) {
         lock.times -= 1
         throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
       }
@@ -45,22 +45,23 @@ afterAll(async () => {
 let folder = ''
 beforeEach(async () => {
   lock.times = 0
+  lock.file = '.mp4'
   vi.mocked(runFfmpeg).mockClear()
   folder = await mkdtemp(join(work, 'out-'))
 })
 
 /** One file per clip, two clips, each written straight to its own name in `folder`. */
-function batch(): RenderPlan {
+function batch(frames = 30): RenderPlan {
   const a = join(folder, 'a.mp4')
   const b = join(folder, 'b.mp4')
   return {
     segments: [
-      { clipId: 'a', index: 1, args: ['-i', 'a.mov', '-y', a], output: a, frames: 30, label: 'a' },
-      { clipId: 'b', index: 2, args: ['-i', 'b.mov', '-y', b], output: b, frames: 30, label: 'b' }
+      { clipId: 'a', index: 1, args: ['-i', 'a.mov', '-y', a], output: a, frames, label: 'a' },
+      { clipId: 'b', index: 2, args: ['-i', 'b.mov', '-y', b], output: b, frames, label: 'b' }
     ],
     join: null,
     outputs: [a, b],
-    totalFrames: 60,
+    totalFrames: 2 * frames,
     loudness: null,
     beside: []
   }
@@ -78,7 +79,9 @@ describe('a file open in another program', () => {
 
   it('stops the export with a plain reason, and keeps the new video beside it rather than throwing it away', async () => {
     await writeFile(join(folder, 'a.mp4'), 'old')
+    // Only a.mp4 held: b may be made beside it, two at a time, and take its name.
     lock.times = 100
+    lock.file = 'a.mp4'
     await expect(run(batch())).rejects.toThrow(/a\.mp4 is open in another program/)
     expect(await readFile(join(folder, 'a.mp4'), 'utf8')).toBe('old')
     const kept = (await readdir(folder)).filter((n) => n.endsWith('.part.mp4'))
@@ -119,12 +122,26 @@ describe('decoding on the graphics card', () => {
     vi.mocked(runFfmpeg).mockImplementationOnce(async () => {
       throw new Error('card failed')
     })
-    await run(batch())
-    const calls = vi.mocked(runFfmpeg).mock.calls.map((c) => c[0])
+    // Long enough to be decoded on the card: 30 s.
+    await run(batch(900))
+    const calls = vi.mocked(runFfmpeg).mock.calls.map((c) => c[0]).filter((args) => args.includes('a.mov'))
     expect(calls[0]).toContain('-hwaccel')
     expect(calls[1]).not.toContain('-hwaccel')
-    expect(calls[1]).toContain('a.mov')
     expect(await readFile(join(folder, 'a.mp4'), 'utf8')).toBe('new')
+  })
+
+  it('leaves a short segment to the processor, where the card is slower to start than it saves', async () => {
+    await run(batch(30))
+    const calls = vi.mocked(runFfmpeg).mock.calls.map((c) => c[0])
+    expect(calls.some((args) => args.includes('-hwaccel'))).toBe(false)
+  })
+})
+
+describe('segments at once', () => {
+  it('runs two at a time with eight threads or more, one with fewer', () => {
+    expect(segmentsAtOnce(16)).toBe(2)
+    expect(segmentsAtOnce(8)).toBe(2)
+    expect(segmentsAtOnce(4)).toBe(1)
   })
 })
 

@@ -5,6 +5,7 @@
 
 import type { Ease, Rect, ZoomKey } from './project'
 import { moves } from './crop-geometry'
+import { cropFilter } from './crop-filter'
 
 /**
  * How many times the output's own pixels a move is worked out in.
@@ -77,7 +78,7 @@ function movingFilters(fps: number, keys: readonly ZoomKey[], move: Move, width:
 
   const f = recordingFrame(move.first, move.speed)
   return [
-    `crop=${seen.w}:${seen.h}:${seen.x}:${seen.y}`,
+    cropFilter(seen.w, seen.h, seen.x, seen.y),
     `scale=iw*${times}:ih*${times}:flags=bicubic`,
     `zoompan=` +
       [
@@ -217,7 +218,7 @@ export function cropFilters(crop: Rect, move: Move | undefined, fps: number, wid
     if (moves(keys)) return movingFilters(fps, keys, move, width)
     crop = keys[0]?.crop ?? crop
   }
-  return [`crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`]
+  return [cropFilter(crop.w, crop.h, crop.x, crop.y)]
 }
 
 /** The smallest rectangle holding both, in whole pixels, which is everything a move shows. */

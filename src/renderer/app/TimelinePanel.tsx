@@ -27,7 +27,7 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
     pauses, toCut, total, togglePause, setKeptPauses, foundKey, hearPause, removeSilences, closeSilences, project, playing, sequenceId,
     switchSequence, addSequence, duplicateSequence, proj, removeSequence, chooseShape, shapeSetups, pickSetup, saveSetup, savedLayouts, playheadStore,
     selectedIds, selectedAlone, gap, missingMedia, rebuildingMedia, revisions, peaks, toggleSelected, alsoSelected, leadSelection, select, selectMany,
-    selectGap, selectedCaption, selectCaption, seek, setScrubbing, setMarkerMenu, selectedTransition, setSelectedTransition, setTransitionMenu,
+    selectGap, selectedCaption, selectCaption, selectedTrack, selectTrack, seek, setScrubbing, setMarkerMenu, selectedTransition, setSelectedTransition, setTransitionMenu,
     trackHeights, windowSettings, timelineRoom, timelineTracks, paintOnto, setTrackHeights, transitionDefaults, rememberTransition, renamingMarker,
     setRenamingMarker, editClip, zoom, zoomBy, zoomTo, addSource, putEffect, range, run, keys, solo, setClipMenu, setGapMenu, setLookingAt, setSolo,
     fitTimeline, trackSize, setTrackSize, picture, timelineShapes, addText, addBlackScreen } = app
@@ -246,6 +246,8 @@ export function TimelinePanel({ app }: { app: AppState }): JSX.Element {
           onSelectGap={selectGap}
           selectedCaptionId={selectedCaption}
           onSelectCaption={selectCaption}
+          selectedTrackId={selectedTrack}
+          onSelectTrack={selectTrack}
           onSeek={seek}
           onScrubPlayhead={setScrubbing}
           onMarkerMenu={onMarkerMenu}

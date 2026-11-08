@@ -8,6 +8,7 @@ import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 67: Play lighter copies. Turned on in Settings, the Output view plays a
@@ -31,6 +32,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), obs)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

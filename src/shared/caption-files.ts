@@ -4,6 +4,7 @@
  */
 
 import { type CaptionClip, type CaptionStyle, type TimedWord, DEFAULT_CAPTION_STYLE, captionEnd, captionFontOf, wordsOf } from './captions'
+import { captionMoves } from './caption-motion'
 import { drawnWord, layoutCaption } from './caption-layout'
 import { captionDrawing, type CaptionRect } from './caption-drawing'
 
@@ -140,41 +141,61 @@ export function captionsAss(opts: { clips: CaptionClip[]; style: CaptionStyle; f
         ? ''
         : `\\fs${round2(layout.fontPx * font.assSizePerEm)}\\bord${round2(layout.outlinePx)}${shadowShare > 0 ? `\\shad${round2(shadowShare * layout.fontPx)}` : ''}${spacingShare !== 0 ? `\\fsp${round2(spacingShare * layout.fontPx)}` : ''}`
     // Plan 99: the box behind the whole caption, the same whichever word is lit, under everything else for as long as it shows.
-    const box = captionDrawing(c, style, layout, 0).box
     const shown = { s: Math.max(from, c.timelineStart), e: Math.min(to, captionEnd(c)) }
-    if (box && shown.e > shown.s) events.push(`Dialogue: 0,${at(shown.s)},${at(shown.e)},Caption,,0,0,0,,${assBox(box)}`)
+    for (const run of runsOf(c, shown.s, shown.e)) {
+      const box = captionDrawing(c, style, layout, 0, run.moves).box
+      if (box && box.opacity > 0) events.push(`Dialogue: 0,${at(run.s)},${at(run.e)},Caption,,0,0,0,,${assBox(box)}`)
+    }
     c.words.forEach((_, i) => {
       const start = c.timelineStart + (i === 0 ? 0 : c.words[i]!.start)
       const end = i === c.words.length - 1 ? captionEnd(c) : c.timelineStart + c.words[i + 1]!.start
-      const s = Math.max(from, start)
-      const e = Math.min(to, end)
-      if (e <= s) return
-      const event = (text: string): number => events.push(`Dialogue: 0,${at(s)},${at(e)},Caption,,0,0,0,,${text}`)
-      const drawing = captionDrawing(c, style, layout, i)
-      // The words again in the glow's colour, their outline widened by half the glow and blurred, under the words.
-      const glow = drawing.glow
-        ? `\\1c${assColour(drawing.glow.colour)}\\3c${assColour(drawing.glow.colour)}\\bord${round2(layout.outlinePx + drawing.glow.blur / 2)}\\shad0\\blur${round2(drawing.glow.blur)}`
-        : null
-      if (drawing.pieces) {
-        // A word at a time, each from its left edge on the baseline, the grown one scaled from there (plan 99).
-        const placed = (p: { x: number; baseline: number; scale: number }): string =>
-          `\\an1\\pos(${round1(p.x)},${round1(p.baseline + font.assDescent * layout.fontPx * p.scale)})${own}${p.scale === 1 ? '' : `\\fscx${round2(p.scale * 100)}\\fscy${round2(p.scale * 100)}`}`
-        if (glow) for (const p of drawing.pieces) event(`{${placed(p)}${glow}}${p.text}`)
-        // The box behind the word being said over the glow, so the glow never hides it.
-        if (drawing.wordBox) event(assBox(drawing.wordBox))
-        for (const p of drawing.pieces) event(`{${placed(p)}${p.lit ? `\\c${lit}` : ''}}${p.text}`)
-        return
-      }
-      const x = round1(layout.centerX)
-      const y = (line: { baseline: number }): number => round1(line.baseline + font.assDescent * layout.fontPx)
-      if (glow) for (const line of layout.lines) event(`{\\an2\\pos(${x},${y(line)})${own}${glow}}${line.words.map((k) => drawnWord(c.words[k]!.text, style)).join(' ')}`)
-      for (const line of layout.lines) {
-        const text = line.words
-          .map((k) => (k === i ? `{\\c${lit}}${drawnWord(c.words[k]!.text, style)}{\\c${words}}` : drawnWord(c.words[k]!.text, style)))
-          .join(' ')
-        event(`{\\an2\\pos(${x},${y(line)})${own}}${text}`)
-      }
+      for (const run of runsOf(c, Math.max(from, start), Math.min(to, end))) wordEvents(c, layout, own, i, run)
     })
+  }
+  /**
+   * Plan 107: the frames from `s` to `e` in stretches that draw alike: one
+   * stretch while nothing moves, and a stretch a frame while the caption or a
+   * word comes in or goes out, since libass's `\t` cannot follow every curve.
+   */
+  function runsOf(c: CaptionClip, s: number, e: number): { s: number; e: number; moves: ReturnType<typeof captionMoves> }[] {
+    const runs: { s: number; e: number; moves: ReturnType<typeof captionMoves>; key: string }[] = []
+    for (let f = s; f < e; f++) {
+      const moves = captionMoves(c, style, f, fps)
+      const key = JSON.stringify(moves)
+      const last = runs.at(-1)
+      if (last && last.key === key) last.e = f + 1
+      else runs.push({ s: f, e: f + 1, moves, key })
+    }
+    return runs
+  }
+  /** The events for caption `c` while word `i` is lit, over one stretch of frames. */
+  function wordEvents(c: CaptionClip, layout: ReturnType<typeof layoutCaption>, own: string, i: number, run: { s: number; e: number; moves: ReturnType<typeof captionMoves> }): void {
+    const event = (text: string): number => events.push(`Dialogue: 0,${at(run.s)},${at(run.e)},Caption,,0,0,0,,${text}`)
+    const drawing = captionDrawing(c, style, layout, i, run.moves)
+    // The words again in the glow's colour, their outline widened by half the glow and blurred, under the words.
+    const glow = drawing.glow
+      ? `\\1c${assColour(drawing.glow.colour)}\\3c${assColour(drawing.glow.colour)}\\bord${round2(layout.outlinePx + drawing.glow.blur / 2)}\\shad0\\blur${round2(drawing.glow.blur)}`
+      : null
+    if (drawing.pieces) {
+      // A word at a time, each from its left edge on the baseline, the grown one scaled from there (plan 99), faded as it comes and goes (plan 107).
+      const placed = (p: { x: number; baseline: number; scale: number; opacity: number }): string =>
+        `\\an1\\pos(${round1(p.x)},${round1(p.baseline + font.assDescent * layout.fontPx * p.scale)})${own}${p.scale === 1 ? '' : `\\fscx${round2(p.scale * 100)}\\fscy${round2(p.scale * 100)}`}${p.opacity < 1 ? `\\alpha${assAlpha(p.opacity)}` : ''}`
+      const seen = drawing.pieces.filter((p) => p.opacity > 0)
+      if (glow) for (const p of seen) event(`{${placed(p)}${glow}}${p.text}`)
+      // The box behind the word being said over the glow, so the glow never hides it.
+      if (drawing.wordBox) event(assBox(drawing.wordBox))
+      for (const p of seen) event(`{${placed(p)}${p.lit ? `\\c${lit}` : ''}}${p.text}`)
+      return
+    }
+    const x = round1(layout.centerX)
+    const y = (line: { baseline: number }): number => round1(line.baseline + font.assDescent * layout.fontPx)
+    if (glow) for (const line of layout.lines) event(`{\\an2\\pos(${x},${y(line)})${own}${glow}}${line.words.map((k) => drawnWord(c.words[k]!.text, style)).join(' ')}`)
+    for (const line of layout.lines) {
+      const text = line.words
+        .map((k) => (k === i ? `{\\c${lit}}${drawnWord(c.words[k]!.text, style)}{\\c${words}}` : drawnWord(c.words[k]!.text, style)))
+        .join(' ')
+      event(`{\\an2\\pos(${x},${y(line)})${own}}${text}`)
+    }
   }
   const size = round2(base * font.assSizePerEm)
   const outline = round2((style.outline ?? DEFAULT_CAPTION_STYLE.outline) * base)

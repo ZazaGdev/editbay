@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { execFile, spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fixtureSet } from '../e2e/fixtures'
+import { wakeSound } from './wake-sound'
 import {
   answerUnsavedPrompt,
   answerSaveDialog,
@@ -63,6 +64,7 @@ async function launch(
   })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   return { app, page }
 }
 

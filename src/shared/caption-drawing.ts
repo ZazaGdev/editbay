@@ -10,6 +10,7 @@
 
 import { captionFontOf, type CaptionClip, type CaptionStyle } from './captions'
 import { drawnWord, spacedWidth, type CaptionLayout } from './caption-layout'
+import { STILL, type CaptionMove } from './caption-motion'
 
 /** How much bigger the word being said is drawn when it grows. */
 export const POP_GROW = 1.25
@@ -47,6 +48,8 @@ export interface CaptionPiece {
   baseline: number
   scale: number
   lit: boolean
+  /** Plan 107: how much of it is drawn, 0 to 1, while it comes in or goes out. */
+  opacity: number
 }
 
 export interface CaptionDrawing {
@@ -56,7 +59,7 @@ export interface CaptionDrawing {
   wordBox: CaptionRect | null
   /** The glow: how far its blur reaches, as libass's `\blur`, and its colour, in frame pixels; or null. */
   glow: { blur: number; colour: string } | null
-  /** Every word on its own, when the word being said pops; null when the lines are drawn whole, as before. */
+  /** Every word on its own, when the word being said pops or anything moves; null when the lines are drawn whole, as before. */
   pieces: CaptionPiece[] | null
 }
 
@@ -69,8 +72,13 @@ export function popsWords(style: Pick<CaptionStyle, 'popGrow' | 'popBox'>): bool
  * What is drawn round caption `c`, laid out as `layout`, while word `lit` is
  * being said. The box behind the caption stays the same size whichever word is
  * lit, so it does not twitch as the words grow in turn.
+ *
+ * Plan 107: with `moves`, as `captionMoves` gives them for a frame, every word
+ * is a piece of its own: each grown or shrunk about its own middle and raised
+ * by its own move, then the whole caption, its box with it, about the
+ * caption's middle by the whole move, and faded by both.
  */
-export function captionDrawing(c: CaptionClip, style: CaptionStyle, layout: CaptionLayout, lit: number): CaptionDrawing {
+export function captionDrawing(c: CaptionClip, style: CaptionStyle, layout: CaptionLayout, lit: number, moves: { whole: CaptionMove; words: CaptionMove[] } | null = null): CaptionDrawing {
   const font = captionFontOf(style)
   const em = layout.fontPx
   const cap = font.capHeight * em
@@ -78,7 +86,7 @@ export function captionDrawing(c: CaptionClip, style: CaptionStyle, layout: Capt
   const widthOf = (k: number): number => spacedWidth(drawnWord(c.words[k]!.text, style), style) * em
   const space = spacedWidth(' ', style) * em
 
-  const pieces: CaptionPiece[] | null = popsWords(style) ? [] : null
+  const pieces: CaptionPiece[] | null = popsWords(style) || moves ? [] : null
   // The widest a line can be: its words, and the widest of them grown.
   let widest = 0
   for (const line of layout.lines) {
@@ -90,7 +98,7 @@ export function captionDrawing(c: CaptionClip, style: CaptionStyle, layout: Capt
     const drawn = widths.reduce((a, w, i) => a + w * scales[i]!, 0) + space * Math.max(0, widths.length - 1)
     let x = layout.centerX - drawn / 2
     line.words.forEach((k, i) => {
-      pieces.push({ word: k, text: drawnWord(c.words[k]!.text, style), x, baseline: line.baseline, scale: scales[i]!, lit: k === lit })
+      pieces.push({ word: k, text: drawnWord(c.words[k]!.text, style), x, baseline: line.baseline, scale: scales[i]!, lit: k === lit, opacity: 1 })
       x += widths[i]! * scales[i]! + space
     })
   }
@@ -103,13 +111,37 @@ export function captionDrawing(c: CaptionClip, style: CaptionStyle, layout: Capt
     box = { x: layout.centerX - widest / 2 - pad, y: top, w: widest + 2 * pad, h: bottom - top, radius: BOX_RADIUS * em, colour: style.boxColour, opacity: style.boxOpacity }
   }
 
+  if (moves && pieces) {
+    const { whole } = moves
+    // The caption's middle: across, its centre; down, half way from the first line's capitals to the last baseline.
+    const cx = layout.centerX
+    const cy = layout.lines.length > 0 ? (layout.lines[0]!.baseline - cap + layout.lines.at(-1)!.baseline) / 2 : 0
+    for (const p of pieces) {
+      const own = moves.words[p.word] ?? STILL
+      const w = widthOf(p.word) * p.scale
+      const h = cap * p.scale
+      // About the word's own middle first.
+      const x = p.x + (w - w * own.scale) / 2
+      const baseline = p.baseline - (h - h * own.scale) / 2 - own.rise * em
+      p.x = cx + (x - cx) * whole.scale
+      p.baseline = cy + (baseline - cy) * whole.scale - whole.rise * em
+      p.scale *= own.scale * whole.scale
+      p.opacity = own.opacity * whole.opacity
+    }
+    if (box) {
+      const x = cx + (box.x - cx) * whole.scale
+      const y = cy + (box.y - cy) * whole.scale - whole.rise * em
+      box = { ...box, x, y, w: box.w * whole.scale, h: box.h * whole.scale, radius: box.radius * whole.scale, opacity: box.opacity * whole.opacity }
+    }
+  }
+
   let wordBox: CaptionRect | null = null
-  const said = pieces?.find((p) => p.lit)
+  const said = pieces?.find((p) => p.lit && p.opacity > 0)
   if (style.popBox && said) {
     const pad = WORD_BOX_PAD * em * said.scale + layout.outlinePx
     const w = widthOf(said.word) * said.scale
     const h = cap * said.scale
-    wordBox = { x: said.x - pad, y: said.baseline - h - pad, w: w + 2 * pad, h: h + 2 * pad, radius: WORD_BOX_RADIUS * em * said.scale, colour: style.popBoxColour, opacity: 1 }
+    wordBox = { x: said.x - pad, y: said.baseline - h - pad, w: w + 2 * pad, h: h + 2 * pad, radius: WORD_BOX_RADIUS * em * said.scale, colour: style.popBoxColour, opacity: said.opacity }
   }
 
   return {

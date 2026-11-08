@@ -9,6 +9,7 @@ import { promisify } from 'node:util'
 import { FIRST_SEQUENCE_ID, addSource, createProject, editSequence, upsertMedia, type ProjectMedia } from '../../src/shared/project'
 import { defaultWorkspace } from '../../src/shared/workspace'
 import { joinProjectFile } from '../../src/shared/project-file'
+import { wakeSound } from './wake-sound'
 
 /**
  * A playlist dressed as a recording must not make the app reach another
@@ -39,6 +40,7 @@ async function launch(project?: string): Promise<void> {
   })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
 }
 
 /** An HLS playlist of one segment, `segment`. */

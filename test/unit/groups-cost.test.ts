@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { addSource, createTimeline, splitClip, type ProjectMedia, type Timeline } from '../../src/shared/project'
-import { settleGroups } from '../../src/shared/groups'
+import { groupedIds, settleGroups } from '../../src/shared/groups'
 import { applyClipEdit } from '../../src/main/project/session'
 
 /**
@@ -53,6 +53,18 @@ describe('settling groups after an edit', () => {
     // Before, each of these took 60 to 80 ms here.
     expect(fastest(() => applyClipEdit(t, { kind: 'setClipAudio', clipId: sound.id, gain: 0.5, muted: false }))).toBeLessThan(20)
     expect(fastest(() => applyClipEdit(t, { kind: 'moveClip', clipId: picture.id, trackId: t.videoTracks[0]!.id, start: picture.timelineStart + 1 }))).toBeLessThan(30)
+  })
+
+  it('works out a grouped piece, and every piece at once, in milliseconds, as the window asks on every change', () => {
+    // Audit 2026-11-07, fix first 2: each piece's links were a search of every
+    // clip, so one piece took 27 ms here and every piece, after Ctrl+A, 52 s.
+    const ids = [...t.videoTracks[0]!.clips, ...t.audioTracks[0]!.clips].map((c) => c.id)
+    expect(fastest(() => groupedIds({ ...t }, picture.id))).toBeLessThan(10)
+    expect(fastest(() => {
+      const fresh = { ...t }
+      for (const id of ids) groupedIds(fresh, id)
+    })).toBeLessThan(2000)
+    expect(new Set(groupedIds({ ...t }, picture.id)).size).toBe(2000)
   })
 
   it('still frames a touched group again, and keeps a piece that comes out the same as the same piece', () => {

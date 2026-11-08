@@ -43,8 +43,10 @@ import {
   type Clip,
   type SoundClip,
   type Timeline,
-  type ProjectMedia
+  type ProjectMedia,
+  type Rect
 } from '../../src/shared/project'
+import { moveTrack, CAPTION_TRACK_ID } from '../../src/shared/project'
 import { placeInPixels } from '../../src/shared/layout'
 import { cropAtKeys } from '../../src/shared/crop-geometry'
 
@@ -1206,6 +1208,20 @@ describe('captions burned in', () => {
     expect(overGraph).toMatch(/overlay=x=\d+:y=\d+\[c\];\[c\]scale=in_color_matrix=bt709:in_range=tv,format=rgb24,ass=filename=captions-002\.ass:fontsdir=fonts,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p\[vt\]/)
   })
 
+  it('burns them in under a picture on V2 once the caption track is dragged below V2 (task 2621)', () => {
+    const over = moveTrack(withPicture(captioned(), 'pic', 'a', 280), CAPTION_TRACK_ID, 1)
+    const graph = graphOf(planRender(request(over)).segments[1]!.args)
+    // Over V1's picture, then V2's laid over the captions, which are not drawn again at the end.
+    expect(graph).toContain('[b]scale=in_color_matrix=bt709:in_range=tv,format=rgb24,ass=filename=captions-002.ass:fontsdir=fonts,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[co]')
+    expect(graph).toMatch(/\[co\]\[q0\]overlay=x=\d+:y=\d+\[vt\]/)
+    expect(graph.match(/ass=filename/g)).toHaveLength(1)
+  })
+
+  it('leaves them out under V1, whose picture is a whole frame that covers them (task 2621)', () => {
+    const under = moveTrack(withPicture(captioned(), 'pic', 'a', 280), CAPTION_TRACK_ID, 0)
+    expect(planRender(request(under)).segments.every((s) => !graphOf(s.args).includes('ass='))).toBe(true)
+  })
+
   it('leaves them out under Handoff, which has no frame to put them in', () => {
     const segments = planRender(request(captioned(), { preset: presetById('handoff'), mode: 'batch' })).segments
     expect(segments.every((s) => s.subtitles === undefined)).toBe(true)
@@ -1874,5 +1890,48 @@ describe('balancedSum', () => {
     const sum = balancedSum(terms)
     expect(sum.replace(/[()]/g, '').split('+')).toEqual(terms)
     expect(depth(sum)).toBeLessThanOrEqual(12)
+  })
+})
+
+describe('a crop that is not four numbers (audit 2026-11-07)', () => {
+  /**
+   * The timeline with a clip's crop, and its zoom keyframes' crops, given one
+   * side that is text: what a crafted project file would hand the plan if a
+   * reader ever let it through. Written into the graph as it stands, its comma
+   * would end the crop and start filters of the file's own.
+   */
+  function withCropText(t: Timeline, clipId: string, side: 'x' | 'y' | 'w' | 'h'): Timeline {
+    const text = (crop: Rect): Rect => ({ ...crop, [side]: '0,drawbox' }) as unknown as Rect
+    return {
+      ...t,
+      videoTracks: t.videoTracks.map((r) => ({
+        ...r,
+        clips: r.clips.map((c) => {
+          if (c.id !== clipId) return c
+          const keys = c.transform.keys?.map((k) => ({ ...k, crop: text(k.crop) }))
+          return { ...c, transform: { ...c.transform, crop: text(c.transform.crop), ...(keys ? { keys } : {}) } }
+        })
+      }))
+    }
+  }
+
+  it('is refused by the plan rather than written into the graph', () => {
+    const t = projectWith(media('a'))
+    for (const side of ['x', 'y', 'w', 'h'] as const) {
+      expect(() => planRender(request(withCropText(t, v1Clips(t)[0]!.id, side))), side).toThrow(/damaged crop/)
+      expect(() => planRender(request(withCropText(t, v1Clips(t)[0]!.id, side), { mode: 'batch' })), side).toThrow(/damaged crop/)
+    }
+  })
+
+  it('is refused on a picture over V1, and on a crop that moves', () => {
+    const over = withPicture(projectWith(media('a')), 'p1', 'a', 0)
+    expect(() => planRender(request(withCropText(over, 'p1', 'y')))).toThrow(/damaged crop/)
+    const t = projectWith(media('a'))
+    const c = v1Clips(t)[0]!
+    const zooming = setZoomKeys(t, c.id, [
+      { at: 0, crop: c.transform.crop },
+      { at: 90, crop: { x: 686, y: 54, w: 548, h: 972 } }
+    ])
+    expect(() => planRender(request(withCropText(zooming, c.id, 'x')))).toThrow(/damaged crop/)
   })
 })

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { pxPerFrameAt } from '../../src/shared/timeline-layout'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 17 step 2, driven through the real window: Ctrl+wheel zooms the
@@ -29,6 +30,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const [asset] = await page.evaluate((p) => window.api.importFiles(p), [clean])
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 180_000 })
@@ -189,6 +191,9 @@ describe('a drag near the edge of the timeline', () => {
     await scrollTo(0)
     await expect.poll(scrolled, WAIT).toBe(0)
     const view = await boxOf('[data-testid="timeline-scroll"]')
+    // The undo before this is in the project a moment before the timeline draws it: until then the
+    // handle measured is where the clips were moved to, and the press there takes the wrong clip.
+    await expect.poll(async () => Math.round((await handleOf(1, 'start')).x - view.x), WAIT).toBe(120 * pxPerFrameAt(9))
     const handle = await handleOf(1, 'start')
     const from = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }
     await page.mouse.move(from.x, from.y)

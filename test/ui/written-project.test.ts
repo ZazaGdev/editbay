@@ -24,6 +24,7 @@ import {
 } from '../../src/shared/project'
 import { defaultWorkspace } from '../../src/shared/workspace'
 import { joinProjectFile } from '../../src/shared/project-file'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 74, step 1: a project written outside the app, whose sources are all
@@ -61,6 +62,7 @@ async function launch(userData: string, project: string): Promise<{ app: Electro
   })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   return { app, page }
 }
 

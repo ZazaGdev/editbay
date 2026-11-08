@@ -19,10 +19,42 @@ import { spanEnd } from './tracks'
  * leaves on the stand in kept as the group's framing (`frameOf`).
  */
 
+/**
+ * Each group's picture pieces, in order, for a timeline asked about more than
+ * once, as `findClip` keeps its index: the window asks it of every selected
+ * piece of a group on every change (audit 2026-11-07, fix first 2).
+ */
+const groupIndexes = new WeakMap<Timeline, Map<string, Clip[]> | 'asked'>()
+
+function groupIndex(p: Timeline): Map<string, Clip[]> | null {
+  const known = groupIndexes.get(p)
+  if (known === undefined) {
+    groupIndexes.set(p, 'asked')
+    return null
+  }
+  if (known !== 'asked') return known
+  const index = new Map<string, Clip[]>()
+  for (const r of p.videoTracks) {
+    // A group's pieces are on the first track that has any, as below.
+    const here = new Map<string, Clip[]>()
+    for (const c of r.clips) {
+      if (c.group === undefined || index.has(c.group)) continue
+      const list = here.get(c.group)
+      if (list) list.push(c)
+      else here.set(c.group, [c])
+    }
+    for (const [group, pieces] of here) index.set(group, pieces.sort((a, b) => a.timelineStart - b.timelineStart))
+  }
+  groupIndexes.set(p, index)
+  return index
+}
+
 /** The picture pieces of the group a clip is in, picture or sound, in order: none when it is in no group. */
 export function groupPieces(p: Timeline, clipId: string): Clip[] {
   const group = findClip(p, clipId)?.clip.group
   if (group === undefined) return []
+  const known = groupIndex(p)
+  if (known) return [...(known.get(group) ?? [])]
   for (const r of p.videoTracks) {
     const pieces = r.clips.filter((c) => c.group === group)
     if (pieces.length > 0) return [...pieces].sort((a, b) => a.timelineStart - b.timelineStart)

@@ -10,7 +10,11 @@ promises about every release, and this list is how they are kept.
 2. `package.json` has the new version, and `CHANGELOG.md` has a section for it in place of
    **Unreleased**. Releases are named with two numbers where people see them: 1.0, 1.1, 1.2,
    tagged `v1.1`. `package.json` keeps three, `1.1.0`, because the build tools need it, so the
-   installer's name is set by hand in `electron-builder.yml` (`artifactName`) to match.
+   downloads' names are set by hand to match: `nsis.artifactName` and `mac.artifactName` in
+   `electron-builder.yml`, and `NAME` in `.github/workflows/mac.yml`. From 2.1 each name says
+   the system: `Editbay-<version>-Windows-Setup.exe` and `Editbay-<version>-Mac.dmg`, one
+   download for every Mac. GitHub turns a space in an upload's name into a dot, so the names
+   have none.
 3. On a quiet machine, `npm run typecheck` passes, and so does `npm run test:all`: the unit
    tests, the e2e tests, the smoke tests and the app tests (`npm run test:ui`), all of which must
    pass before every release. `npm run test:smoke` needs your own footage; see
@@ -22,7 +26,10 @@ promises about every release, and this list is how they are kept.
 npm run dist
 ```
 
-The installer lands in `release/` as `Editbay Setup <version>.exe`. Then:
+The installer lands in `release/` as `Editbay-<version>-Windows-Setup.exe`. It is packed by the 64-bit
+7-Zip at `C:\Program Files\7-Zip\7z.exe` when that is installed, which makes it about 19 MB
+smaller than electron-builder's own 7-Zip does; `EDITBAY_7ZIP` names another `7z.exe`, and the
+build says which it used. Then:
 
 ```
 npm run test:packaged
@@ -41,7 +48,7 @@ from an older build is easy to upload by mistake.
 `SECURITY.md` promises a SHA-256 for every installer, because the installer is not code signed.
 
 ```
-certutil -hashfile "release\Editbay Setup <version>.exe" SHA256
+certutil -hashfile "release\Editbay-<version>-Windows-Setup.exe" SHA256
 ```
 
 ## The release
@@ -49,6 +56,7 @@ certutil -hashfile "release\Editbay Setup <version>.exe" SHA256
 Tag the commit `v<version>`, publish the source (below), and create the release on the public
 repo from its new commit. Attach the installer, and put in the notes:
 
+- first, a short **Which file do I need?**: Windows takes the Setup file, every Mac the Mac file
 - what changed, from the changelog
 - the SHA-256 from above
 - one line saying the installer contains FFmpeg and FFprobe under GPL-3.0, with a link to
@@ -80,24 +88,30 @@ words the scan should look for, such as a workplace name, go one per line in
 
 Create the release on the public repo, not this one, and attach the installer there.
 
-## The Mac versions
+## The Mac version
 
-Nobody working on Editbay has a Mac, so the Mac versions are built and tested on GitHub's Macs
-by `.github/workflows/mac.yml` (plan 104). They run free only on the public repo: this one has
+Nobody working on Editbay has a Mac, so the Mac version is built and tested on GitHub's Macs
+by `.github/workflows/mac.yml` (plan 104). It runs free only on the public repo: this one has
 no Mac minutes to spare, and GitHub refuses the job once the month's free minutes are gone.
 
-After publishing the source and pushing it, start **Mac** on the public repo's Actions page
-(both chips), or `gh workflow run mac.yml --repo ZazaGdev/editbay --field chips=both`. Each
-chip's job runs the type check, the unit and e2e tests, builds the speech program, builds the
-`.dmg`, checks every program in it is signed, runs the packaged test against the app and
-takes a picture of its window. When both are green:
+From 2.1 it is one `.dmg` for every Mac (task 2682): each program in it carries both Apple
+Silicon and Intel, and macOS runs the half for its chip. The workflow fetches ffmpeg for both
+chips and joins them, builds the speech program for both, and uses ONNX Runtime 1.23.2, the
+last with an Intel library, for both.
 
-- download the two files from the run (`Editbay-<version>-arm64` and `Editbay-<version>-intel`)
-  and look at each screenshot
-- attach both `.dmg` files to the release, and put each one's SHA-256 (the `.sha256` beside it)
-  in the notes, with the "how to open it" steps from the README's **Mac** section
-- change the version in the workflow's two names and in `electron-builder.yml`'s
-  `mac.artifactName` with the version, as for the Windows installer
+After publishing the source and pushing it, start **Mac** on the public repo's Actions page,
+or `gh workflow run mac.yml --repo ZazaGdev/editbay`. Its one job runs the type check, the
+unit and e2e tests, builds the speech program and the `.dmg`, checks every program in it is
+signed and has both halves, runs each program on each chip, runs the packaged test against
+the app on Apple Silicon and again on Intel through Rosetta, taking a picture of its window
+each time, checks no half needs a newer macOS than the app says, and runs the UI suite. Then
+run **Mac release check** with that run's id,
+`gh workflow run mac-release-check.yml --repo ZazaGdev/editbay --field build_run=<run id>`,
+which opens the built `.dmg` on an Apple Silicon Mac and a real Intel one. When both are green:
+
+- download the run's file (`Editbay-<version>-Mac`) and look at both screenshots
+- attach the `.dmg` to the release, and put its SHA-256 (the `.sha256` beside it) in the
+  notes, with the "how to open it" steps from the README's **Mac** section
 
 While Mac work is being built, tries go to a `mac-dev` branch of the public repo instead, which
 starts the workflow on every push: check that branch out in the public clone before running

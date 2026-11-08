@@ -234,6 +234,28 @@ describe('a project someone else made', () => {
     expect((await loadProjectFrom(file, { ...anywhere, cacheDir: dir })).workspace.export.folder).toBeNull()
   })
 
+  it('keeps offline for now the files on an allowed computer that does not answer, rather than waiting for Windows to give up on it (audit 2026-11-07)', async () => {
+    const { file, dir } = await crafted(media('a', '\\\\off.invalid\\footage\\Holiday.mp4'))
+    const asked: string[][] = []
+    const access: SourceAccess = {
+      ...anywhere,
+      allowed: new Set(['\\\\off.invalid\\footage']),
+      cacheDir: dir,
+      offlineDir: join(dir, 'offline'),
+      silent: async (shares) => {
+        asked.push(shares)
+        return shares
+      }
+    }
+    const loaded = await loadProjectFrom(file, access)
+    expect(asked).toEqual([['\\\\off.invalid\\footage']])
+    expect(loaded.unreachable).toEqual(['\\\\off.invalid\\footage'])
+    expect(loaded.project.media[0]!.originalPath).toBe(join(dir, 'offline', 'Holiday.mp4'))
+    expect(loaded.missingMedia).toEqual(['a'])
+    // Where it really is goes back into the file on the next save.
+    expect(loaded.withheld.get('a')?.originalPath).toBe('\\\\off.invalid\\footage\\Holiday.mp4')
+  })
+
   it('remembers where a source kept offline really was, so saving never loses it', async () => {
     const { file, dir } = await crafted(media('a', '\\\\nas.invalid\\footage\\Holiday.mp4'))
     const loaded = await loadProjectFrom(file, { ...anywhere, cacheDir: dir, offlineDir: join(dir, 'offline') })

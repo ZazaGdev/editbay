@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fixtureSet } from '../e2e/fixtures'
 import type { EditList } from '../../src/shared/edit-list'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 74: a project written by `npm run cli -- build` opens in Editbay, its
@@ -50,6 +51,7 @@ async function launch(userData: string, project: string): Promise<{ app: Electro
   })
   const page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   return { app, page }
 }
 

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 29, the first step: putting a transition on a cut, shaping it by hand,
@@ -24,6 +25,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   await page.evaluate((p) => window.api.importFiles([p]), clip)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -59,10 +61,18 @@ async function cutFrame(): Promise<number> {
 
 /** Put the pointer over the cut on V1 so the seam button appears, and click it. */
 async function addAtTheCut(): Promise<void> {
+  // The button is worked out as the pointer moves, against the timeline as it
+  // is drawn: a transition just taken away may still be drawn on the cut for a
+  // moment, so the pointer comes over it again until the button shows.
   const row = (await page.locator('[data-testid="track"][data-track-id="v1"]').boundingBox())!
-  const clip = (await page.locator('[data-testid="clip"][data-kind="video"]').nth(1).boundingBox())!
-  await page.mouse.move(clip.x, row.y + row.height / 2)
-  await page.waitForSelector('[data-testid="seam-add"]', WAIT)
+  await expect
+    .poll(async () => {
+      const clip = (await page.locator('[data-testid="clip"][data-kind="video"]').nth(1).boundingBox())!
+      await page.mouse.move(clip.x - 40, row.y + row.height / 2)
+      await page.mouse.move(clip.x, row.y + row.height / 2, { steps: 4 })
+      return page.locator('[data-testid="seam-add"]').isVisible()
+    }, WAIT)
+    .toBe(true)
   await page.locator('[data-testid="seam-add"]').click()
   await page.waitForSelector(TRANSITION, WAIT)
 }
@@ -424,6 +434,7 @@ describe('picking a transition out', () => {
     await page.evaluate(() => window.api.setAppSettings({ transitionSeconds: 0.5 }))
     await page.reload()
     await page.waitForSelector('main')
+    await wakeSound(page)
     await clearAll()
     await addAtTheCut()
     const box = (await page.locator(TRANSITION).first().boundingBox())!

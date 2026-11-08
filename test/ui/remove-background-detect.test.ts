@@ -7,6 +7,7 @@ import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 32: Remove background finds the colour itself. Real files on a green
@@ -122,6 +123,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   for (const name of Object.keys(FILES) as Name[]) {
     const before = await page.locator('[data-testid="clip"]').count()

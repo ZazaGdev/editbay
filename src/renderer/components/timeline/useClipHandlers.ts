@@ -78,7 +78,10 @@ export function useClipHandlers({ props, t, total, drag, setDrag, setClosingUp, 
     setDrag({
       clipId,
       alone,
-      with: rest,
+      // The group's other pieces go too: the move takes the pressed clip's
+      // links and these, and left without them it moved one piece into the
+      // next and broke the group (audit 2026-11-07).
+      with: [...own.filter((id) => id !== clipId), ...rest],
       kind: found.kind,
       startX: x,
       startScroll: scroller.current?.scrollLeft ?? 0,

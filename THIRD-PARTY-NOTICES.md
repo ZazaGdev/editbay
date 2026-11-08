@@ -103,8 +103,9 @@ draws texts in them from its own copy; the export takes the drawn text, not the 
 
 ### ONNX Runtime
 
-- **Version:** 1.30.0, the `onnxruntime-node` and `onnxruntime-common` npm packages, the
-  Windows x64 CPU library only.
+- **Version:** 1.30.0 on Windows, the `onnxruntime-node` and `onnxruntime-common` npm
+  packages, the Windows x64 CPU library only. On the Mac, 1.23.2 of both packages, with its
+  Apple Silicon and Intel libraries, as 1.23 is the last release with an Intel Mac library.
 - **Licence:** MIT.
 - **Copyright:** Microsoft Corporation, https://github.com/microsoft/onnxruntime
 - **Full text:** `resources/licences/ONNXRuntime-MIT.txt`, also installed with the app. The
@@ -157,7 +158,7 @@ installer contains; the rest are build tools only.
 
 | Package | Version | Licence |
 | --- | --- | --- |
-| Electron | 44.4.3 | MIT |
+| Electron | 44.10.2 | MIT |
 | React and React DOM | 19.3.0 | MIT |
 | scheduler (part of React DOM) | 0.28.0 | MIT |
 | lucide-react | 1.47.0 | ISC (the icons drawn from Feather: MIT) |

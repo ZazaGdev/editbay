@@ -7,6 +7,7 @@ import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fixtureSet } from '../e2e/fixtures'
 import { discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Remove silences, driven through the real window: the pauses in a
@@ -46,6 +47,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
   const [asset] = await page.evaluate((p) => window.api.importFiles(p), [file])
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"][data-status="ready"]').length === 1, undefined, {

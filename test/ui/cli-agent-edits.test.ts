@@ -11,6 +11,7 @@ import { fitInBox } from '../../src/shared/crop-geometry'
 import { discardUnsavedWork } from './dialogs'
 import type { EditListV2 } from '../../src/shared/edit-list'
 import type { Project } from '../../src/shared/project'
+import { wakeSound } from './wake-sound'
 
 /**
  * Task 1188: what an editing agent writes into an edit list, built by
@@ -160,6 +161,7 @@ describe("the edit agent's additions, built from an edit list", () => {
     app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`, target], cwd: process.cwd(), env: { ...process.env } as Record<string, string> })
     page = await app.firstWindow()
     await page.waitForSelector('main')
+    await wakeSound(page)
     // Every clip in, the sound-only ones too, and nothing missing.
     await page.waitForFunction(
       () => {

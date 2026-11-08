@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { TIMELINE_LEAVES, TIMELINE_MIN } from '../state/useSettings'
 import type { Clip, Landing, SoundClip, Timeline as TimelineData, TrackKind } from '../../shared/project'
 import { allClips, findClip, groupsOnV1, linkedIds, markedSpan, mediaDurationFrames, newId, plannedMove, timelineDuration, trackLabel, trackOf,
-  rearrangeBlockers, rippleTrimBlockers, transitionsOf
+  rearrangeBlockers, rippleTrimBlockers, transitionsOf, CAPTION_TRACK_ID, captionsAbove
 } from '../../shared/project'
 import { MAX_AUDIO_TRACKS, MAX_VIDEO_TRACKS, gapAt, snapFrame, snapFrameTo, snapMove, snapMoveTo, snapReach, snapTargets, spanEnd, trimTargets, type Span } from '../../shared/tracks'
 import { heldInWindows, nearestSeam, seamsOn, type TransitionSide, type TransitionWindow } from '../../shared/transitions'
@@ -50,6 +50,8 @@ function TimelineView(props: TimelineProps): JSX.Element {
   const trackRefs = useRef(new Map<string, HTMLDivElement>())
   const laneRefs = useRef(new Map<TrackKind, HTMLDivElement>())
   const [drag, setDrag] = useState<Drag | null>(null)
+  /** The clips a drag is moving, asked of every clip drawn on every movement. */
+  const landing = useMemo(() => new Set((drag?.landings ?? []).map((l) => l.clipId)), [drag?.landings])
   /** A box being drawn over empty timeline space to pick several clips, in client pixels. */
   const [box, setBox] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null)
   /** Where that press landed, for the click it turns into if it never moves: its row's left edge on screen included. */
@@ -514,6 +516,13 @@ function TimelineView(props: TimelineProps): JSX.Element {
           // clip does: this is drawn again only when something about it changed.
           const width = Math.max(MIN_CLIP_WIDTH, (spanEnd(clip) - clip.timelineStart) * pxPerFrame)
           const shown = shownPart(clip.timelineStart * pxPerFrame, width, drawn)
+          const dragging = landing.has(clip.id)
+          // A clip well out of view is not drawn at all, as a caption is not:
+          // drawing every clip of a long cut made each ripple edit, zoom notch
+          // and Ctrl+A on it pause the window for a tenth to a third of a
+          // second (audit 2026-11-07, fix first 3). The one pressed, those
+          // moving with it and one closing up stay, whatever their place.
+          if (shown.to === 0 && !dragging && drag?.clipId !== clip.id && closingUp?.clipId !== clip.id) return null
           return (
             <TrackClip
               key={clip.id}
@@ -537,7 +546,7 @@ function TimelineView(props: TimelineProps): JSX.Element {
               rebuilding={rebuilding.has(media.id)}
               revision={props.revisions.get(media.id) ?? 0}
               peaks={kind === 'audio' ? props.peaks.get(peaksKey(clip.mediaId, (clip as SoundClip).track)) : undefined}
-              dragging={drag !== null && drag.landings !== null && (drag.landings.some((l) => l.clipId === clip.id))}
+              dragging={dragging}
               snap={clipSnap}
               edgeScroll={edgeScroll}
               onSelect={clipSelect}
@@ -715,6 +724,22 @@ function TimelineView(props: TimelineProps): JSX.Element {
   const videoOrder = t.videoTracks.map((_, i) => i).reverse()
   // The caption track is there once the sequence has captions.
   const captioned = t.captions.clips.length > 0
+  const captionsOnTop = captioned && captionsAbove(t) === t.videoTracks.length
+  const captionRow = (): JSX.Element => (
+    <CaptionTrack
+      key={CAPTION_TRACK_ID}
+      clips={t.captions.clips}
+      style={t.captions.style}
+      pxPerFrame={pxPerFrame}
+      selectedId={props.selectedCaptionId}
+      onSelect={props.onSelectCaption}
+      onPressEmpty={captionPressEmpty}
+      onEdit={props.onEdit}
+      targets={captionSnaps}
+      snapWithin={snapWithin}
+      drawn={drawn}
+    />
+  )
   const lastFrame = useMemo(() => Math.max(total, ...allClips(t).map((c) => spanEnd(c))), [total, t])
 
   return (
@@ -839,23 +864,12 @@ function TimelineView(props: TimelineProps): JSX.Element {
             </div>
 
             <div style={{ position: 'relative' }}>
-              {captioned && (
-                <CaptionTrack
-                  clips={t.captions.clips}
-                  style={t.captions.style}
-                  pxPerFrame={pxPerFrame}
-                  selectedId={props.selectedCaptionId}
-                  onSelect={props.onSelectCaption}
-                  onPressEmpty={captionPressEmpty}
-                  onEdit={props.onEdit}
-                  targets={captionSnaps}
-                  snapWithin={snapWithin}
-                  drawn={drawn}
-                />
-              )}
+              {captionsOnTop && captionRow()}
               {/* The top track is the last: V2 above V1, as they are drawn. */}
               {newTrackLane('video')}
-              {videoOrder.map((i) => trackRow('video', i))}
+              {/* Captions dragged down sit between the tracks they are drawn between (task 2621). */}
+              {videoOrder.map((i) => [...(!captionsOnTop && captioned && i === captionsAbove(t) - 1 ? [captionRow()] : []), trackRow('video', i)])}
+              {!captionsOnTop && captioned && captionsAbove(t) === 0 && captionRow()}
               {t.audioTracks.map((_, i) => trackRow('audio', i))}
               {newTrackLane('audio')}
 

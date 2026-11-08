@@ -4,7 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
-import { discardUnsavedWork } from './dialogs'
+import { discardUnsavedWork, pressNewProject } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 93: the framing used last, given to a recording of the same size put
@@ -25,6 +26,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 240_000)
 
@@ -63,7 +65,7 @@ describe('the framing used last', () => {
 
   it('is given to a recording of the same size in a new project, with an Undo', async () => {
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('ControlOrMeta+n')
+    await pressNewProject(page)
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0, undefined, WAIT)
     await add(clean)
     await page.waitForSelector('[data-testid="toast"][data-kind="lastFraming"]', WAIT)
@@ -74,7 +76,7 @@ describe('the framing used last', () => {
 
   it('is offered to a recording of another size, and given when Use is pressed', async () => {
     await page.locator('[data-testid="timecode"]').click()
-    await page.keyboard.press('ControlOrMeta+n')
+    await pressNewProject(page)
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0, undefined, WAIT)
     await add(obs)
     const offer = '[data-testid="toast"][data-kind="lastFramingOffer"]'

@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { discardUnsavedWork } from './dialogs'
+import { discardUnsavedWork, pressNewProject } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Plan 13, step 3: the sequence tabs, the transport and the monitor. A new
@@ -27,6 +28,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${join(root, 'user-data')}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 
@@ -40,7 +42,7 @@ afterAll(async () => {
 async function fresh(): Promise<void> {
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), cleanPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

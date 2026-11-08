@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { chooseExportFolder, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * The editing half of docs/smoke-checklist.md, driven through the real app.
@@ -40,6 +41,7 @@ beforeAll(async () => {
   app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: process.cwd() })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
   await discardUnsavedWork(app)
 }, 180_000)
 
@@ -493,6 +495,36 @@ describe('grouping pieces into one clip (bugs and notes 2, note 29)', () => {
     await page.keyboard.press('ControlOrMeta+Shift+g')
     await expect.poll(async () => (await groups()).every((g) => g === '')).toBe(true)
     expect(await clipLengths()).toEqual(lengths)
+  })
+
+  it('moves the whole group when one of its pieces is dragged, the group kept (audit 2026-11-07)', async () => {
+    await twoPieces()
+    const a = (await page.locator(CLIP).nth(0).boundingBox())!
+    const b = (await page.locator(CLIP).nth(1).boundingBox())!
+    await page.mouse.click(a.x + a.width / 2, a.y + CLIP_BODY_Y)
+    await page.keyboard.down('Shift')
+    await page.mouse.click(b.x + b.width / 2, b.y + CLIP_BODY_Y)
+    await page.keyboard.up('Shift')
+    await page.keyboard.press('ControlOrMeta+g')
+    await expect.poll(async () => (await groups()).filter((g) => g !== '').length).toBe(2)
+    // The grouped pieces, each where it starts and how long it is.
+    const grouped = (): Promise<{ start: number; length: number }[]> =>
+      page.locator(`${CLIP}[data-group]:not([data-group=""])`).evaluateAll((els) =>
+        els.map((e) => ({ start: Number(e.getAttribute('data-start')), length: Number(e.getAttribute('data-length-frames')) }))
+      )
+    const before = await grouped()
+    expect(before).toHaveLength(2)
+    // Nothing selected, then the second piece pressed and dragged later: the first comes with it, by as much.
+    await page.keyboard.press('Escape')
+    await expect.poll(selectedCount).toBe(0)
+    const pressed = (await page.locator(CLIP).nth(1).boundingBox())!
+    // Without Alt, which would take the piece on its own.
+    await dragBy(pressed.x + pressed.width / 2, pressed.y + CLIP_BODY_Y, 40)
+    await expect.poll(async () => (await grouped())[0]?.start ?? 0).toBeGreaterThan(before[0]!.start)
+    const after = await grouped()
+    const by = after[0]!.start - before[0]!.start
+    expect(after).toEqual(before.map((p) => ({ start: p.start + by, length: p.length })))
+    expect(new Set((await groups()).filter((g) => g !== '')).size).toBe(1)
   })
 
   it('offers Group in the right click Join, and a zoom on it runs across the cut', async () => {

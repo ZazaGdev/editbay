@@ -44,6 +44,7 @@ import { isVoiceStrength } from './voice'
 import { PRESETS } from './presets'
 import { cleanWorkspace, type Workspace } from './workspace'
 import { cleanBoxKeys } from './box-keys'
+import { possibleSource } from './possible-source'
 
 /**
  * The `.editbay` file: the project and the workspace, joined on write and
@@ -194,12 +195,17 @@ function isGroupFrame(f: unknown): f is GroupFrame {
   )
 }
 
-/** A clip on a video track as schema 6 stores it. */
+/**
+ * A clip on a video track as schema 6 stores it. Its crop is four numbers or
+ * the clip is refused: the export writes a crop into its filter graph as it
+ * stands, so text there would be filters of the file's own (audit 2026-11-07).
+ */
 function isVideoClip(c: unknown): c is Clip {
   const x = c as Partial<Clip> | null
   return (
     isSpan(c) &&
-    typeof x?.transform?.crop?.w === 'number' &&
+    typeof x?.transform?.crop === 'object' &&
+    isRectLike(x.transform.crop) &&
     isRectLike(x.transform.place) &&
     Array.isArray(x.layers) &&
     x.layers.every(isLayer) &&
@@ -510,7 +516,9 @@ function validCaptions(raw: unknown): Captions {
     }),
     style: cleanCaptionStyle(x.style),
     listenTo: Array.isArray(x.listenTo) ? x.listenTo.filter((id): id is string => typeof id === 'string') : [],
-    edited: x.edited === true
+    edited: x.edited === true,
+    // Where they sit among the video tracks: on top unless it reads as a count.
+    ...(typeof x.above === 'number' && Number.isInteger(x.above) && x.above >= 0 ? { above: x.above } : {})
   }
 }
 
@@ -535,7 +543,7 @@ type OldClip = Omit<Clip, 'link'> & { audio: { gain: number; muted: boolean; tra
  */
 function isOldClip(c: unknown): boolean {
   const x = c as Partial<OldClip> | null
-  return isSpan(c) && typeof x?.transform?.crop?.w === 'number' && typeof x.audio?.gain === 'number'
+  return isSpan(c) && isRectLike(x?.transform?.crop) && typeof x?.audio?.gain === 'number'
 }
 
 /**
@@ -841,14 +849,16 @@ const MOST_FRAMES = 240 * 3600 * 24
 /**
  * A project that could not have been saved by the app is refused in words
  * (audit 2026-10-01): a frame rate of nothing, two sources or two clips with
- * one id, a clip of a source the project does not have, or one that ends
- * before it starts or runs out to numbers no recording reaches. Opened, each
- * of these broke something later and far from its cause.
+ * one id, a source with numbers no import writes, a clip of a source the
+ * project does not have, or one that ends before it starts or runs out to
+ * numbers no recording reaches. Opened, each of these broke something later
+ * and far from its cause.
  */
 function refuseImpossible(p: Project): void {
   if (!(Number.isFinite(p.fps) && p.fps > 0 && p.fps <= 240)) throw new Error('this project has a frame rate it cannot be played at')
   const sources = new Set(p.media.map((m) => m.id))
   if (sources.size !== p.media.length) throw new Error('this project has two sources under one name')
+  if (!p.media.every(possibleSource)) throw new Error('this project has a damaged source in it')
   for (const s of p.sequences) {
     const ids = new Set<string>()
     for (const track of [...s.videoTracks, ...s.audioTracks]) {

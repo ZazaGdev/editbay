@@ -250,6 +250,8 @@ export type ClipEdit =
   | { kind: 'addTrack'; trackKind: TrackKind; trackId: string }
   /** Only an empty track goes, and never V1 or A1. */
   | { kind: 'removeTrack'; trackId: string }
+  /** A track moved among the tracks of its kind, `to` counting from V1 or A1 as 0 (task 2613). */
+  | { kind: 'moveTrack'; trackId: string; to: number }
   /**
    * The main picture's crop, or a layer's when `picture` names one. With
    * `from`, the crop shown when it was changed, a zoom moves and scales as

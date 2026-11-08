@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { wakeSound } from './wake-sound'
 
 /**
  * Recording a voice over from Chromium's fake microphone, which plays a
@@ -31,6 +32,7 @@ async function launch(): Promise<void> {
   })
   page = await app.firstWindow()
   await page.waitForSelector('main')
+  await wakeSound(page)
 }
 
 interface Sound {
