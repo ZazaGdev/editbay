@@ -118,7 +118,55 @@ export type FoundClip =
   | { kind: 'video'; index: number; track: VideoTrack; clip: Clip }
   | { kind: 'audio'; index: number; track: AudioTrack; clip: SoundClip }
 
+/** Every clip of a timeline by id, and the ids of each link, in the order `findClip` and `linkedIds` give them. */
+interface ClipIndex {
+  found: Map<string, FoundClip>
+  links: Map<string, string[]>
+}
+
+/**
+ * The index of a timeline asked about more than once, or that it has been
+ * asked about once. A timeline is never changed once made, so its index holds
+ * for its life. Asked once, a timeline is searched as it is: edits make many
+ * a timeline on the way that is asked one thing, and indexing each would cost
+ * more than the search. Asked again, as the window's selection asks of every
+ * selected piece of a group, it is indexed, and a lookup that was a search of
+ * every clip is one step (audit 2026-11-07, fix first 2).
+ */
+const clipIndexes = new WeakMap<Timeline, ClipIndex | 'asked'>()
+
+function clipIndex(p: Timeline): ClipIndex | null {
+  const known = clipIndexes.get(p)
+  if (known === undefined) {
+    clipIndexes.set(p, 'asked')
+    return null
+  }
+  if (known !== 'asked') return known
+  const found = new Map<string, FoundClip>()
+  const links = new Map<string, string[]>()
+  for (const [index, track] of p.videoTracks.entries()) {
+    for (const clip of track.clips) if (!found.has(clip.id)) found.set(clip.id, { kind: 'video', index, track, clip })
+  }
+  for (const [index, track] of p.audioTracks.entries()) {
+    for (const clip of track.clips) if (!found.has(clip.id)) found.set(clip.id, { kind: 'audio', index, track, clip })
+  }
+  for (const c of allClips(p)) {
+    if (c.link === undefined) continue
+    const ids = links.get(c.link)
+    if (ids) ids.push(c.id)
+    else links.set(c.link, [c.id])
+  }
+  const index = { found, links }
+  clipIndexes.set(p, index)
+  return index
+}
+
 export function findClip(p: Timeline, clipId: string): FoundClip | null {
+  const known = clipIndex(p)
+  if (known) {
+    const f = known.found.get(clipId)
+    return f ? { ...f } : null
+  }
   for (const [index, track] of p.videoTracks.entries()) {
     const clip = track.clips.find((c) => c.id === clipId)
     if (clip) return { kind: 'video', index, track, clip }
@@ -148,6 +196,8 @@ export function linkedIds(p: Timeline, clipId: string): string[] {
   if (!found) return []
   const link = found.clip.link
   if (link === undefined) return [clipId]
+  const known = clipIndex(p)
+  if (known) return [...(known.links.get(link) ?? [])]
   return allClips(p)
     .filter((c) => c.link === link)
     .map((c) => c.id)

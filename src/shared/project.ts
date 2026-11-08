@@ -561,7 +561,7 @@ export {
 } from './split-join'
 export {
   linkClips, unlinkClip, addTrack, setTrackMuted, setTrackDuck, setTrackLocked, setTrackName, setTrackHidden,
-  trackLabel, removeTrack
+  trackLabel, removeTrack, moveTrack, CAPTION_TRACK_ID, captionsAbove, tracksUnderCaptions
 } from './track-edits'
 export {
   setClipDenoise, cleanedFile, setClipVoice, treatedFile, enhancedFile, playedCopy, wantingVoiceCopy,

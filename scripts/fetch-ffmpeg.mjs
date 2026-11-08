@@ -6,7 +6,9 @@
 // Plan 104: on a Mac, one martin-riedl.de release build for the chip being
 // built for, its two programs zipped one apiece, pinned and checked the same
 // way. The chip is the running Node's, or EDITBAY_TARGET_ARCH (arm64 or x64)
-// to fetch the other one.
+// to fetch the other one. EDITBAY_TARGET_ARCH=universal fetches both and joins
+// each pair with lipo into one program that runs on either chip, for the one
+// Mac download (task 2682).
 //
 // A stamp holds the hash of the archive the folder came from, so an install with
 // the right build already there downloads nothing.
@@ -103,8 +105,34 @@ async function windows() {
   })
 }
 
+/** Both chips' builds, each pair joined by lipo into one program that runs on either chip. */
+async function macUniversal() {
+  const chips = ['arm64', 'x64']
+  const all = `universal ${chips.flatMap((c) => [MAC_BUILDS[c].ffmpeg.sha256, MAC_BUILDS[c].ffprobe.sha256]).join(' ')}`
+  if (await current(['ffmpeg', 'ffprobe'], all)) return
+  console.log(`fetch-ffmpeg: downloading ffmpeg ${BUILD.version} for both Mac chips (about 120 MB)`)
+  await staged(all, async (scratch, into) => {
+    for (const name of ['ffmpeg', 'ffprobe']) {
+      const thin = []
+      for (const chip of chips) {
+        const dir = join(scratch, chip)
+        await mkdir(dir, { recursive: true })
+        const zip = join(dir, `${name}.zip`)
+        await download(MAC_BUILDS[chip][name].url, MAC_BUILDS[chip][name].sha256, zip)
+        const r = spawnSync('/usr/bin/unzip', ['-q', '-o', zip, name, '-d', dir], { stdio: 'inherit' })
+        if (r.status !== 0) throw new Error(`ffmpeg ${BUILD.version}: ${chip} ${name}.zip could not be opened`)
+        thin.push(join(dir, name))
+      }
+      const r = spawnSync('/usr/bin/lipo', ['-create', ...thin, '-output', join(into, name)], { stdio: 'inherit' })
+      if (r.status !== 0) throw new Error(`ffmpeg ${BUILD.version}: lipo could not join the two ${name} programs`)
+      await chmod(join(into, name), 0o755)
+    }
+  })
+}
+
 async function mac() {
   const arch = process.env.EDITBAY_TARGET_ARCH ?? process.arch
+  if (arch === 'universal') return macUniversal()
   const build = MAC_BUILDS[arch]
   if (!build) throw new Error(`fetch-ffmpeg: no Mac build for the chip ${arch}`)
   const both = `${arch} ${build.ffmpeg.sha256} ${build.ffprobe.sha256}`

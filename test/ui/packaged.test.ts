@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core'
-import { mkdtemp, rm, readdir } from 'node:fs/promises'
+import { mkdtemp, rm, readdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -28,12 +28,16 @@ import { wakeSound } from './wake-sound'
 // Mac build's Editbay.app, for checking a fresh build while the usual one is
 // open and cannot be replaced.
 const MAC = process.platform === 'darwin'
-// The chip the app was built for, which on GitHub's Intel Mac is not the test's own (task 2384).
+// The chip the app runs as, which on GitHub's Apple Silicon Mac can be Intel, through Rosetta (tasks 2384, 2682).
 const ARCH = process.env.EDITBAY_TEST_ARCH ?? process.arch
+// The one Mac download carries both chips (task 2682); a build for one chip is in a folder of its own.
+const UNIVERSAL = join(process.cwd(), 'release-test', 'mac-universal', 'Editbay.app')
 const UNPACKED =
   process.env.EDITBAY_PACKAGED_DIR ??
   (MAC
-    ? join(process.cwd(), 'release-test', ARCH === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app')
+    ? existsSync(UNIVERSAL)
+      ? UNIVERSAL
+      : join(process.cwd(), 'release-test', ARCH === 'arm64' ? 'mac-arm64' : 'mac', 'Editbay.app')
     : join(process.cwd(), 'release-test', 'win-unpacked'))
 // A Mac app keeps its program and its resources inside the bundle (plan 104).
 const EXE = MAC ? join(UNPACKED, 'Contents', 'MacOS', 'Editbay') : join(UNPACKED, 'Editbay.exe')
@@ -55,7 +59,14 @@ beforeAll(async () => {
 
   // A stand-in for the speech engine, so captions can be made without downloading it.
   const fake = join(process.cwd(), 'test', 'fixtures', 'fake-whisper.mjs')
-  app = await electron.launch({ executablePath: EXE, args: [`--user-data-dir=${userData}`], env: { ...process.env, EDITBAY_SPEECH_FAKE: fake } })
+  // Asked for Intel on an Apple Silicon Mac: started through `arch`, so macOS
+  // runs the app's Intel half under Rosetta (task 2682).
+  let executablePath = EXE
+  if (MAC && ARCH === 'x64' && process.arch === 'arm64') {
+    executablePath = join(userData, 'editbay-x64.sh')
+    await writeFile(executablePath, `#!/bin/sh\nexec /usr/bin/arch -x86_64 '${EXE.replace(/'/g, `'\\''`)}' "$@"\n`, { mode: 0o755 })
+  }
+  app = await electron.launch({ executablePath, args: [`--user-data-dir=${userData}`], env: { ...process.env, EDITBAY_SPEECH_FAKE: fake } })
   page = await app.firstWindow()
   await page.waitForSelector('main')
   await wakeSound(page)
@@ -85,18 +96,25 @@ describe.skipIf(!built)('the packaged application', () => {
     expect(existsSync(join(RESOURCES, 'licences', 'Montserrat-OFL.txt'))).toBe(true)
   })
 
+  it.runIf(MAC)('runs as the chip it was asked for', async () => {
+    expect(await app.evaluate(() => process.arch)).toBe(ARCH)
+  })
+
   it('ships ONNX Runtime for Follow face beside the archive, CPU only, with the C++ runtime and the face model', async () => {
-    const platform = MAC ? join('darwin', ARCH) : join('win32', 'x64')
-    const bin = join(RESOURCES, 'onnxruntime', 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', platform)
-    const files = (await readdir(bin)).map((f) => f.toLowerCase()).sort()
-    expect(files).toContain('onnxruntime_binding.node')
-    if (MAC) {
-      // 1.30 for Apple Silicon ships it under two names, 1.23 for Intel under one.
-      expect(files.some((f) => /^libonnxruntime\..*dylib$/.test(f))).toBe(true)
-    } else {
-      expect(files).toContain('onnxruntime.dll')
-      expect(files).toContain('vcruntime140.dll')
-      expect(files).not.toContain('directml.dll')
+    // The one Mac download has a library for each chip (task 2682).
+    const platforms = MAC ? (UNPACKED === UNIVERSAL ? ['arm64', 'x64'] : [ARCH]).map((c) => join('darwin', c)) : [join('win32', 'x64')]
+    for (const platform of platforms) {
+      const bin = join(RESOURCES, 'onnxruntime', 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', platform)
+      const files = (await readdir(bin)).map((f) => f.toLowerCase()).sort()
+      expect(files).toContain('onnxruntime_binding.node')
+      if (MAC) {
+        // 1.30 ships it under two names, 1.23 under one.
+        expect(files.some((f) => /^libonnxruntime\..*dylib$/.test(f))).toBe(true)
+      } else {
+        expect(files).toContain('onnxruntime.dll')
+        expect(files).toContain('vcruntime140.dll')
+        expect(files).not.toContain('directml.dll')
+      }
     }
     expect(existsSync(join(RESOURCES, 'models', 'face_detection_yunet_2023mar.onnx'))).toBe(true)
     expect(existsSync(join(RESOURCES, 'licences', 'ONNXRuntime-MIT.txt'))).toBe(true)

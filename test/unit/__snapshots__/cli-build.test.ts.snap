@@ -256,7 +256,9 @@ exports[`a half of a side-by-side recording > writes the same file every time 1`
           "glowColour": "#FFD400",
           "popGrow": false,
           "popBox": false,
-          "popBoxColour": "#7C3AED"
+          "popBoxColour": "#7C3AED",
+          "animation": "none",
+          "animateBy": "line"
         },
         "listenTo": [],
         "edited": false
@@ -649,7 +651,9 @@ exports[`a project made from an edit list > writes the same file every time 1`] 
           "glowColour": "#FFD400",
           "popGrow": false,
           "popBox": false,
-          "popBoxColour": "#7C3AED"
+          "popBoxColour": "#7C3AED",
+          "animation": "none",
+          "animateBy": "line"
         },
         "listenTo": [],
         "edited": false

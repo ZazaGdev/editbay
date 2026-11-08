@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath, ffprobePath } from '../../src/main/ffmpeg/locate'
-import { closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { closeExport, discardUnsavedWork, openExport, pressNewProject } from './dialogs'
 import { wakeSound } from './wake-sound'
 
 /**
@@ -92,7 +92,7 @@ async function freshProject(copies = 1, source = cleanPath): Promise<string> {
   await closeExport(page)
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), source)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })
@@ -497,8 +497,12 @@ describe('the Export dialog', () => {
     // A recording that goes missing after it was imported makes its clip fail.
     const doomed = join(root, 'doomed.mp4')
     await copyFile(cleanPath, doomed)
-    await freshProject(1, doomed)
+    // Gone before its clip is put on the timeline: once it is, the preview has
+    // the file open to show it, and Windows will not delete a file in use.
+    await freshProject(0, doomed)
     await rm(doomed)
+    await page.locator('[data-testid="add-to-timeline"]').first().click()
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 1)
     await chooseFolder()
     await exportNow()
     await page.waitForSelector('[data-testid="export-error"]', { timeout: 120_000 })

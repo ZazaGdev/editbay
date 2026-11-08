@@ -46,6 +46,9 @@ async function resize(width: number, height: number): Promise<void> {
     { width, height }
   )
   await page.waitForFunction((w) => Math.abs(window.innerWidth - w) <= 2, width, { timeout: 5000 })
+  // The timeline's row hears its new width a frame or two later, and only then
+  // folds or opens a side for it: a side read before that is the old window's.
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => done())))))
 }
 
 const inInspector = (name: string): string => `[data-testid="inspector-column"] [data-inspector-group][data-group="${name}"]`

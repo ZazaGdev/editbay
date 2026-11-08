@@ -8,6 +8,7 @@ import { useMemo, type ComponentProps } from 'react'
 import { DEFAULT_TEXT, type TextStyle } from '../../shared/text'
 import { captionLook, otherTexts, textStyledAs } from '../../shared/apply-to-all'
 import { renderText } from '../text/draw'
+import { captionAt } from '../../shared/captions'
 import type { SectionLayout } from '../../shared/section-layout'
 import type { Inspector } from '../components/Inspector'
 import type { SectionHost } from '../components/section-host'
@@ -21,7 +22,7 @@ export function useInspectorProps(app: AppState): InspectorProps | null {
   const { windowSettings, setWindowSettings, timeline, framing, alsoChanged, peaks, selected, selectedCaption, aspectLocked, setAspectLocked, picture,
     zoomEnd, setZoomEnd, zoomPicked, setZoomPicked, zoomTools, choosePicture, captionMove, relocateHandPlaced, setRelocateHandPlaced, painter, paint, frameSelected, textEdit,
     blurBox, copiedCrop, savedLayouts, layoutActions, inspectorShapes, playheadStore, marks, keys, editClip, run, setCaptionMove, seek, setBlurBox,
-    setView, changeColour, proj, changeText, lastTextStyle, project } = app
+    setView, changeColour, proj, changeText, lastTextStyle, project, selectedTrack, solo, setSolo, selectCaption } = app
   const inspectorEdit = useSteady(editClip)
   const inspectorCopyCrop = useSteady(() => run('copyCrop'))
   const inspectorPasteCrop = useSteady(() => run('pasteCrop'))
@@ -30,6 +31,20 @@ export function useInspectorProps(app: AppState): InspectorProps | null {
     setWindowSettings({ inspectorFolds: { ...windowSettings.inspectorFolds, [name]: folded } })
   )
   const inspectorSeek = useSteady((frame: number) => seek(frame))
+  // A selected track's Solo, and the caption track's look (task 2612), as their headers do.
+  const inspectorSolo = useSteady((trackId: string, on: boolean) =>
+    setSolo((was) => {
+      const next = new Set(was)
+      if (on) next.add(trackId)
+      else next.delete(trackId)
+      return next
+    })
+  )
+  const inspectorCaptionLook = useSteady(() => {
+    const clips = timeline?.captions.clips ?? []
+    const c = captionAt(clips, playheadStore.get()) ?? clips[0]
+    if (c) selectCaption(c.id)
+  })
   // Steady, as every handler the Inspector is given: a new one each render drew it again on every frame of playback (audit 2026-10-01).
   const inspectorBlurBox = useSteady((index: number | null) => {
     setBlurBox(index)
@@ -80,6 +95,10 @@ export function useInspectorProps(app: AppState): InspectorProps | null {
     peaks,
     clipId: selected,
     captionId: selectedCaption,
+    trackId: selectedTrack,
+    solo,
+    onSolo: inspectorSolo,
+    onCaptionLook: inspectorCaptionLook,
     aspectLocked,
     onAspectLock: setAspectLocked,
     picture,

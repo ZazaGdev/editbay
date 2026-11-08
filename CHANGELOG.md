@@ -1,5 +1,73 @@
 # Changelog
 
+## 2.1
+
+A security fix for projects from other people, one Mac download for every Mac, captions that
+animate, tracks that reorder by dragging, and a faster timeline, export and start.
+
+### Security
+
+- **A security fix for projects from other people.** A project file someone sent you could
+  make its export write files outside the export folder and reach another computer. Every
+  earlier version has this, so update before exporting a project you did not make. Such a file
+  is now refused as damaged when it opens.
+- A project file holding numbers no recording has, such as a trillion sound tracks, could
+  freeze Editbay as it opened. It is now refused as damaged.
+- Editbay is built on Electron 44.10.2, which brings the security fixes in the six releases of
+  Electron and Chromium since 44.4.3, the version 2.0 shipped with.
+
+### Added
+
+- **Captions animate** in and out with Fade, Pop, Slide up or Slide down, a whole line at a
+  time or word by word as each is said, with the spoken word still highlighted. The export
+  draws the same frames as the preview.
+- **Tracks move by dragging.** Drag a track's header up or down to move the track, with its
+  clips, among the tracks of its kind. The Captions track moves among the video tracks the same
+  way, and the captions are drawn under the tracks above it. The order shows in the preview
+  and the export, saves with the project and undoes.
+- Clicking a track's header shows that track in the Inspector, with the settings its header
+  has.
+
+### Changed
+
+- **One Mac download for every Mac**, `Editbay-2.1-Mac.dmg`, in place of one for Apple Silicon
+  and one for Intel. It runs on Apple Silicon from macOS 14 and on Intel from macOS 13.4, as
+  before. Follow face uses ONNX Runtime 1.23.2 on both chips, the last with an Intel library.
+- The Windows download is `Editbay-2.1-Windows-Setup.exe`, rather than `Editbay.Setup.2.0.exe`.
+- The Windows installer is 135 MB rather than 169 MB.
+- The add-track buttons sit in the strip beside the ruler, and every track header's buttons are
+  one height on one row.
+- Select all, then Group, on a long cut in many pieces no longer freezes the window for up to a
+  minute, and selecting one grouped piece is instant.
+- The timeline draws only the clips near the view, so Ctrl+A, Esc, a zoom notch or a ripple
+  delete on a long cut no longer holds the window.
+- A picture in picture with rounded corners, an edge or a shadow exports two to six times
+  faster.
+- An export of many short pieces takes about a third less time on a computer with eight or
+  more threads. The file is the same.
+- Making captions for a long cut in many pieces gets its sound ready in under a second, rather
+  than half a minute.
+
+### Fixed
+
+- Editbay's window opens at once. Recordings on a computer that is switched off kept it off
+  the screen for 21 seconds; such files are now marked offline after 3 seconds, with a notice
+  naming the computer. An ffmpeg that does not answer is named in the banner after 30 seconds,
+  rather than leaving Editbay without a window.
+- On a Mac whose sound goes to a headset or another device that is also a microphone, Editbay
+  no longer asks for the microphone as it opens. macOS may ask once, at the first click in it,
+  and either answer is fine for playing and editing.
+- Dragging a piece of a group with nothing selected moves the whole group, rather than that
+  piece alone, which broke the group.
+- At a cut that runs straight on in the footage, the preview's picture no longer starts 90 ms
+  behind the sound and takes a second to catch up.
+- After a jump cut the preview's picture stays within about 15 ms of the sound, rather than up
+  to 65 ms behind it for most of the next piece.
+- A crop number shows the chosen picture's own number from the moment it is chosen, so a width
+  typed for Picture 2 straight after choosing it is kept.
+- A text changed while another project opens keeps the change in its own project, rather than
+  passing it to the opened project's text.
+
 ## 2.0
 
 Editbay on a Mac, clip speed, a Portrait picture in picture, a tidier Inspector, and a long

@@ -53,6 +53,9 @@ export interface TimelineProps {
   /** The selected caption, drawn selected. */
   selectedCaptionId: string | null
   onSelectCaption: (id: string) => void
+  /** The track whose header was clicked, drawn selected: a track's id, or 'captions' (task 2612). */
+  selectedTrackId?: string | null | undefined
+  onSelectTrack?: ((trackId: string) => void) | undefined
   onSeek: (frame: number) => void
   /** The playhead is being dragged along the ruler, or has stopped being. */
   onScrubPlayhead?: (on: boolean) => void

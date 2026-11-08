@@ -1,5 +1,5 @@
 import type { Timeline } from '../../shared/project'
-import { isStill, shownTracks, timelineDuration } from '../../shared/project'
+import { isStill, shownTracks, timelineDuration, tracksUnderCaptions } from '../../shared/project'
 import { fitInBox } from '../../shared/crop-geometry'
 import { previewScale } from '../../shared/sound'
 import type { WorkspaceView } from '../../shared/workspace'
@@ -368,7 +368,11 @@ export class HtmlVideoEngine implements PreviewEngine {
         else if (id === blend.toClipId) step.mix = mix.into
       }
     }
-    drawOutput(this.ctx, this.timeline, frame, pictures.map((p) => p.el as HTMLVideoElement | HTMLImageElement | null), plan, this.scale)
+    // Captions dragged down among the tracks (task 2621): under the first picture of a track above them.
+    const below = tracksUnderCaptions(this.timeline)
+    const over = pictures.findIndex((p) => !below.has(p.track))
+    const under = over === -1 ? undefined : { source: over, covered: over === 0 && pictures[0]!.lane !== null }
+    drawOutput(this.ctx, this.timeline, frame, pictures.map((p) => p.el as HTMLVideoElement | HTMLImageElement | null), plan, this.scale, under)
     this.drawnClips.drew(pictures.filter((p) => p.el).map((p) => p.clip.id))
   }
 

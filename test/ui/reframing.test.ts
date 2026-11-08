@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { closeExport, discardUnsavedWork } from './dialogs'
+import { closeExport, discardUnsavedWork, pressNewProject } from './dialogs'
 import { wakeSound } from './wake-sound'
 
 /**
@@ -47,7 +47,7 @@ async function fresh(source?: string): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   // A new project starts on the shape chosen last, and offers the framing used last: these tests start from Vertical, unframed.
   await page.evaluate(() => window.api.setAppSettings({ lastShape: 'vertical', lastFraming: null }))
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), source ?? cleanPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

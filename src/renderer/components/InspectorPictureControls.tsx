@@ -46,9 +46,6 @@ export function CropNumber(props: {
   const applied = useRef<number | null>(null)
   const cancelled = useRef(false)
   const timer = useRef(0)
-  useEffect(() => {
-    if (!focused.current) setText(String(props.value))
-  }, [props.value])
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const parse = (t: string): number | null => {
@@ -76,7 +73,10 @@ export function CropNumber(props: {
         data-testid={props.testid}
         type="number"
         step={2}
-        value={props.mixed === true && !focused.current ? '' : text}
+        // Out of the field, the crop's own number as it is drawn: taken from
+        // the text a frame later, the last picture's number would still be
+        // there for a click to select and the typing to land after (task 2620).
+        value={focused.current ? text : props.mixed === true ? '' : String(props.value)}
         placeholder={props.mixed === true ? 'Mixed' : undefined}
         onFocus={() => {
           focused.current = true

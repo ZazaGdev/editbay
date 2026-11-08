@@ -9,7 +9,7 @@ import { runExport } from '../../src/main/render/runner'
 import { planRender } from '../../src/shared/render-plan'
 import { presetById } from '../../src/shared/presets'
 import { addClip, createTimeline, setCaptionStyle, setCaptions, type ProjectMedia, type Timeline } from '../../src/shared/project'
-import { layoutCaption, type CaptionStyleChange } from '../../src/shared/captions'
+import { captionMoves, layoutCaption, type CaptionStyleChange } from '../../src/shared/captions'
 import { fontFor } from '../../src/main/fonts/system-fonts'
 import { readFontFigures } from '../../src/shared/font-file'
 import { CAPTION_FONTS, captionFont } from '../../src/shared/caption-fonts'
@@ -346,6 +346,56 @@ describe('captions burned into the export', () => {
     expect(letters(await frameAt(a!, 6, 1080, 1920), 1080).yellow).toBe(0)
     expect(letters(await frameAt(b!, 6, 1080, 1920), 1080).yellow).toBeGreaterThan(200)
     expect(letters(await frameAt(b!, 36, 1080, 1920), 1080).yellow).toBe(0)
+  })
+})
+
+describe('captions coming in and going out (plan 107)', () => {
+  const two = [{ text: 'one', start: 0, length: 30 }, { text: 'two', start: 30, length: 30 }]
+
+  it('pop in with their box grown about the middle, where the preview puts it on that frame', async () => {
+    const { out, t } = await exported('anim-pop', two, { animation: 'pop', box: true, boxColour: '#0000FF', boxOpacity: 1 })
+    const c = t.captions.clips[0]!
+    const style = t.captions.style
+    const layout = layoutCaption(c, style, 1080, 1920)
+    const blue = (r: number, g: number, b: number): boolean => b > 150 && g < 80 && r < 120
+    for (const frame of [3, 20]) {
+      const box = captionDrawing(c, style, layout, 0, captionMoves(c, style, frame, 30)).box!
+      const got = extent(await frameAt(out, frame, 1080, 1920), 1080, blue)
+      expect(Math.abs(got.left - box.x)).toBeLessThan(4)
+      expect(Math.abs(got.right + 1 - (box.x + box.w))).toBeLessThan(4)
+      expect(Math.abs(got.top - box.y)).toBeLessThan(4)
+      expect(Math.abs(got.bottom + 1 - (box.y + box.h))).toBeLessThan(4)
+    }
+  })
+
+  it('slide up from below, standing where the preview draws them on each frame', async () => {
+    const { out, t } = await exported('anim-slide', two, { animation: 'slideUp' })
+    const c = t.captions.clips[0]!
+    const style = t.captions.style
+    const layout = layoutCaption(c, style, 1080, 1920)
+    const still = layout.lines[0]!.baseline
+    const pieces = captionDrawing(c, style, layout, 0, captionMoves(c, style, 1, 30)).pieces!
+    expect(pieces[0]!.baseline).toBeGreaterThan(still + 10)
+    const rising = letters(await frameAt(out, 1, 1080, 1920), 1080)
+    expect(rising.white).toBeGreaterThan(200)
+    expect(Math.abs(rising.bottom - pieces[0]!.baseline)).toBeLessThan(5)
+    expect(Math.abs(letters(await frameAt(out, 20, 1080, 1920), 1080).bottom - still)).toBeLessThan(5)
+  })
+
+  it('word by word, show only the words said so far, the one being said in the highlight', async () => {
+    const { out, t } = await exported('anim-words', two, { animateBy: 'word', animation: 'pop' })
+    const c = t.captions.clips[0]!
+    const layout = layoutCaption(c, t.captions.style, 1080, 1920)
+    const placed = captionDrawing(c, t.captions.style, layout, 1, null).pieces ?? null
+    const before = letters(await frameAt(out, 20, 1080, 1920), 1080)
+    // Only ONE, lit, and nothing where TWO goes.
+    expect(before.white).toBe(0)
+    expect(before.yellow).toBeGreaterThan(200)
+    expect(before.right).toBeLessThan(layout.centerX)
+    const after = letters(await frameAt(out, 50, 1080, 1920), 1080)
+    expect(after.white).toBeGreaterThan(200)
+    expect(after.yellowX).toBeGreaterThan(layout.centerX)
+    expect(placed).toBeNull()
   })
 })
 

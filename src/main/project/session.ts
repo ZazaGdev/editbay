@@ -28,6 +28,7 @@ import {
   linkClips,
   addTrack,
   removeTrack,
+  moveTrack,
   setSequenceMarks,
   setSourceMarksOn,
   setClipMark,
@@ -696,6 +697,8 @@ function clipEdit(p: Timeline, edit: ClipEdit): Timeline {
       return addTrack(p, edit.trackKind, edit.trackId)
     case 'removeTrack':
       return removeTrack(p, edit.trackId)
+    case 'moveTrack':
+      return moveTrack(p, edit.trackId, edit.to)
     case 'setTrackMuted':
       return setTrackMuted(p, edit.trackId, edit.muted)
     case 'setTrackDuck':

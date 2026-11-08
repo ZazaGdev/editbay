@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { drawCaption } from '../../../src/renderer/preview/drawCaption'
 import { drawPlan, type DrawPlan } from '../../../src/renderer/preview/compositor'
 import { addClip, createTimeline, setCaptionStyle, setCaptions, v1Clips, type ProjectMedia, type Timeline } from '../../../src/shared/project'
-import { layoutCaption, type CaptionStyleChange } from '../../../src/shared/captions'
+import { captionMoves, layoutCaption, type CaptionStyleChange } from '../../../src/shared/captions'
 import { BLUR_SIGMA_PER_ASS, POP_GROW, captionDrawing } from '../../../src/shared/caption-drawing'
 import { FULL_PLACE } from '../../../src/shared/layout'
 
@@ -167,5 +167,26 @@ describe('the word being said popping on the Output view', () => {
     const { ctx: first, marks: early } = recorder()
     drawCaption(first, t, 3, plan(t), 1)
     expect(early[0]!.x).toBeLessThan(marks[0]!.x)
+  })
+})
+
+describe('captions coming in and going out on the Output view (plan 107)', () => {
+  it('draws each word where and as faded as the export writes it on that frame', () => {
+    const t = captioned({ animation: 'pop' })
+    const { ctx, marks } = recorder()
+    drawCaption(ctx, t, 1, plan(t), 1)
+    const c = t.captions.clips[0]!
+    const layout = layoutCaption(c, t.captions.style, 1080, 1920)
+    const pieces = captionDrawing(c, t.captions.style, layout, 0, captionMoves(c, t.captions.style, 1, 30)).pieces!
+    const fills = marks.filter((m) => m.how === 'fill')
+    expect(fills.map((f) => [f.text, f.x, f.y, f.scale, f.alpha])).toEqual(pieces.map((p) => [p.text, p.x * K, p.baseline * K, p.scale, p.opacity]))
+    expect(fills[0]!.scale).toBeLessThan(1)
+  })
+
+  it('draws nothing of a word not said yet, word by word', () => {
+    const t = captioned({ animateBy: 'word' })
+    const { ctx, marks } = recorder()
+    drawCaption(ctx, t, 3, plan(t), 1)
+    expect([...new Set(marks.map((m) => m.text))]).toEqual(['ONE'])
   })
 })

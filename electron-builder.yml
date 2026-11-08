@@ -30,9 +30,11 @@ extraResources:
       - dist/**/*.js
   - from: node_modules/onnxruntime-common
     to: onnxruntime/node_modules/onnxruntime-common
+    # The code and the file that says it is CommonJS; not its type files and maps.
     filter:
       - package.json
-      - dist/cjs/**/*
+      - dist/cjs/**/*.js
+      - dist/cjs/package.json
   - from: resources/models
     to: models
   - from: resources/fonts
@@ -106,12 +108,19 @@ win:
     - from: C:/Windows/System32/vcruntime140_1.dll
       to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/vcruntime140_1.dll
 
-# The Mac (plan 104): a .dmg per chip, built on GitHub's Apple Silicon runners,
-# arm64 for M-series Macs and x64 for Intel ones (`npm run dist:mac -- --x64`,
-# with the Intel job's own minimum macOS and name, see .github/workflows/mac.yml).
+# The Mac (plan 104): one .dmg that runs on both Apple Silicon and Intel Macs
+# (task 2682), built on GitHub's Apple Silicon runners, see
+# .github/workflows/mac.yml. electron-builder packs the app once per chip and
+# joins the two; the programs below must already carry both chips, as the
+# workflow makes them: ffmpeg and ffprobe by
+# `EDITBAY_TARGET_ARCH=universal node scripts/fetch-ffmpeg.mjs`, whisper-cli by
+# `scripts/build-whisper-mac.sh universal`, and ONNX Runtime 1.23.2, the last
+# with an Intel Mac library, for both chips.
 mac:
   target:
     - target: dmg
+      arch:
+        - universal
   icon: build/icon.icns
   category: public.app-category.video
   # Not signed with Apple's certificate, so ad-hoc: Apple Silicon runs nothing
@@ -119,38 +128,55 @@ mac:
   # refuses ONNX Runtime's library and silently cuts off the microphone.
   identity: '-'
   hardenedRuntime: false
-  # ONNX Runtime 1.30's Apple Silicon library is built for macOS 14.
-  minimumSystemVersion: '14.0'
-  artifactName: Editbay-2.0-arm64.${ext}
+  # Intel Macs from macOS 13.4, Apple Silicon ones from macOS 14, as the two
+  # downloads of 2.0 were: whisper-cli's Apple Silicon half is built for 14.
+  minimumSystemVersion: '13.4'
+  # One download for every Mac, named in plain words (task 2682).
+  artifactName: Editbay-2.1-Mac.${ext}
+  # ONNX Runtime keeps one folder per chip, each a library for that chip alone,
+  # so both packs carry both folders unchanged rather than joined by lipo.
+  x64ArchFiles: Contents/Resources/onnxruntime/**
   extendInfo:
     NSMicrophoneUsageDescription: Editbay records your voice over from the microphone.
+    LSMinimumSystemVersionByArchitecture:
+      arm64: '14.0'
+      x86_64: '13.4'
   extraResources:
-    # ffmpeg and ffprobe for the chip, fetched by npm install (scripts/fetch-ffmpeg.mjs).
+    # ffmpeg and ffprobe, one program each for both chips (scripts/fetch-ffmpeg.mjs).
     - from: vendor/ffmpeg
       to: ffmpeg
       filter:
         - ffmpeg
         - ffprobe
-    # whisper.cpp's program, built by scripts/build-whisper-mac.sh, and its licence.
+    # whisper.cpp's program for both chips, built by scripts/build-whisper-mac.sh, and its licence.
     - from: vendor/whisper
       to: whisper
       filter:
         - whisper-cli
         - LICENSE
-    # ONNX Runtime's library for the chip, both its names, as the binding loads one by the other's.
-    - from: node_modules/onnxruntime-node/bin/napi-v6/darwin/${arch}
-      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/darwin/${arch}
+    # ONNX Runtime's library for each chip, in the folder the binding looks in
+    # for the chip it runs on, with all its names, as the binding loads one by the other's.
+    - from: node_modules/onnxruntime-node/bin/napi-v6/darwin
+      to: onnxruntime/node_modules/onnxruntime-node/bin/napi-v6/darwin
       filter:
-        - '*.dylib'
-        - onnxruntime_binding.node
+        - arm64/*.dylib
+        - arm64/onnxruntime_binding.node
+        - x64/*.dylib
+        - x64/onnxruntime_binding.node
 
 nsis:
   # Releases are named with two numbers, 1.0, 1.1, where people see them; package.json keeps
-  # three (1.0.0) because the build tools need it. Change this with the version.
-  artifactName: Editbay Setup 2.0.${ext}
+  # three (1.0.0) because the build tools need it. Change this with the version. The name
+  # says the system, beside the two Mac downloads, and has no spaces (task 2682).
+  artifactName: Editbay-2.1-Windows-Setup.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Editbay
+  # Editbay has no updater, so the app is packed whole, in one solid archive, rather than
+  # in blocks an updater could fetch one at a time, which made the installer 14.6 MB bigger,
+  # and there is no updater to need elevate.exe either (audit 2026-11-07).
+  differentialPackage: false
+  packElevateHelper: false

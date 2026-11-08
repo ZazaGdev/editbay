@@ -106,13 +106,70 @@ function withTrack(p: Timeline, trackId: string, change: <T extends VideoTrack |
   }
 }
 
+/**
+ * A track, with its clips, moved to another place among the tracks of its
+ * kind (task 2613): `to` counts as V1 and A1 do, 0 being V1 at the bottom of
+ * the pictures and A1 at the top of the sound. A track keeps its name; one
+ * without a name takes the number of its new place, as the others do.
+ */
+export function moveTrack(p: Timeline, trackId: string, to: number): Timeline {
+  // With captions, they are one of the pictures' tracks (task 2621): `to` is a
+  // place among the video tracks and the caption track together.
+  if (p.captions.clips.length > 0 && (trackId === CAPTION_TRACK_ID || p.videoTracks.some((r) => r.id === trackId))) {
+    const stack = p.videoTracks.map((r) => r.id)
+    stack.splice(captionsAbove(p), 0, CAPTION_TRACK_ID)
+    const from = stack.indexOf(trackId)
+    const at = Math.max(0, Math.min(stack.length - 1, Math.round(to)))
+    if (at === from) return p
+    stack.splice(from, 1)
+    stack.splice(at, 0, trackId)
+    const above = stack.indexOf(CAPTION_TRACK_ID)
+    const { above: _was, ...captions } = p.captions
+    return {
+      ...p,
+      videoTracks: stack.filter((id) => id !== CAPTION_TRACK_ID).map((id) => p.videoTracks.find((r) => r.id === id)!),
+      captions: above === p.videoTracks.length ? captions : { ...captions, above }
+    }
+  }
+  const found = trackOf(p, trackId)
+  if (!found) return p
+  const count = found.kind === 'video' ? p.videoTracks.length : p.audioTracks.length
+  const at = Math.max(0, Math.min(count - 1, Math.round(to)))
+  if (at === found.index) return p
+  const move = <T extends { id: string }>(tracks: readonly T[]): T[] => {
+    const rest = tracks.filter((r) => r.id !== trackId)
+    return [...rest.slice(0, at), tracks[found.index]!, ...rest.slice(at)]
+  }
+  return found.kind === 'video' ? { ...p, videoTracks: move(p.videoTracks) } : { ...p, audioTracks: move(p.audioTracks) }
+}
+
 /** Take away an empty track. V1 and A1 always stay. */
 export function removeTrack(p: Timeline, trackId: string): Timeline {
   const found = trackOf(p, trackId)
   if (!found || found.index === 0 || found.track.clips.length > 0) return p
+  // Captions over the track taken away are over one fewer.
+  const under = found.kind === 'video' && p.captions.above !== undefined && found.index < p.captions.above
   return {
     ...p,
     videoTracks: p.videoTracks.filter((r) => r.id !== trackId),
-    audioTracks: p.audioTracks.filter((r) => r.id !== trackId)
+    audioTracks: p.audioTracks.filter((r) => r.id !== trackId),
+    ...(under ? { captions: { ...p.captions, above: p.captions.above! - 1 } } : {})
   }
+}
+
+/** The caption track, where a track id is asked for: in a drag, or for the track shown in the Inspector. */
+export const CAPTION_TRACK_ID = 'captions'
+
+/**
+ * How many video tracks, from V1 up, the captions are drawn over (task
+ * 2621): every one of them unless the caption track was dragged down.
+ */
+export function captionsAbove(p: Timeline): number {
+  const n = p.videoTracks.length
+  return p.captions.above === undefined ? n : Math.max(0, Math.min(n, p.captions.above))
+}
+
+/** The video tracks under the captions, by id: the preview and the export draw the captions over these and under the rest. */
+export function tracksUnderCaptions(p: Timeline): Set<string> {
+  return new Set(p.videoTracks.slice(0, captionsAbove(p)).map((r) => r.id))
 }

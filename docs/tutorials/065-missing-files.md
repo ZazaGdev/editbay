@@ -1,7 +1,7 @@
 ---
 title: When a source file goes missing
 category: Getting started
-keywords: missing, moved, renamed, offline, not found, relink, find, locate, drive, red clip
+keywords: missing, moved, renamed, offline, not found, relink, find, locate, drive, red clip, network, share, another computer, nas
 ---
 
 Point Editbay at a recording that was moved, renamed or is on a drive that is not plugged in.
@@ -23,3 +23,7 @@ that same folder for the other missing files and brings back every one it finds 
 folder moved at once takes a single answer.
 
 If the file you choose is a different recording, Editbay asks before using it.
+
+Files on another computer, such as a NAS, count as missing for now when that computer does not
+answer within a few seconds as the project opens: a notice names it, and the rest of the project
+opens without waiting. Open the project again once that computer is on, and its files come back.

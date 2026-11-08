@@ -7,7 +7,7 @@ import { fixtureSet } from '../e2e/fixtures'
 import { capture, captureText } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
 import { fitInBox } from '../../src/shared/crop-geometry'
-import { chooseExportFolder, closeExport, discardUnsavedWork, openExport } from './dialogs'
+import { chooseExportFolder, closeExport, discardUnsavedWork, openExport, pressNewProject } from './dialogs'
 import { wakeSound } from './wake-sound'
 
 /**
@@ -70,7 +70,7 @@ function colourOf(r: number, g: number, b: number): Colour {
 async function fresh(mode: 'simple' | 'keys' = 'keys'): Promise<void> {
   await closeExport(page)
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="clip"]').length === 0)
   await page.evaluate((p) => window.api.importFiles([p]), targetPath)
   await page.waitForSelector('[data-testid="asset"][data-status="ready"]', { timeout: 120_000 })

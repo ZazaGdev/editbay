@@ -23,6 +23,7 @@ import { BT601_TO_709 } from './colour-space'
 import { framesToSeconds } from './time'
 import { DEFAULT_BORDER_COLOUR, blurSigma, shadowOf } from './picture-style'
 import { cropFilters, layerMove, type Clock, type Move } from './render-moves'
+import { cropFilter } from './crop-filter'
 import { level } from './render-sound'
 import { boxClock, movingBox } from './render-box-moves'
 
@@ -277,7 +278,7 @@ export function boxed(input: string, crop: string, box: Rect, blur: number | nul
   if (blur === null) return `${input}${crop},${fit},pad=${box.w}:${box.h}:(ow-iw)/2:(oh-ih)/2:color=black${clear}`
   return (
     `${input}${crop},split=2[bf${tag}][bb${tag}];` +
-    `[bb${tag}]scale=${box.w}:${box.h}:force_original_aspect_ratio=increase:flags=bilinear,crop=${box.w}:${box.h},gblur=sigma=${blur}[bg${tag}];` +
+    `[bb${tag}]scale=${box.w}:${box.h}:force_original_aspect_ratio=increase:flags=bilinear,${cropFilter(box.w, box.h)},gblur=sigma=${blur}[bg${tag}];` +
     `[bf${tag}]${fit}[fg${tag}];[bg${tag}][fg${tag}]overlay=(W-w)/2:(H-h)/2`
   )
 }
@@ -300,6 +301,14 @@ function withAlpha(alpha: string): string {
 }
 
 /**
+ * The first frame of a still source, held for good. A mask, an edge or a
+ * shadow never changes, and worked out again on every pixel of every frame it
+ * made a framed picture in picture's export 2 to 6 times slower (audit
+ * 2026-11-07, fix first 4).
+ */
+const HELD = 'trim=end_frame=1,loop=loop=-1:size=1'
+
+/**
  * A picture in picture's frame, from an open chain of its box: its corners
  * rounded, a border round it, and a shadow under it, as the preview draws
  * them. Returns the statements, the label the framed picture comes out as,
@@ -318,7 +327,14 @@ export function framedBox(
   const b = style?.border ?? 0
   if (r === 0 && b === 0 && style?.shadow !== true) return null
   const parts: string[] = []
-  parts.push(`${open},setsar=1${r > 0 ? `,${withAlpha(roundedAlpha(0, 0, box.w, box.h, r, 255))}` : ''}[pk${tag}]`)
+  if (r > 0) {
+    // The corners' mask made once, as a grey picture, and given to every frame as its alpha.
+    parts.push(
+      `${open},setsar=1,format=yuva420p[pa${tag}];` +
+        `color=c=black:s=${box.w}x${box.h}:r=${fps},format=gray,geq=lum='${roundedAlpha(0, 0, box.w, box.h, r, 255)}',${HELD}[pm${tag}];` +
+        `[pa${tag}][pm${tag}]alphamerge[pk${tag}]`
+    )
+  } else parts.push(`${open},setsar=1[pk${tag}]`)
   let label = `pk${tag}`
   const bw = box.w + 2 * b
   const bh = box.h + 2 * b
@@ -328,7 +344,7 @@ export function framedBox(
       // Made in RGB and turned into video by BT.709, as a picture's colour is:
       // the colour source's own conversion is BT.601, and red came out 15 levels off.
       `color=c=${colour}:s=${bw}x${bh}:r=${fps},format=rgba,${TO_VIDEO},format=yuva420p` +
-        `${r > 0 ? `,${withAlpha(roundedAlpha(0, 0, bw, bh, r + b, 255))}` : ''}[bd${tag}];` +
+        `${r > 0 ? `,${withAlpha(roundedAlpha(0, 0, bw, bh, r + b, 255))}` : ''},${HELD}[bd${tag}];` +
         `[bd${tag}][${label}]overlay=${b}:${b}[pb${tag}]`
     )
     label = `pb${tag}`
@@ -339,7 +355,7 @@ export function framedBox(
     const m = 3 * s.sigma + s.dy
     parts.push(
       `color=c=black:s=${bw + 2 * m}x${bh + 2 * m}:r=${fps},` +
-        `${withAlpha(roundedAlpha(m, m + s.dy, bw, bh, r > 0 ? r + b : 0, Math.round(255 * s.alpha)))},gblur=sigma=${s.sigma}[sd${tag}];` +
+        `${withAlpha(roundedAlpha(m, m + s.dy, bw, bh, r > 0 ? r + b : 0, Math.round(255 * s.alpha)))},gblur=sigma=${s.sigma},${HELD}[sd${tag}];` +
         `[sd${tag}][${label}]overlay=${m}:${m}[ps${tag}]`
     )
     label = `ps${tag}`
@@ -466,7 +482,7 @@ export function pictureGraph(
       parts.push(...frame.parts)
       parts.push(
         `[${frame.label}]format=rgba,pad=${width + 2 * m}:${height + 2 * m}:${box.x}:${box.y}:color=black@0,` +
-          `crop=${width}:${height}:${m}:${m},setsar=1,tpad=stop_mode=clone:stop=-1[${out}]`
+          `${cropFilter(width, height, m, m)},setsar=1,tpad=stop_mode=clone:stop=-1[${out}]`
       )
       return
     }
@@ -487,7 +503,7 @@ export function pictureGraph(
         // Turning and fading work in RGB, there and back by the matrix the rest uses.
         `${fitted},setsar=1,${TO_RGB},format=rgba${turnAndFade(at.free!.rotation, at.free!.opacity)},` +
           `pad=${width + 2 * margin}:${height + 2 * margin}:x=${margin}+${cx}-iw/2:y=${margin}+${cy}-ih/2:color=black@0,` +
-          `crop=${width}:${height}:${margin}:${margin},${TO_VIDEO},format=yuva420p,tpad=stop_mode=clone:stop=-1[${out}]`
+          `${cropFilter(width, height, margin, margin)},${TO_VIDEO},format=yuva420p,tpad=stop_mode=clone:stop=-1[${out}]`
       )
     } else if (i === 0) {
       const out = pictures.length === 1 ? last : `o${g}0`

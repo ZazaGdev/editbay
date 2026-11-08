@@ -8,7 +8,7 @@ import { tempoFilters } from '../../shared/render-sound'
 import { framesToSeconds } from '../../shared/time'
 import { readWhisperJson, wordsToFrames, type TimedWord } from '../../shared/captions'
 import { clipNameFromPath } from '../../shared/filename'
-import { runFfmpeg } from '../ffmpeg/run'
+import { runFfmpeg, streamFfmpeg } from '../ffmpeg/run'
 import { capture } from '../ffmpeg/spawn'
 import { exists } from '../media/cache'
 import { SpeechError } from './engine'
@@ -86,53 +86,173 @@ function level(n: number): string {
 }
 
 /**
- * The filter graph that mixes the clips heard, and the files it reads, one
- * input each however many clips are cut from it: each file's first audio
- * stream is decoded once, at whisper's rate in one channel, and split. Each
- * clip is its stretch of that, counted in samples from where the file's time
- * starts, as the export counts it, so a sound that starts a little after its
- * picture keeps that gap and its words are not heard early. Each is set to its
- * level and delayed to where it starts in the sequence; they are summed, as
- * the export's sound is, never averaged.
+ * Where a clip heard goes in the mix, in samples at whisper's rate: its file's
+ * samples `from` to `to`, counted from where the file's time starts, as the
+ * export counts it, so a sound that starts a little after its picture keeps
+ * that gap and its words are not heard early; laid at `at`, at its level.
  */
-export function mixGraph(clips: Listened[]): { inputs: string[]; graph: string } {
-  const inputs = [...new Set(clips.map((c) => c.path))]
-  const parts: string[] = []
-  const branch = new Map<string, number>()
-  const labels = clips.map((c, i) => {
-    const k = inputs.indexOf(c.path)
-    const j = branch.get(c.path) ?? 0
-    branch.set(c.path, j + 1)
-    const from = Math.round(c.fromSec * SPEECH_RATE)
-    const speed = c.speed ?? 1
-    const to = from + Math.max(1, Math.round(c.lengthSec * speed * SPEECH_RATE))
-    const delay = Math.round(c.atSec * SPEECH_RATE)
-    parts.push(
-      `[i${k}_${j}]atrim=start_sample=${from}:end_sample=${to},asetpts=PTS-STARTPTS,${speed !== 1 ? `${tempoFilters(speed)},` : ''}volume=${level(c.gain)}` +
-        `${delay > 0 ? `,adelay=${delay}S:all=1` : ''}[m${i}]`
-    )
-    return `[m${i}]`
-  })
-  const heads = inputs.map((path, k) => {
-    const n = clips.filter((c) => c.path === path).length
-    const outs = Array.from({ length: n }, (_, j) => `[i${k}_${j}]`).join('')
-    return `[${k}:a:0]aresample=${SPEECH_RATE}:async=1:first_pts=0,aformat=sample_fmts=fltp:channel_layouts=mono,${n > 1 ? `asplit=${n}` : 'anull'}${outs}`
-  })
-  const summed = labels.length > 1 ? `${labels.join('')}amix=inputs=${labels.length}:duration=longest:normalize=0[sum]` : `${labels[0]}anull[sum]`
-  return { inputs, graph: [...heads, ...parts, summed, `[sum]${SPEECH_LEVEL}[out]`].join(';\n') }
+export interface Laid {
+  from: number
+  to: number
+  at: number
+  /** Its level, as ffmpeg's volume holds it. */
+  gain: number
+  speed: number
 }
 
-/** The command that makes the mix, its filter graph read from a file: a long cut is too long a graph for a command line. */
-export function mixArgs(inputs: string[], graphPath: string, output: string): string[] {
+export function laidOut(c: Listened): Laid {
+  const from = Math.round(c.fromSec * SPEECH_RATE)
+  const speed = c.speed ?? 1
+  return { from, to: from + Math.max(1, Math.round(c.lengthSec * speed * SPEECH_RATE)), at: Math.round(c.atSec * SPEECH_RATE), gain: Math.fround(c.gain), speed }
+}
+
+/**
+ * One file's clips laid into the mix as the file's samples stream in, each
+ * stretch of them added, at its level, wherever a clip takes it; a clip at a
+ * speed has its stretch kept instead, to be stretched to its time first.
+ *
+ * Summed, as the export's sound is, never averaged. Each sample is read once
+ * however many clips are cut from the file: a filter graph that gave every
+ * clip the whole file and a mix of every clip padded to the sequence's length
+ * took 72 s for 10 minutes in 1000 pieces, squared in the pieces (audit
+ * 2026-11-07, fix first 5).
+ */
+export class Layer {
+  private readonly clips: { laid: Laid; kept?: Float32Array; got: number }[]
+  private next = 0
+  private open: Layer['clips'] = []
+  /** Where the last sample laid ends in the mix. */
+  end = 0
+
+  constructor(laid: Laid[], private readonly mix: Float32Array) {
+    this.clips = [...laid].sort((a, b) => a.from - b.from).map((l) => ({ laid: l, got: 0, ...(l.speed !== 1 ? { kept: new Float32Array(l.to - l.from) } : {}) }))
+  }
+
+  /** A stretch of the file's samples, the first of them its sample `start`. */
+  add(samples: Float32Array, start: number): void {
+    const end = start + samples.length
+    while (this.next < this.clips.length && this.clips[this.next]!.laid.from < end) this.open.push(this.clips[this.next++]!)
+    this.open = this.open.filter((c) => c.laid.to > start)
+    for (const c of this.open) {
+      const { from, to, at, gain } = c.laid
+      const a = Math.max(from, start)
+      const b = Math.min(to, end)
+      if (b <= a) continue
+      c.got = b - from
+      if (c.kept) c.kept.set(samples.subarray(a - start, b - start), a - from)
+      else {
+        for (let i = a; i < b; i++) this.mix[at + i - from]! += samples[i - start]! * gain
+        this.end = Math.max(this.end, at + b - from)
+      }
+    }
+  }
+
+  /** The clips at a speed, each with as much of its stretch as the file had. */
+  kept(): { laid: Laid; samples: Float32Array }[] {
+    return this.clips.flatMap((c) => (c.kept && c.got > 0 ? [{ laid: c.laid, samples: c.kept.subarray(0, c.got) }] : []))
+  }
+}
+
+/** Raw samples, as ffmpeg writes `f32le`, from a stream cut wherever it happened to be cut. */
+class Samples {
+  private carry = Buffer.alloc(0)
+  take(chunk: Buffer): Float32Array {
+    const bytes = this.carry.length > 0 ? Buffer.concat([this.carry, chunk]) : chunk
+    const n = Math.floor(bytes.length / 4)
+    const out = new Float32Array(n)
+    Buffer.from(out.buffer).set(bytes.subarray(0, n * 4))
+    this.carry = Buffer.from(bytes.subarray(n * 4))
+    return out
+  }
+}
+
+/** The arguments that read a file's first audio stream as one channel of raw samples at whisper's rate, up to `toSample`. */
+export function decodeArgs(path: string, toSample: number): string[] {
   return [
-    ...inputs.flatMap((path) => ['-i', path]),
-    '-/filter_complex', graphPath,
-    '-map', '[out]',
-    '-c:a', 'pcm_s16le',
-    '-ar', String(SPEECH_RATE),
-    '-ac', '1',
-    '-y', output
+    '-i', path, '-map', '0:a:0',
+    '-af', `aresample=${SPEECH_RATE}:async=1:first_pts=0,aformat=sample_fmts=flt:channel_layouts=mono,atrim=end_sample=${toSample}`,
+    '-f', 'f32le', '-'
   ]
+}
+
+/** Raw samples run through ffmpeg filters, at whisper's rate in one channel, through a scratch file. */
+async function filtered(samples: Float32Array, filters: string, scratch: string, signal?: AbortSignal): Promise<Float32Array> {
+  await writeFile(scratch, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength))
+  try {
+    const parts: Float32Array[] = []
+    const reader = new Samples()
+    await streamFfmpeg(['-f', 'f32le', '-ar', String(SPEECH_RATE), '-ac', '1', '-i', scratch, '-af', filters, '-f', 'f32le', '-'], (chunk) => parts.push(reader.take(chunk)), signal)
+    const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0))
+    let at = 0
+    for (const p of parts) {
+      out.set(p, at)
+      at += p.length
+    }
+    return out
+  } finally {
+    await rm(scratch, { force: true })
+  }
+}
+
+/**
+ * Mix the clips heard into `output`, one channel of 16-bit samples at 16 kHz,
+ * levelled: each file read once, its clips laid in where they are heard, the
+ * clips at a speed stretched by ffmpeg first, then the whole levelled in one
+ * pass. `onProgress` hears the share done.
+ */
+export async function mixClips(
+  clips: Listened[],
+  output: string,
+  opts: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {}
+): Promise<void> {
+  const files = [...new Set(clips.map((c) => c.path))].map((path) => ({ path, laid: clips.filter((c) => c.path === path).map(laidOut) }))
+  // Room for every clip, a stretched one with some to spare: the mix is cut to what was laid.
+  const room = Math.max(1, ...files.flatMap((f) => f.laid.map((l) => l.at + Math.ceil((l.to - l.from) / l.speed) + SPEECH_RATE)))
+  let mix = new Float32Array(room)
+  const needed = files.reduce((n, f) => n + Math.max(...f.laid.map((l) => l.to)), 0)
+  let read = 0
+  let end = 0
+  const later: { laid: Laid; samples: Float32Array }[] = []
+  for (const f of files) {
+    const toSample = Math.max(...f.laid.map((l) => l.to))
+    const layer = new Layer(f.laid, mix)
+    const reader = new Samples()
+    let at = 0
+    await streamFfmpeg(
+      decodeArgs(f.path, toSample),
+      (chunk) => {
+        const samples = reader.take(chunk)
+        layer.add(samples, at)
+        at += samples.length
+        read += samples.length
+        opts.onProgress?.(Math.min(0.9, (0.9 * read) / Math.max(1, needed)))
+      },
+      opts.signal
+    )
+    end = Math.max(end, layer.end)
+    later.push(...layer.kept())
+  }
+  for (const [i, k] of later.entries()) {
+    const heard = await filtered(k.samples, `${tempoFilters(k.laid.speed)},volume=${level(k.laid.gain)}`, `${output}.${i}.raw`, opts.signal)
+    if (k.laid.at + heard.length > mix.length) {
+      const grown = new Float32Array(k.laid.at + heard.length)
+      grown.set(mix)
+      mix = grown
+    }
+    for (let j = 0; j < heard.length; j++) mix[k.laid.at + j]! += heard[j]!
+    end = Math.max(end, k.laid.at + heard.length)
+  }
+  const raw = `${output}.raw`
+  await writeFile(raw, Buffer.from(mix.buffer, 0, Math.max(1, end) * 4))
+  try {
+    await runFfmpeg(
+      ['-f', 'f32le', '-ar', String(SPEECH_RATE), '-ac', '1', '-i', raw, '-af', SPEECH_LEVEL, '-c:a', 'pcm_s16le', '-ar', String(SPEECH_RATE), '-ac', '1', '-y', output],
+      opts.signal ? { signal: opts.signal } : {}
+    )
+  } finally {
+    await rm(raw, { force: true })
+  }
+  opts.onProgress?.(1)
 }
 
 /**
@@ -196,19 +316,7 @@ export async function makeMix(
       c.copy ? `${c.label} is not ready yet. Try again once it has been prepared.` : `${c.label} cannot be found. Find it in the bin, then try again.`
     )
   }
-  const { inputs, graph } = mixGraph(clips)
-  const graphPath = `${output}.txt`
-  await writeFile(graphPath, graph)
-  const totalMs = Math.max(1, ...clips.map((c) => (c.atSec + c.lengthSec) * 1000))
-  const onProgress = opts.onProgress
-  try {
-    await runFfmpeg(mixArgs(inputs, graphPath, output), {
-      ...(onProgress ? { onProgress: (u) => u.timeMs !== undefined && onProgress(Math.min(1, u.timeMs / totalMs)) } : {}),
-      ...(opts.signal ? { signal: opts.signal } : {})
-    })
-  } finally {
-    await rm(graphPath, { force: true })
-  }
+  await mixClips(clips, output, opts)
 }
 
 /**

@@ -61,10 +61,18 @@ async function cutFrame(): Promise<number> {
 
 /** Put the pointer over the cut on V1 so the seam button appears, and click it. */
 async function addAtTheCut(): Promise<void> {
+  // The button is worked out as the pointer moves, against the timeline as it
+  // is drawn: a transition just taken away may still be drawn on the cut for a
+  // moment, so the pointer comes over it again until the button shows.
   const row = (await page.locator('[data-testid="track"][data-track-id="v1"]').boundingBox())!
-  const clip = (await page.locator('[data-testid="clip"][data-kind="video"]').nth(1).boundingBox())!
-  await page.mouse.move(clip.x, row.y + row.height / 2)
-  await page.waitForSelector('[data-testid="seam-add"]', WAIT)
+  await expect
+    .poll(async () => {
+      const clip = (await page.locator('[data-testid="clip"][data-kind="video"]').nth(1).boundingBox())!
+      await page.mouse.move(clip.x - 40, row.y + row.height / 2)
+      await page.mouse.move(clip.x, row.y + row.height / 2, { steps: 4 })
+      return page.locator('[data-testid="seam-add"]').isVisible()
+    }, WAIT)
+    .toBe(true)
   await page.locator('[data-testid="seam-add"]').click()
   await page.waitForSelector(TRANSITION, WAIT)
 }

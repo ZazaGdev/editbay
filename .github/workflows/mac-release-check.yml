@@ -81,10 +81,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # From 2.1 one .dmg, Editbay-<version>-Mac.dmg, is for both chips
+          # and each kind of Mac checks it (task 2682); 2.0's ended in the chip's name.
           - chip: arm64
+            file: Mac
             runner: macos-15
             node_arch: arm64
           - chip: intel
+            file: Mac
             runner: macos-15-intel
             node_arch: x64
     name: ${{ matrix.chip }}
@@ -123,15 +127,15 @@ jobs:
           mkdir dl && cd dl
           if [ -n "${{ inputs.build_run }}" ]; then
             # A build not yet released: the .dmg a Mac workflow run kept, checked against its own hash.
-            gh run download "${{ inputs.build_run }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}"
-            DMG="$(ls */release/Editbay-*-${{ matrix.chip }}.dmg)"
+            gh run download "${{ inputs.build_run }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.file }}" --pattern "Editbay-*-${{ matrix.chip }}"
+            DMG="$(ls */release/Editbay-*-${{ matrix.file }}.dmg */release/Editbay-*-${{ matrix.chip }}.dmg 2>/dev/null | head -1)"
             HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
             echo "$DMG $HASH"
             grep -q "$HASH" "$DMG.sha256"
             echo "The hash matches the one the build kept."
           else
-            gh release download "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.chip }}.dmg"
-            DMG="$(ls Editbay-*-${{ matrix.chip }}.dmg)"
+            gh release download "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern "Editbay-*-${{ matrix.file }}.dmg" --pattern "Editbay-*-${{ matrix.chip }}.dmg"
+            DMG="$(ls Editbay-*-${{ matrix.file }}.dmg Editbay-*-${{ matrix.chip }}.dmg 2>/dev/null | head -1)"
             HASH="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
             echo "$DMG $HASH"
             gh release view "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json body --jq .body | grep -q "$HASH"

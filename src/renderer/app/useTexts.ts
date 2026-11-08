@@ -95,11 +95,13 @@ export function useTexts({
       const ask = (textAsked.current.get(mediaId) ?? 0) + 1
       textAsked.current.set(mediaId, ask)
       if (!continuing) textStepUnbegun.current.add(mediaId)
+      // Kept for the project it was changed in, not one opened while it was drawn.
+      const madeIn = proj.openDoc()
       const drawn = await renderText(style)
       if (textAsked.current.get(mediaId) !== ask) return
       const joins = continuing && !textStepUnbegun.current.has(mediaId)
       textStepUnbegun.current.delete(mediaId)
-      await proj.edit({ kind: 'setText', mediaId, style, drawn }, { unrecorded, ...(joins ? { continuing: true } : {}) })
+      await proj.edit({ kind: 'setText', mediaId, style, drawn }, { unrecorded, madeIn, ...(joins ? { continuing: true } : {}) })
     },
     [proj]
   )

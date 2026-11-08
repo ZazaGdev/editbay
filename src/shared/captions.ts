@@ -45,6 +45,11 @@ export interface Captions {
   listenTo: string[]
   /** Whether a caption has been changed by hand since they were made, so making them again asks first. */
   edited: boolean
+  /**
+   * How many video tracks, from V1 up, the captions are drawn over (task
+   * 2621). Absent while they sit on top of them all, as they always did.
+   */
+  above?: number
 }
 
 /** A word at frames of its own in the sequence. */
@@ -603,6 +608,7 @@ function range(from: number, to: number): number[] {
 }
 
 export * from './caption-style'
+export { CAPTION_ANIMATIONS, captionMoves, type CaptionAnimation, type CaptionAnimateBy, type CaptionMove } from './caption-motion'
 
 // What moved out of this file, by what it does. Everything that was exported
 // here still is, so every file goes on importing from this one.

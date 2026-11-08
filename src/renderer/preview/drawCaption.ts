@@ -1,5 +1,5 @@
 import { targetAspect, type Timeline } from '../../shared/project'
-import { captionAt, captionFontOf, drawnWord, layoutCaption, wordAt, type CaptionStyle } from '../../shared/captions'
+import { captionAt, captionFontOf, captionMoves, drawnWord, layoutCaption, wordAt, type CaptionStyle } from '../../shared/captions'
 import { BLUR_SIGMA_PER_ASS, captionDrawing, type CaptionPiece, type CaptionRect } from '../../shared/caption-drawing'
 import type { DrawPlan } from './compositor'
 
@@ -23,7 +23,8 @@ export function drawCaption(ctx: CanvasRenderingContext2D, timeline: Timeline, f
   // Monitor pixels per output pixel.
   const k = plan.frame.w / W
   const lit = wordAt(c, frame)
-  const drawing = captionDrawing(c, style, layout, lit)
+  // Plan 107: coming in or going out, every word is placed and faded on its own.
+  const drawing = captionDrawing(c, style, layout, lit, captionMoves(c, style, frame, timeline.fps))
   const X = (x: number): number => plan.frame.x + x * k
   const Y = (y: number): number => plan.frame.y + y * k
   ctx.save()
@@ -131,7 +132,9 @@ function drawPieces(
   overGlow: () => void
 ): void {
   const each = (p: CaptionPiece, draw: () => void): void => {
+    if (p.opacity <= 0) return
     ctx.save()
+    ctx.globalAlpha = p.opacity
     ctx.translate(X(p.x), Y(p.baseline))
     ctx.scale(p.scale, p.scale)
     draw()

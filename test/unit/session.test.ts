@@ -161,6 +161,7 @@ describe('applyEditTo', () => {
       link: { kind: 'link', clipIds: ['x', 'y'] },
       addTrack: { kind: 'addTrack', trackKind: 'video', trackId: 'V2' },
       removeTrack: { kind: 'removeTrack', trackId: 'empty' },
+      moveTrack: { kind: 'moveTrack', trackId: 'empty', to: 0 },
       setCrop: { kind: 'setCrop', clipId: 'x', rect: { x: 0, y: 0, w: 1080, h: 1080 } },
       setZoomKey: { kind: 'setZoomKey', clipId: 'x', at: 90, crop: { x: 100, y: 0, w: 540, h: 960 } },
       removeZoomKey: { kind: 'removeZoomKey', clipId: 'x', at: 60 },

@@ -5,6 +5,7 @@ import { defaultWorkspace, type Workspace } from '../../shared/workspace'
 import { joinProjectFile, splitProjectFile, mediaPathCandidates, withOriginalAt } from '../../shared/project-file'
 import { writeAtomic, exists } from '../media/cache'
 import { mayUse, shareOf, sharesToAsk, usableProject, type PathRules, type Withheld } from '../../shared/source-paths'
+import { silentShares } from './share-patience'
 
 /**
  * The project alone, as text. This is what "has it changed since it was saved"
@@ -33,6 +34,8 @@ export interface LoadedProject {
   fileSchema: number
   /** Where each source kept offline really was, to be written back there. */
   withheld: Map<string, Withheld>
+  /** Shares the sources are on whose computer did not answer in time, kept offline for now. */
+  unreachable: string[]
 }
 
 /** Whether two files look like copies of one: the same size, last changed within two seconds of each other. */
@@ -53,6 +56,12 @@ export interface SourceAccess extends PathRules {
    * before anything touches them. Resolves to the ones the user allows.
    */
   ask: (shares: string[]) => Promise<string[]>
+  /**
+   * Of the allowed shares the sources are on, those whose computer does not
+   * answer in time, which are kept offline for this open. Asks the network,
+   * see share-patience.ts, unless given.
+   */
+  silent?: (shares: string[]) => Promise<string[]>
 }
 
 /**
@@ -74,6 +83,11 @@ export async function loadProjectFrom(target: string, access: SourceAccess): Pro
   if (own !== null) allowed.add(own)
   const toAsk = sharesToAsk(file.project.media, allowed)
   if (toAsk.length > 0) for (const s of await access.ask(toAsk)) if (toAsk.includes(s)) allowed.add(s)
+  // A computer that is off is kept offline after a few seconds, not after Windows's 21:
+  // its files show as missing until the project is opened with it on (audit 2026-11-07).
+  const used = sharesToAsk(file.project.media, new Set()).filter((s) => allowed.has(s) && s !== own)
+  const unreachable = used.length > 0 ? await (access.silent ?? silentShares)(used) : []
+  for (const s of unreachable) allowed.delete(s)
   const rules: PathRules = { ...access, allowed }
 
   const usable = usableProject(file.project.media, file.workspace, rules)
@@ -100,5 +114,5 @@ export async function loadProjectFrom(target: string, access: SourceAccess): Pro
   for (const m of project.media) {
     if (!(await exists(m.playablePath))) missingMedia.push(m.id)
   }
-  return { project, workspace: usable.workspace, missingMedia, fileSchema: file.fileSchema, withheld: usable.withheld }
+  return { project, workspace: usable.workspace, missingMedia, fileSchema: file.fileSchema, withheld: usable.withheld, unreachable }
 }

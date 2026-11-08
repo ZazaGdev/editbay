@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { captureText } from './spawn'
+import { captureText, type SpawnOptions } from './spawn'
 
 // A Mac program has no extension (plan 104).
 const EXE = process.platform === 'win32' ? '.exe' : ''
@@ -49,7 +49,6 @@ export interface FfmpegCapabilities {
   hasZscale: boolean
 }
 
-let cached: FfmpegCapabilities | null = null
 let gpu: Promise<boolean> | null = null
 
 /**
@@ -73,20 +72,41 @@ export function canEncodeOnGpu(): Promise<boolean> {
 /** How long the graphics card is given to encode its one test frame. */
 const GPU_CHECK_MS = 15_000
 
-/**
- * Check the bundled binaries and report what they can do.
- * Throws when libx264, aac or pcm_s16le is missing, because nothing in the app
- * works without them.
- */
-export async function verifyFfmpeg(): Promise<FfmpegCapabilities> {
-  if (cached) return cached
+/** Runs one check of the bundled binaries and gives what it printed. */
+export type CheckRunner = (binary: string, args: string[], opts: SpawnOptions) => Promise<string>
 
+/**
+ * How long each check may take before ffmpeg is taken as unusable. A first
+ * start, with the virus scanner reading both programs, takes under a second
+ * (audit 2026-11-07); one that hung kept the app from opening at all.
+ */
+const CHECK_MS = 30_000
+
+let checking: Promise<FfmpegCapabilities> | null = null
+
+/**
+ * Check the bundled binaries and report what they can do. Everyone who asks
+ * while a check runs shares it, and one that failed is tried again when next
+ * asked. Throws when a check fails or takes too long, or when libx264, aac or
+ * pcm_s16le is missing, because nothing in the app works without them; the
+ * window says so in a banner.
+ */
+export function verifyFfmpeg(run: CheckRunner = captureText): Promise<FfmpegCapabilities> {
+  checking ??= checkBinaries(run).catch((err: unknown) => {
+    checking = null
+    throw err
+  })
+  return checking
+}
+
+async function checkBinaries(run: CheckRunner): Promise<FfmpegCapabilities> {
+  const limit = { timeoutMs: CHECK_MS }
   // All four at once: in turn, they held the window back four times over (audit 2026-10-01).
   const [versionOut, encoderOut, filterOut] = await Promise.all([
-    captureText(ffmpegPath, ['-hide_banner', '-version']),
-    captureText(ffmpegPath, ['-hide_banner', '-encoders']),
-    captureText(ffmpegPath, ['-hide_banner', '-filters']),
-    captureText(ffprobePath, ['-hide_banner', '-version'])
+    run(ffmpegPath, ['-hide_banner', '-version'], limit),
+    run(ffmpegPath, ['-hide_banner', '-encoders'], limit),
+    run(ffmpegPath, ['-hide_banner', '-filters'], limit),
+    run(ffprobePath, ['-hide_banner', '-version'], limit)
   ])
   const version = versionOut.split('\n')[0] ?? 'unknown'
   const encoders = parseEncoderList(encoderOut)
@@ -101,6 +121,5 @@ export async function verifyFfmpeg(): Promise<FfmpegCapabilities> {
 
   const hasZscale = /\bzscale\b/.test(filterOut)
 
-  cached = { version, encoders, hasZscale }
-  return cached
+  return { version, encoders, hasZscale }
 }

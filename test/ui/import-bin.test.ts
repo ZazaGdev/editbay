@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
 import { capture } from '../../src/main/ffmpeg/spawn'
 import { ffmpegPath } from '../../src/main/ffmpeg/locate'
-import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { answerSaveDialog, discardUnsavedWork, pressNewProject } from './dialogs'
 import { wakeSound } from './wake-sound'
 
 /**
@@ -71,7 +71,7 @@ afterAll(async () => {
 async function fresh(): Promise<void> {
   // Out of the search box, which keeps keys for itself, as a text box does.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"]').length === 0)
 }
 

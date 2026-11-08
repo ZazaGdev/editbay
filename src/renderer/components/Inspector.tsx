@@ -24,6 +24,7 @@ import { Level, SoundSection } from './InspectorSound'
 import { SpeedSection } from './InspectorSpeed'
 import { CaptionPanel } from './InspectorCaptions'
 import { PicturePanel } from './InspectorPicture'
+import { TrackPanel } from './InspectorTrack'
 import { Sections } from './section-host'
 
 export { Level }
@@ -87,6 +88,13 @@ interface InspectorProps {
   alsoChanged?: readonly string[] | undefined
   /** The selected caption, when a caption is selected rather than a clip. */
   captionId: string | null
+  /** The track whose header was clicked, when no clip or caption is selected: a track's id, or 'captions' (task 2612). */
+  trackId?: string | null | undefined
+  /** The tracks heard alone, and hearing one alone or not, for a selected audio track. */
+  solo?: ReadonlySet<string> | undefined
+  onSolo?: ((trackId: string, on: boolean) => void) | undefined
+  /** Open how captions look, for the caption track selected. */
+  onCaptionLook?: (() => void) | undefined
   aspectLocked: boolean
   onAspectLock: (locked: boolean) => void
   /** The picture being edited: the main one, or a layer's id. */
@@ -192,6 +200,18 @@ function InspectorBody(props: InspectorProps): JSX.Element | null {
   const found = props.clipId ? findClip(t, props.clipId) : null
   if (!found) {
     if (only !== null) return null
+    if (props.trackId) {
+      return (
+        <TrackPanel
+          timeline={t}
+          trackId={props.trackId}
+          onEdit={props.onEdit}
+          solo={props.solo}
+          onSolo={props.onSolo}
+          onCaptionLook={props.onCaptionLook}
+        />
+      )
+    }
     return (
       <section>
         {heading('Clip')}

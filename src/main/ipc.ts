@@ -282,7 +282,11 @@ export function registerIpc(): void {
 
   ipcMain.handle('project:current', (): Project => session.getProject())
 
-  ipcMain.handle('project:session', (): OpenedDocument => lifecycle.snapshot())
+  // Once the project the app starts with is open, which the window now asks for as soon as it is up.
+  ipcMain.handle('project:session', async (): Promise<OpenedDocument> => {
+    await lifecycle.openedAtStart()
+    return lifecycle.snapshot()
+  })
 
   // Edits and undo name the document they were made in. One that arrives
   // after another document has opened, such as an undo pressed just as a
@@ -358,7 +362,10 @@ export function registerIpc(): void {
     lifecycle.forgetRecentProject(path)
   )
 
-  ipcMain.handle('recovery:offer', (): RecoveryOffer | null => lifecycle.recoveryOffer())
+  ipcMain.handle('recovery:offer', async (): Promise<RecoveryOffer | null> => {
+    await lifecycle.openedAtStart()
+    return lifecycle.recoveryOffer()
+  })
   ipcMain.handle('recovery:restore', (event): Promise<void> =>
     lifecycle.restoreRecovery(BrowserWindow.fromWebContents(event.sender))
   )

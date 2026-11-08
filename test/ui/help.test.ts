@@ -4,7 +4,7 @@ import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fixtureSet } from '../e2e/fixtures'
-import { answerSaveDialog, discardUnsavedWork } from './dialogs'
+import { answerSaveDialog, discardUnsavedWork, pressNewProject } from './dialogs'
 import { wakeSound } from './wake-sound'
 
 /**
@@ -50,7 +50,7 @@ afterAll(async () => {
 
 async function newProject(): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await page.keyboard.press('ControlOrMeta+n')
+  await pressNewProject(page)
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="asset"]').length === 0)
 }
 

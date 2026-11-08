@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { availableParallelism } from 'node:os'
 import { copyFile, lstat, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import {
@@ -72,6 +73,26 @@ function standIns(outputs: string[]): Map<string, string> {
 export function withCardDecoding(args: string[], platform: NodeJS.Platform = process.platform): string[] {
   if (platform !== 'win32') return args
   return args.flatMap((a, i) => (a === '-i' && args[i - 1] !== '-hwaccel' ? ['-hwaccel', 'd3d11va', a] : [a]))
+}
+
+/**
+ * How long a segment is before its recordings are decoded on the card.
+ * Starting the card's decoder costs more than it saves on a short one: a
+ * one-frame segment took 294 ms with it and 130 ms without, and on the PC the
+ * audit ran on it was no faster on long ones either (audit 2026-11-07, fix
+ * first 6), where another measured it 12 to 16 percent faster (7cc0dd56).
+ */
+const CARD_FROM_MS = 20_000
+
+/**
+ * How many segments are encoded at once: two on a machine with eight or more
+ * processor threads, one otherwise. One x264 does not keep eight threads busy
+ * through a short segment's start and end, so two finish many short segments
+ * about a third sooner; on fewer threads they would only share them. Each
+ * ffmpeg can hold about 1.5 GB at its peak.
+ */
+export function segmentsAtOnce(threads = availableParallelism()): number {
+  return threads >= 8 ? 2 : 1
 }
 
 /** A command's arguments with each finished file's name swapped for its stand-in. */
@@ -198,8 +219,8 @@ export interface RunExportOptions {
 /**
  * Execute a render plan.
  *
- * Segments run one at a time: two simultaneous x264 encodes saturate the CPU and
- * neither finishes sooner. The scratch directory is removed whether the export
+ * Segments run in order, two at once on a machine with the threads for it
+ * (`segmentsAtOnce`). The scratch directory is removed whether the export
  * succeeds, fails or is cancelled, and so is every finished file still under
  * its stand-in name, so a broken run leaves nothing behind and replaces nothing.
  */
@@ -260,52 +281,61 @@ export async function runExport(opts: RunExportOptions): Promise<string[]> {
       }
     }
 
-    for (const segment of plan.segments) {
+    // One segment failing stops the other running beside it.
+    const stop = new AbortController()
+    const passOn = (): void => stop.abort()
+    if (signal?.aborted) stop.abort()
+    signal?.addEventListener('abort', passOn, { once: true })
+    /** How far each segment running has got, in frames. */
+    const running = new Map<number, number>()
+    const runSegment = async (segment: RenderPlan['segments'][number]): Promise<void> => {
       if (signal?.aborted) throw new ProcessError('cancelled', null, '')
       if (segment.subtitles) await writeFile(join(scratchDir, segment.subtitles.name), segment.subtitles.content)
       if (segment.graph) await writeFile(join(scratchDir, segment.graph.name), segment.graph.content)
 
       const segmentMs = (segment.frames / fps) * 1000
-      report({
-        stage: 'segment',
-        clipIndex: segment.index,
-        clipLabel: segment.label,
-        clipCount: plan.segments.length,
-        fraction: (doneFrames / total) * SEGMENT_SHARE
-      })
+      const progressed = (): void => {
+        let frames = doneFrames
+        for (const f of running.values()) frames += f
+        report({
+          stage: 'segment',
+          clipIndex: segment.index,
+          clipLabel: segment.label,
+          clipCount: plan.segments.length,
+          fraction: (frames / total) * SEGMENT_SHARE
+        })
+      }
+      running.set(segment.index, 0)
+      progressed()
 
       const encode = (args: string[]): Promise<void> =>
         runFfmpeg(writingTo(args, stand), {
           onProgress: (u) => {
             if (u.timeMs === undefined || segmentMs <= 0) return
-            const within = Math.min(1, u.timeMs / segmentMs)
-            report({
-              stage: 'segment',
-              clipIndex: segment.index,
-              clipLabel: segment.label,
-              clipCount: plan.segments.length,
-              fraction: ((doneFrames + within * segment.frames) / total) * SEGMENT_SHARE
-            })
+            running.set(segment.index, Math.min(1, u.timeMs / segmentMs) * segment.frames)
+            progressed()
           },
-          ...(signal ? { signal } : {}),
+          signal: stop.signal,
           // Where its captions' file and font are, which its filter names by
           // relative paths, and its filter graph when that is in a file.
           cwd: scratchDir
         }).then(() => undefined)
       try {
-        const card = withCardDecoding(segment.args)
+        const card = segmentMs > CARD_FROM_MS ? withCardDecoding(segment.args) : segment.args
         try {
           await encode(card)
         } catch (err) {
           // A card or driver that fails part way: the processor decodes it instead.
-          if (signal?.aborted || card === segment.args) throw err
+          if (stop.signal.aborted || card === segment.args) throw err
           await encode(segment.args)
         }
       } catch (err) {
-        if (signal?.aborted) throw err
+        if (stop.signal.aborted) throw err
         // Name the clip. "ffmpeg exited with code 1" on its own is useless when
         // there are twenty segments.
         throw new ExportFailure(`Clip ${segment.index} (${segment.label}) could not be exported.`, detailsOf(err))
+      } finally {
+        running.delete(segment.index)
       }
 
       doneFrames += segment.frames
@@ -313,6 +343,28 @@ export async function runExport(opts: RunExportOptions): Promise<string[]> {
       // next one: a batch stopped at clip 39 keeps the 38 before it.
       if (!plan.join) await settle(segment.output)
     }
+
+    // Taken in order, by as many at once as the machine runs well; the first
+    // failure is the one told, the other stopped beside it.
+    let next = 0
+    let failed: unknown = null
+    const worker = async (): Promise<void> => {
+      while (failed === null && next < plan.segments.length) {
+        const segment = plan.segments[next++]!
+        try {
+          await runSegment(segment)
+        } catch (err) {
+          if (failed === null) failed = err
+          stop.abort()
+        }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(segmentsAtOnce(), plan.segments.length) }, worker))
+    } finally {
+      signal?.removeEventListener('abort', passOn)
+    }
+    if (failed !== null) throw failed
 
     if (plan.join) {
       if (signal?.aborted) throw new ProcessError('cancelled', null, '')

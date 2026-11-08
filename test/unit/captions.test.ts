@@ -572,7 +572,9 @@ describe('how a caption looks, set by hand', () => {
       glowColour: DEFAULT_CAPTION_STYLE.glowColour,
       popGrow: false,
       popBox: false,
-      popBoxColour: DEFAULT_CAPTION_STYLE.popBoxColour
+      popBoxColour: DEFAULT_CAPTION_STYLE.popBoxColour,
+      animation: 'none',
+      animateBy: 'line'
     })
   })
 
